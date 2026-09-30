@@ -167,6 +167,8 @@ CREATE TABLE IF NOT EXISTS directory_scan_task (
 CREATE TABLE IF NOT EXISTS export_task (
     id          BIGINT AUTO_INCREMENT PRIMARY KEY,
     comic_id    BIGINT      NOT NULL,
+    comic_ids   TEXT        NULL,
+    format      VARCHAR(32) NOT NULL DEFAULT 'ZIP',
     status      VARCHAR(20) NOT NULL DEFAULT 'PENDING',
     progress    SMALLINT    NOT NULL DEFAULT 0,
     output_root VARCHAR(20),

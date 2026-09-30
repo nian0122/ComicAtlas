@@ -2,6 +2,7 @@ package com.comicatlas.api.exporter.service.impl;
 
 import com.comicatlas.contract.common.constant.HttpStatusCodes;
 import com.comicatlas.api.exporter.enums.ExportTaskStatus;
+import com.comicatlas.common.constant.ExportFormats;
 import com.comicatlas.contract.common.exception.BusinessException;
 import com.comicatlas.api.storage.config.ApiStorageProperties;
 import com.comicatlas.api.storage.PathTraversalException;
@@ -54,6 +55,9 @@ public class ExportArtifactServiceImpl implements com.comicatlas.api.exporter.se
         if (task.getStatus() != ExportTaskStatus.SUCCESS) {
             throw new BusinessException(HttpStatusCodes.CONFLICT,
                     "导出任务未完成，无法提供产物清单，当前状态: " + task.getStatus());
+        }
+        if (ExportFormats.BATCH_DIRECTORY.equalsIgnoreCase(task.getFormat())) {
+            return List.of();
         }
         String outputPath = task.getOutputPath();
         if (outputPath == null || outputPath.isBlank()) {

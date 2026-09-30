@@ -42,15 +42,23 @@ public class ContentReactionManagementServiceImpl implements ContentReactionMana
             LambdaQueryWrapper<Comic> query = new LambdaQueryWrapper<Comic>()
                     .in(Comic::getReaction, MediaReaction.LIKE, MediaReaction.DISLIKE)
                     .orderByDesc(Comic::getReactionAt).orderByAsc(Comic::getId);
-            if (reaction != null) query.eq(Comic::getReaction, reaction);
-            if (!includeTrashed) query.eq(Comic::getStatus, ComicStatus.READY);
+            if (reaction != null) {
+                query.eq(Comic::getReaction, reaction);
+            }
+            if (!includeTrashed) {
+                query.eq(Comic::getStatus, ComicStatus.READY);
+            }
             return comicMapper.selectList(query).stream().map(this::toComicView).toList();
         }
         LambdaQueryWrapper<Chapter> query = new LambdaQueryWrapper<Chapter>()
                 .in(Chapter::getReaction, MediaReaction.LIKE, MediaReaction.DISLIKE)
                 .orderByDesc(Chapter::getReactionAt).orderByAsc(Chapter::getId);
-        if (reaction != null) query.eq(Chapter::getReaction, reaction);
-        if (!includeTrashed) query.eq(Chapter::getStatus, ChapterLifecycleStatus.READY);
+        if (reaction != null) {
+            query.eq(Chapter::getReaction, reaction);
+        }
+        if (!includeTrashed) {
+            query.eq(Chapter::getStatus, ChapterLifecycleStatus.READY);
+        }
         return chapterMapper.selectList(query).stream().map(this::toChapterView).toList();
     }
 

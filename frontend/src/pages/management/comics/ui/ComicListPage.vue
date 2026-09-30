@@ -116,6 +116,9 @@
         <AppButton variant="secondary" :disabled="selectedIds.length === 0" @click="showBatchDialog = true">
           批量编辑
         </AppButton>
+        <AppButton variant="danger" :disabled="selectedIds.length === 0 || exporting" @click="exportSelectedDirectory">
+          {{ exporting ? '创建中…' : '移出并导出文件夹' }}
+        </AppButton>
       </div>
     </div>
 
@@ -173,6 +176,26 @@
       </AppButton>
     </div>
 
+    <div v-if="directoryExportTask" class="directory-export-status" role="status">
+      <div class="directory-export-status__copy">
+        <strong>批量文件夹导出 #{{ directoryExportTask.id }}</strong>
+        <span v-if="directoryExportTask.status === 'PENDING'">等待处理</span>
+        <span v-else-if="directoryExportTask.status === 'RUNNING'"
+          >正在移动媒体目录（{{ directoryExportTask.progress }}%）</span
+        >
+        <span v-else-if="directoryExportTask.status === 'SUCCESS'"
+          >导出完成：{{ directoryExportTask.physicalPath || directoryExportTask.outputPath }}</span
+        >
+        <span v-else class="directory-export-status__error"
+          >导出失败：{{ directoryExportTask.errorMsg || '任务处理失败' }}</span
+        >
+      </div>
+      <AppButton v-if="directoryExportTask.status === 'SUCCESS'" variant="secondary" @click="openDirectoryExport">
+        打开导出目录
+      </AppButton>
+      <AppButton variant="text" aria-label="关闭导出任务状态" @click="clearDirectoryExportTask">关闭</AppButton>
+    </div>
+
     <BatchEditDialog v-model:visible="showBatchDialog" :comic-ids="selectedIds" @saved="onBatchSaved" />
     <BatchComicOperationDialog
       v-model:visible="showBatchOperationDialog"
@@ -189,14 +212,15 @@ import { ContentState } from '@/shared/ui/content-state'
 import { StatGrid } from '@/shared/ui/management-panel'
 import { StatCard } from '@/shared/ui/management-panel'
 import { PageHeader } from '@/shared/ui/page-header'
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { useRouter } from 'vue-router'
 import { useManagementComicStore } from '@/pages/management/comics/model/management-comic-store'
 import { useCategoryStore } from '@/entities/category'
 import { useTagStore } from '@/entities/tag'
 import { BatchEditDialog } from '@/features/comic-batch-edit'
 import { BatchComicOperationDialog } from '@/features/comic-batch-operations'
-import type { StorageStats } from '@/entities/storage'
+import { exportApi, type StorageStats } from '@/entities/storage'
 import { storageService } from '@/features/storage'
 import { COMIC_STATUSES, comicStatusMeta } from '@/entities/comic'
 import type { ManagementTaskType } from '@/entities/task'
@@ -238,6 +262,9 @@ const selectedIds = ref<number[]>([])
 const showBatchDialog = ref(false)
 const showBatchOperationDialog = ref(false)
 const selectedBatchOperation = ref<ComicBatchOperation>('LQ_GENERATE')
+const exporting = ref(false)
+const directoryExportTask = ref<Awaited<ReturnType<typeof exportApi.getTask>>['data'] | null>(null)
+let directoryExportPollTimer: ReturnType<typeof setTimeout> | undefined
 
 const {
   filters,
@@ -282,6 +309,64 @@ function onBatchOperationCompleted() {
   store.fetchList()
 }
 
+async function exportSelectedDirectory(): Promise<void> {
+  if (selectedIds.value.length === 0 || exporting.value) return
+  try {
+    await ElMessageBox.confirm(
+      `将移动所选 ${selectedIds.value.length} 本漫画的媒体目录，并从 ComicAtlas 移除这些漫画。完成后无法在本系统阅读或恢复。请确认导出目录可用。`,
+      '确认批量移出并导出',
+      { type: 'warning', confirmButtonText: '移出并导出', cancelButtonText: '取消' },
+    )
+    exporting.value = true
+    const task = await exportApi.createBatchDirectoryExport([...selectedIds.value])
+    directoryExportTask.value = task.data
+    scheduleDirectoryExportPoll()
+    ElMessage.success(`批量导出任务 ${task.data.id} 已创建，可在任务中心查看进度`)
+    selectedIds.value = []
+    await store.fetchList()
+  } catch (error: unknown) {
+    if (error !== 'cancel' && error !== 'close') {
+      ElMessage.error(error instanceof Error && error.message ? error.message : '创建批量导出任务失败')
+    }
+  } finally {
+    exporting.value = false
+  }
+}
+
+function scheduleDirectoryExportPoll(): void {
+  if (directoryExportPollTimer) clearTimeout(directoryExportPollTimer)
+  if (!directoryExportTask.value || ['SUCCESS', 'FAILED'].includes(directoryExportTask.value.status)) return
+  directoryExportPollTimer = setTimeout(() => void refreshDirectoryExportTask(), 2000)
+}
+
+async function refreshDirectoryExportTask(): Promise<void> {
+  const taskId = directoryExportTask.value?.id
+  if (!taskId) return
+  try {
+    const response = await exportApi.getTask(taskId)
+    directoryExportTask.value = response.data
+  } catch (error: unknown) {
+    ElMessage.error(error instanceof Error && error.message ? error.message : '读取导出任务状态失败')
+  }
+  scheduleDirectoryExportPoll()
+}
+
+async function openDirectoryExport(): Promise<void> {
+  const taskId = directoryExportTask.value?.id
+  if (!taskId) return
+  try {
+    await exportApi.openDir(taskId)
+  } catch (error: unknown) {
+    ElMessage.error(error instanceof Error && error.message ? error.message : '打开导出目录失败')
+  }
+}
+
+function clearDirectoryExportTask(): void {
+  if (directoryExportPollTimer) clearTimeout(directoryExportPollTimer)
+  directoryExportPollTimer = undefined
+  directoryExportTask.value = null
+}
+
 function statusLabel(s: string) {
   const knownStatus = COMIC_STATUSES.find((value) => value === s)
   return knownStatus ? comicStatusMeta(knownStatus).label : s
@@ -309,6 +394,10 @@ onMounted(() => {
   tagStore.fetchList()
   store.fetchList()
   void loadStorageSummary()
+})
+
+onUnmounted(() => {
+  if (directoryExportPollTimer) clearTimeout(directoryExportPollTimer)
 })
 
 async function loadStorageSummary(): Promise<void> {
@@ -510,6 +599,35 @@ function formatBytes(bytes: number | undefined): string {
   border-radius: var(--radius-sm);
 }
 
+.directory-export-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  margin-bottom: var(--space-lg);
+  padding: var(--space-md);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface);
+}
+
+.directory-export-status__copy {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  min-width: 0;
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+}
+
+.directory-export-status__copy strong {
+  color: var(--text-primary);
+}
+
+.directory-export-status__error {
+  color: var(--danger);
+}
+
 @media (max-width: 680px) {
   .batch-toolbar {
     align-items: flex-start;
@@ -524,6 +642,11 @@ function formatBytes(bytes: number | undefined): string {
   .batch-operation-select {
     flex: 1 1 100%;
     width: 100%;
+  }
+
+  .directory-export-status {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }
 </style>

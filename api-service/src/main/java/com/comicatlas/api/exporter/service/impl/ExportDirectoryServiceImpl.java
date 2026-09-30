@@ -28,7 +28,7 @@ public class ExportDirectoryServiceImpl implements com.comicatlas.api.exporter.s
             return new ExportDirectoryOpenResult(ExportDirectoryOpenResult.Status.NOT_FOUND, null);
         }
         Path output = Path.of(physicalPath.replace("/", java.io.File.separator));
-        Path directory = ExportFormats.DIRECTORY.equalsIgnoreCase(task.getFormat()) ? output : output.getParent();
+        Path directory = ExportFormats.BATCH_DIRECTORY.equalsIgnoreCase(task.getFormat()) ? output : output.getParent();
         if (directory == null || !Files.exists(directory)) {
             return new ExportDirectoryOpenResult(ExportDirectoryOpenResult.Status.NOT_FOUND, null);
         }

@@ -28,6 +28,10 @@ public class ExportOperationServiceImpl implements com.comicatlas.api.exporter.s
         return exportService.createExportTask(comicId, format);
     }
 
+    public ExportTaskVO createBatchDirectoryExportTask(List<Long> comicIds) {
+        return exportService.createBatchDirectoryExportTask(comicIds);
+    }
+
     public List<ExportTaskVO> listExports(Long comicId) {
         return exportService.listExports(comicId);
     }

@@ -121,28 +121,30 @@ class ExportTaskHandlerTest {
     }
 
     @Test
-    @DisplayName("文件夹导出：将 DIRECTORY 格式透传给导出服务")
-    void directoryExport_passesDirectoryFormatToService() throws Exception {
-        ExportTaskCreatedEvent directoryEvent = new ExportTaskCreatedEvent(UUID.randomUUID(), Instant.now(),
-                99L, 1L, ExportFormats.DIRECTORY);
-        when(exportService.export(1L, 99L, ExportFormats.DIRECTORY))
-                .thenReturn(output(99L, 1L, "99/标题", 1234L));
+    @DisplayName("批量文件夹导出：将漫画 ID 列表透传给目录移动服务")
+    void batchDirectoryExport_passesComicIdsToService() throws Exception {
+        List<Long> comicIds = List.of(1L, 2L);
+        ExportTaskCreatedEvent batchEvent = new ExportTaskCreatedEvent(UUID.randomUUID(), Instant.now(),
+                99L, 1L, ExportFormats.BATCH_DIRECTORY, comicIds);
+        when(exportService.exportBatchDirectory(comicIds, 99L))
+                .thenReturn(output(99L, 1L, "99", 1234L));
 
-        handler.handle(directoryEvent, channel, 5L);
+        handler.handle(batchEvent, channel, 5L);
 
-        verify(exportService).export(1L, 99L, ExportFormats.DIRECTORY);
+        verify(exportService).exportBatchDirectory(comicIds, 99L);
         verify(channel).basicAck(5L, false);
     }
 
     @Test
-    @DisplayName("章节目录移动中断：保留漫画移出状态并重投，不发布普通失败")
-    void directoryMoveInterrupted_requeuesWithoutFailedEvent() throws Exception {
-        ExportTaskCreatedEvent directoryEvent = new ExportTaskCreatedEvent(UUID.randomUUID(), Instant.now(),
-                99L, 1L, ExportFormats.DIRECTORY);
-        when(exportService.export(1L, 99L, ExportFormats.DIRECTORY))
+    @DisplayName("批量章节目录移动中断：保留检查点并重投，不发布普通失败")
+    void batchDirectoryMoveInterrupted_requeuesWithoutFailedEvent() throws Exception {
+        List<Long> comicIds = List.of(1L, 2L);
+        ExportTaskCreatedEvent batchEvent = new ExportTaskCreatedEvent(UUID.randomUUID(), Instant.now(),
+                99L, 1L, ExportFormats.BATCH_DIRECTORY, comicIds);
+        when(exportService.exportBatchDirectory(comicIds, 99L))
                 .thenThrow(new ExportMoveOutException("章节目录部分移动", new IOException("磁盘繁忙")));
 
-        handler.handle(directoryEvent, channel, 5L);
+        handler.handle(batchEvent, channel, 5L);
 
         verify(channel).basicReject(5L, true);
         verify(channel, never()).basicAck(anyLong(), anyBoolean());

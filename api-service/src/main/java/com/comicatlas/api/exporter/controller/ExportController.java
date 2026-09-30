@@ -1,6 +1,7 @@
 package com.comicatlas.api.exporter.controller;
 import com.comicatlas.api.exporter.dto.ExportArtifactVO;
 import com.comicatlas.api.exporter.dto.ExportTaskVO;
+import com.comicatlas.api.exporter.dto.BatchDirectoryExportRequest;
 import com.comicatlas.api.exporter.model.ExportDirectoryOpenResult;
 import com.comicatlas.api.exporter.service.ExportDirectoryService;
 import com.comicatlas.api.exporter.service.ExportOperationService;
@@ -14,6 +15,8 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.RequestBody;
+import jakarta.validation.Valid;
 
 import java.util.List;
 
@@ -42,6 +45,14 @@ public class ExportController {
         ExportTaskVO task = "ZIP".equalsIgnoreCase(format)
                 ? exportOperationService.createExportTask(comicId)
                 : exportOperationService.createExportTask(comicId, format);
+        return ResponseEntity.status(HttpStatus.ACCEPTED).body(task);
+    }
+
+    /** 创建批量文件夹移出任务。 */
+    @PostMapping("/comics/batch-directory")
+    public ResponseEntity<ExportTaskVO> createBatchDirectoryExport(
+            @Valid @RequestBody BatchDirectoryExportRequest request) {
+        ExportTaskVO task = exportOperationService.createBatchDirectoryExportTask(request.getComicIds());
         return ResponseEntity.status(HttpStatus.ACCEPTED).body(task);
     }
 

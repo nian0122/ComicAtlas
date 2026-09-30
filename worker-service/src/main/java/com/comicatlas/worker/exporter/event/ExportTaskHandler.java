@@ -45,7 +45,8 @@ public class ExportTaskHandler {
     public void handle(ExportTaskCreatedEvent event, Channel channel, @Header(AmqpHeaders.DELIVERY_TAG) long tag) {
         Long taskId = event.taskId();
         Long comicId = event.comicId();
-        log.info("导出任务开始: taskId={}, comicId={}", taskId, comicId);
+        log.info("导出任务开始: taskId={}, comicCount={}", taskId,
+                event.comicIds().isEmpty() ? 1 : event.comicIds().size());
         mqConsumerSupport.consume(channel, tag, "导出任务: taskId=" + taskId,
                 () -> exportAndPublish(event),
                 null,
@@ -58,11 +59,15 @@ public class ExportTaskHandler {
 
         ExportService.ExportOutput output;
         try {
-            output = ExportFormats.DIRECTORY.equalsIgnoreCase(event.format())
-                    ? exportService.export(event.comicId(), event.taskId(), ExportFormats.DIRECTORY)
-                    : ExportFormats.CBZ.equalsIgnoreCase(event.format())
-                            ? exportService.export(event.comicId(), event.taskId(), ExportFormats.CBZ)
-                            : exportService.export(event.comicId(), event.taskId());
+            if (ExportFormats.BATCH_DIRECTORY.equalsIgnoreCase(event.format())) {
+                output = exportService.exportBatchDirectory(event.comicIds(), event.taskId());
+            } else if (ExportFormats.CBZ.equalsIgnoreCase(event.format())) {
+                output = exportService.export(event.comicId(), event.taskId(), ExportFormats.CBZ);
+            } else if (event.format() == null || ExportFormats.ZIP.equalsIgnoreCase(event.format())) {
+                output = exportService.export(event.comicId(), event.taskId());
+            } else {
+                throw new IllegalArgumentException("不支持的导出格式: " + event.format());
+            }
         } catch (java.io.IOException | RuntimeException failure) {
             if (failure instanceof ExportMoveOutException) {
                 throw failure;

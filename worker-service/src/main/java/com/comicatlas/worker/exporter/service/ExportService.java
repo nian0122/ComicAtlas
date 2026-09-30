@@ -1,11 +1,13 @@
 package com.comicatlas.worker.exporter.service;
 
 import java.io.IOException;
+import java.util.List;
 
 /** Worker 导出编排服务契约。 */
 public interface ExportService {
     ExportOutput export(Long comicId, Long taskId) throws IOException;
     ExportOutput export(Long comicId, Long taskId, String format) throws IOException;
+    ExportOutput exportBatchDirectory(List<Long> comicIds, Long taskId) throws IOException;
     String classifyExportError(Exception exception);
 
     static final class ExportOutput {

@@ -8,6 +8,7 @@ import java.util.List;
 public interface ExportOperationService {
     ExportTaskVO createExportTask(Long comicId);
     ExportTaskVO createExportTask(Long comicId, String format);
+    ExportTaskVO createBatchDirectoryExportTask(List<Long> comicIds);
     List<ExportTaskVO> listExports(Long comicId);
     List<ExportTaskVO> listAllExports();
     ExportTaskVO getTask(Long taskId);

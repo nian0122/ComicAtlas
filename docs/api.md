@@ -929,7 +929,8 @@ OP_NOT_ALLOWED, COMIC_NOT_FOUND
 | 生成 LQ | `POST /api/manage/storage/lq/comics/{id}`、`/lq/chapters/{id}` |
 | 视频转码 | `POST /api/manage/storage/transcode/comics/{id}`、`/transcode/chapters/{id}` |
 | 删除 HQ 保留 LQ | `POST /api/manage/storage/delete-hq/comics/{id}`、`/delete-hq/chapters/{id}` |
-| 导出漫画 | `POST /api/manage/storage/export/comics/{id}` |
+| 单本 ZIP/CBZ 导出 | `POST /api/manage/storage/export/comics/{id}?format=ZIP`（或 `CBZ`）|
+| 批量文件夹导出 | `POST /api/manage/storage/export/comics/batch-directory` |
 | 导出任务查询 | `GET /api/manage/storage/export/comics/{id}/tasks`、`GET /api/manage/storage/export/tasks/{taskId}` |
 | 导出分卷清单 | `GET /api/manage/storage/export/tasks/{taskId}/artifacts` |
 | 导出打开目录 | `POST /api/manage/storage/export/tasks/{taskId}/open` |
@@ -938,7 +939,9 @@ OP_NOT_ALLOWED, COMIC_NOT_FOUND
 
 > 旧端点（`/comics/{id}/lq`、`/admin/storage/comics/{id}/transcode-videos` 等）已随接口收敛全部移除，存储操作统一使用上表 `/api/manage/storage/*` 形态。
 >
-> **导出为本地路径交互**：导出产物落在宿主机 `EXPORT/{taskId}/{base}.z01..zNN + {base}.zip`（标准分卷，主 `.zip` 为最后卷）。`GET /api/manage/storage/export/tasks/{taskId}/artifacts` 返回有序分卷**元数据**（1-based index、文件名、字节大小、是否最后 `.zip`、本地物理路径），**不提供任何文件字节下载**；`POST /api/manage/storage/export/tasks/{taskId}/open` 仅在宿主机打开文件管理器。HTTP 全程只传输任务/路径/状态/卷元数据，文件字节不经过 HTTP——把最后 `.zip` 的本地路径作为 `sourcePath` 即可重新导入该分卷（缺任一卷会失败，`.z01` 不可作为入口）。
+> **导出为本地路径交互**：ZIP/CBZ 产物落在宿主机 `EXPORT/{taskId}/`，标准分卷归档由 artifacts 接口返回分卷元数据。批量文件夹导出结果目录为 `EXPORT/{taskId}/`，下含以漫画名命名的子目录，仅放媒体文件及目录结构；冲突名称追加漫画 ID。导出不提供 HTTP 文件字节下载，`POST /api/manage/storage/export/tasks/{taskId}/open` 在宿主机打开结果目录。批量文件夹导出成功后，所选漫画从系统脱管。
+
+批量文件夹导出请求体为 `{ "comicIds": [101, 205, 319] }`。任务创建前会锁定并校验全部漫画；任务失败时漫画状态恢复为可管理状态。目录移动中断则保留检查点并重试，不会把部分移动误报为普通失败。
 >
 > **METADATA_REFRESH（刷新元数据，异步任务）**：`POST /api/manage/storage/refresh-metadata/comics/{id}` 走统一命令管线，同一事务 CAS 漫画 `READY → REFRESHING`、创建 COMIC 级管理任务并发布命令到 Outbox。漫画不存在返回 `404`；非 `READY` 或并发被占用返回 `409`；成功返回 `202 Accepted` 与 `OperationSubmitResultDTO`（含 `taskId`）。
 

@@ -55,7 +55,9 @@ public class ExportResultServiceImpl implements com.comicatlas.api.exporter.serv
             task.setStatus(ExportTaskStatus.RUNNING);
             exportTaskMapper.updateById(task);
         }
-        updateItem(event.comicId(), ManagementTaskStatus.RUNNING, null, event.taskId());
+        for (Long comicId : comicIds(task)) {
+            updateItem(comicId, ManagementTaskStatus.RUNNING, null, event.taskId());
+        }
     }
 
     @Transactional
@@ -73,10 +75,14 @@ public class ExportResultServiceImpl implements com.comicatlas.api.exporter.serv
             task.setCompletedAt(LocalDateTime.now());
             exportTaskMapper.updateById(task);
         }
-        if (ExportFormats.DIRECTORY.equalsIgnoreCase(task.getFormat())) {
-            detachExportedComic(event.comicId());
+        if (ExportFormats.BATCH_DIRECTORY.equalsIgnoreCase(task.getFormat())) {
+            for (Long comicId : comicIds(task)) {
+                detachExportedComic(comicId);
+            }
         }
-        updateItem(event.comicId(), ManagementTaskStatus.SUCCEEDED, null, event.taskId());
+        for (Long comicId : comicIds(task)) {
+            updateItem(comicId, ManagementTaskStatus.SUCCEEDED, null, event.taskId());
+        }
     }
 
     @Transactional
@@ -91,14 +97,18 @@ public class ExportResultServiceImpl implements com.comicatlas.api.exporter.serv
             task.setProgress(-1);
             exportTaskMapper.updateById(task);
         }
-        if (ExportFormats.DIRECTORY.equalsIgnoreCase(task.getFormat())) {
-            Comic comic = comicMapper.selectByIdForUpdate(event.comicId());
-            if (comic != null && comic.getStatus() == ComicStatus.EXPORTING) {
-                comic.setStatus(ComicStatus.READY);
-                comicMapper.updateById(comic);
+        if (ExportFormats.BATCH_DIRECTORY.equalsIgnoreCase(task.getFormat())) {
+            for (Long comicId : comicIds(task)) {
+                Comic comic = comicMapper.selectByIdForUpdate(comicId);
+                if (comic != null && comic.getStatus() == ComicStatus.EXPORTING) {
+                    comic.setStatus(ComicStatus.READY);
+                    comicMapper.updateById(comic);
+                }
+                updateItem(comicId, ManagementTaskStatus.FAILED, event.errorMessage(), event.taskId());
             }
+        } else {
+            updateItem(event.comicId(), ManagementTaskStatus.FAILED, event.errorMessage(), event.taskId());
         }
-        updateItem(event.comicId(), ManagementTaskStatus.FAILED, event.errorMessage(), event.taskId());
     }
 
     /** 文件夹导出已原子发布后，删除系统目录树记录并保留漫画 tombstone。 */
@@ -132,5 +142,12 @@ public class ExportResultServiceImpl implements com.comicatlas.api.exporter.serv
         if (item != null) {
             managementTaskService.updateItemStatus(item.getId(), status, errorMessage, RESULT_REF_TYPE, exportTaskId);
         }
+    }
+
+    private List<Long> comicIds(ExportTask task) {
+        if (task.getComicIds() == null || task.getComicIds().isBlank()) {
+            return task.getComicId() == null ? List.of() : List.of(task.getComicId());
+        }
+        return java.util.Arrays.stream(task.getComicIds().split(",")).map(Long::valueOf).toList();
     }
 }

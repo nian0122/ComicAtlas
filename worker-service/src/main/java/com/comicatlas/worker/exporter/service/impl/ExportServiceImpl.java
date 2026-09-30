@@ -5,7 +5,7 @@ import com.comicatlas.worker.exporter.resolver.ExportFileResolver;
 import com.comicatlas.worker.exporter.publisher.ExportArchivePublisher;
 import com.comicatlas.worker.exporter.archive.ZipBuilder;
 import com.comicatlas.worker.exporter.archive.ExportStagingCleanup;
-import com.comicatlas.worker.exporter.archive.DirectoryMoveCheckpoint;
+import com.comicatlas.worker.exporter.archive.BatchDirectoryMoveCheckpoint;
 import com.comicatlas.worker.exporter.exception.ExportFileNotFoundException;
 import com.comicatlas.worker.exporter.exception.ExportManifestBuildException;
 import com.comicatlas.worker.exporter.exception.ExportMoveOutException;
@@ -54,7 +54,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 
-/** 导出编排：收集 → 构建清单 → 打包归档或写出文件夹 → 原子发布任务目录。 */
+/** 导出编排：单本 ZIP/CBZ 归档，或批量文件夹目录移动。 */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -111,33 +111,10 @@ public class ExportServiceImpl implements ExportService {
 
     private ExportOutput exportExclusive(Long comicId, Long taskId, String format) throws IOException {
         long started = System.nanoTime();
-        boolean isDirectoryExport = ExportFormats.DIRECTORY.equalsIgnoreCase(format);
         StorageRoot exportRoot = StorageRootResolver.optional(storageProperties, StorageRootKeys.EXPORT);
         if (exportRoot == null || !exportRoot.exists()) {
             throw new IllegalStateException("EXPORT 存储根未配置或路径不存在");
         }
-        if (isDirectoryExport) {
-            Optional<ExportOutput> publishedOutput = cleanupPublishedDirectoryExport(taskId, comicId, exportRoot);
-            if (publishedOutput.isPresent()) {
-                return publishedOutput.get();
-            }
-            Path moveCheckpoint = exportRoot.resolve(".moveout-" + taskId + ".checkpoint");
-            DirectoryExportPlan plan;
-            if (Files.isRegularFile(moveCheckpoint)) {
-                plan = loadMoveCheckpoint(moveCheckpoint, taskId);
-                requireSameFileStore(exportRoot, plan.sourceRootKey(), comicId, true);
-            } else {
-                ExportCollectResult result = exportCollector.collect(comicId);
-                plan = buildDirectoryPlan(comicId, result);
-                validateDirectoryMovePlan(comicId, plan, exportRoot.resolve(STAGING_DIR_PREFIX + taskId));
-                requireSameFileStore(exportRoot, plan.sourceRootKey(), comicId, false);
-                DirectoryMoveCheckpoint.save(moveCheckpoint, plan);
-            }
-            log.info("文件夹导出目录计划就绪：taskId={}, comicId={}, sourceRoot={}, chapters={}", taskId,
-                    comicId, plan.sourceRootKey(), plan.chapterMoves().size());
-            return exportDirectory(taskId, comicId, plan, exportRoot);
-        }
-
         ExportCollectResult result = exportCollector.collect(comicId);
         ExportManifest manifest = buildManifest(result);
         log.info("导出清单就绪：taskId={}, comicId={}, entries={}, collectMs={}", taskId, comicId,
@@ -167,85 +144,112 @@ public class ExportServiceImpl implements ExportService {
         }
     }
 
-    /** 按章节目录直接移出原件，不逐文件枚举；完成后原子发布 staging。 */
-    private ExportOutput exportDirectory(Long taskId, Long comicId, DirectoryExportPlan plan, StorageRoot exportRoot)
-            throws IOException {
+    /** 批量文件夹导出：整批预检通过后，以章节目录为单位移动媒体目录。 */
+    @Override
+    public ExportOutput exportBatchDirectory(List<Long> comicIds, Long taskId) throws IOException {
+        try {
+            exportLock.lockInterruptibly();
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            InterruptedIOException interrupted = new InterruptedIOException("等待批量导出执行时被中断");
+            interrupted.initCause(exception);
+            throw interrupted;
+        }
+        try {
+            return exportBatchDirectoryExclusive(comicIds, taskId);
+        } finally {
+            exportLock.unlock();
+        }
+    }
+
+    private ExportOutput exportBatchDirectoryExclusive(List<Long> comicIds, Long taskId) throws IOException {
+        if (comicIds == null || comicIds.isEmpty() || comicIds.stream().anyMatch(java.util.Objects::isNull)
+                || comicIds.stream().distinct().count() != comicIds.size()) {
+            throw new IOException("批量文件夹导出漫画列表为空或包含重复项");
+        }
+        StorageRoot exportRoot = StorageRootResolver.optional(storageProperties, StorageRootKeys.EXPORT);
+        if (exportRoot == null || !exportRoot.exists()) {
+            throw new IOException("EXPORT 存储根未配置或路径不存在");
+        }
+        Path checkpointPath = exportRoot.resolve(".batch-move-" + taskId + ".checkpoint");
         Path stagingDir = exportRoot.resolve(STAGING_DIR_PREFIX + taskId);
         Path finalDir = exportRoot.resolve(String.valueOf(taskId));
-        Path stagingRoot = stagingDir.resolve(plan.rootDirName());
-        Path checkpointPath = exportRoot.resolve(".moveout-" + taskId + ".checkpoint");
-        boolean hasCheckpoint = Files.isRegularFile(checkpointPath);
-        boolean hadPriorMoves = plan.chapterMoves().stream().anyMatch(move ->
-                !Files.exists(sourcePath(plan.sourceRootKey(), move.sourceRelativePath()), LinkOption.NOFOLLOW_LINKS));
+        List<DirectoryExportPlan> plans;
+        if (Files.isRegularFile(checkpointPath, LinkOption.NOFOLLOW_LINKS)) {
+            plans = loadBatchMoveCheckpoint(checkpointPath, taskId);
+            if (!plans.stream().map(DirectoryExportPlan::comicId).toList().equals(comicIds)) {
+                throw new ExportMoveOutException("批量导出检查点与任务漫画列表不一致 taskId=" + taskId,
+                        new IOException("检查点漫画列表不匹配"));
+            }
+            validateBatchDirectoryPlans(plans, stagingDir);
+            for (DirectoryExportPlan plan : plans) {
+                requireSameFileStore(exportRoot, plan.sourceRootKey(), plan.comicId(), true);
+            }
+        } else {
+            plans = buildBatchDirectoryPlans(comicIds);
+            validateBatchDirectoryPlans(plans, stagingDir);
+            for (DirectoryExportPlan plan : plans) {
+                requireSameFileStore(exportRoot, plan.sourceRootKey(), plan.comicId(), false);
+            }
+            BatchDirectoryMoveCheckpoint.save(checkpointPath, plans);
+        }
+
+        if (Files.exists(finalDir, LinkOption.NOFOLLOW_LINKS)) {
+            verifyPublishedBatchDirectory(finalDir, plans, taskId);
+            for (DirectoryExportPlan plan : plans) {
+                detachManagedDirectories(plan.comicId(), plan.sourceRootKey(), taskId);
+            }
+            return batchOutput(taskId, plans);
+        }
+
         int movedDirectoryCount = 0;
         try {
-            long metadataBytes = plan.metadataJson().getBytes(StandardCharsets.UTF_8).length;
-            long comicInfoBytes = plan.comicInfoXml() == null ? 0
-                    : plan.comicInfoXml().getBytes(StandardCharsets.UTF_8).length;
-            long metadataTotalBytes = Math.addExact(metadataBytes, comicInfoBytes);
-            long requiredBytes = Math.addExact(metadataTotalBytes,
-                    workerConfig.getDirectoryExport().getMinimumFreeSpaceBytes());
-            long availableBytes = Files.getFileStore(exportRoot.getPath()).getUsableSpace();
-            if (availableBytes < requiredBytes) {
-                throw new IOException("文件夹导出空间不足：元数据需要 " + metadataTotalBytes
-                        + " 字节，安全余量 " + workerConfig.getDirectoryExport().getMinimumFreeSpaceBytes()
-                        + " 字节，当前可用 " + availableBytes + " 字节");
-            }
-            Files.createDirectories(stagingRoot);
-            writeDirectoryEntry(stagingRoot.resolve("metadata.json"),
-                    plan.metadataJson().getBytes(StandardCharsets.UTF_8));
-            if (plan.comicInfoXml() != null && !plan.comicInfoXml().isBlank()) {
-                writeDirectoryEntry(stagingRoot.resolve("ComicInfo.xml"),
-                        plan.comicInfoXml().getBytes(StandardCharsets.UTF_8));
-            }
-
-            List<DirectoryExportPlan.ChapterMove> orderedMoves = plan.chapterMoves().stream()
-                    .sorted(Comparator.comparingInt(move -> Path.of(move.targetRelativePath()).getNameCount()))
-                    .toList();
-            for (DirectoryExportPlan.ChapterMove move : orderedMoves) {
-                Path sourceDirectory = sourcePath(plan.sourceRootKey(), move.sourceRelativePath());
-                Path targetDirectory = exportRoot.resolve(STAGING_DIR_PREFIX + taskId)
-                        .resolve(move.targetRelativePath()).normalize();
-                if (!targetDirectory.startsWith(stagingDir.toAbsolutePath().normalize())) {
-                    throw new IOException("文件夹导出目标路径越界");
+            Files.createDirectories(stagingDir);
+            for (DirectoryExportPlan plan : plans) {
+                for (DirectoryExportPlan.ChapterMove move : plan.chapterMoves()) {
+                    if (Thread.currentThread().isInterrupted()) {
+                        throw new InterruptedIOException("批量目录移动被中断");
+                    }
+                    Path sourceDirectory = sourcePath(plan.sourceRootKey(), move.sourceRelativePath());
+                    Path targetDirectory = stagingDir.resolve(validatedRelativePath(move.targetRelativePath())).normalize();
+                    if (!targetDirectory.startsWith(stagingDir.toAbsolutePath().normalize())) {
+                        throw new IOException("批量导出目标路径越界");
+                    }
+                    boolean sourceExists = Files.exists(sourceDirectory, LinkOption.NOFOLLOW_LINKS);
+                    boolean targetExists = Files.exists(targetDirectory, LinkOption.NOFOLLOW_LINKS);
+                    if (!sourceExists && Files.isDirectory(targetDirectory, LinkOption.NOFOLLOW_LINKS)) {
+                        continue;
+                    }
+                    if (!sourceExists || !Files.isDirectory(sourceDirectory, LinkOption.NOFOLLOW_LINKS)
+                            || Files.isSymbolicLink(sourceDirectory) || targetExists) {
+                        throw new IOException("章节目录移动源或目标状态冲突：comicId=" + plan.comicId()
+                                + ", chapterId=" + move.chapterId());
+                    }
+                    Files.createDirectories(targetDirectory.getParent());
+                    try {
+                        Files.move(sourceDirectory, targetDirectory, StandardCopyOption.ATOMIC_MOVE);
+                    } catch (AtomicMoveNotSupportedException exception) {
+                        Files.move(sourceDirectory, targetDirectory);
+                    }
+                    movedDirectoryCount++;
                 }
-                boolean sourceExists = Files.exists(sourceDirectory, LinkOption.NOFOLLOW_LINKS);
-                boolean targetExists = Files.exists(targetDirectory, LinkOption.NOFOLLOW_LINKS);
-                if (!sourceExists && Files.isDirectory(targetDirectory, LinkOption.NOFOLLOW_LINKS)) {
-                    continue;
+                for (String directory : plan.catalogDirectories()) {
+                    Path targetDirectory = stagingDir.resolve(validatedRelativePath(directory)).normalize();
+                    if (!targetDirectory.startsWith(stagingDir.toAbsolutePath().normalize())) {
+                        throw new IOException("批量导出目录结构越界");
+                    }
+                    Files.createDirectories(targetDirectory);
                 }
-                if (!sourceExists || !Files.isDirectory(sourceDirectory, LinkOption.NOFOLLOW_LINKS)
-                        || Files.isSymbolicLink(sourceDirectory) || targetExists) {
-                    throw new IOException("章节目录移动源或目标状态冲突：chapterId=" + move.chapterId());
-                }
-                Files.createDirectories(targetDirectory.getParent());
-                try {
-                    Files.move(sourceDirectory, targetDirectory, StandardCopyOption.ATOMIC_MOVE);
-                } catch (AtomicMoveNotSupportedException exception) {
-                    Files.move(sourceDirectory, targetDirectory);
-                }
-                movedDirectoryCount++;
-            }
-
-            for (String catalogDirectory : plan.catalogDirectories()) {
-                Path targetDirectory = stagingDir.resolve(catalogDirectory).normalize();
-                if (!targetDirectory.startsWith(stagingDir.toAbsolutePath().normalize())) {
-                    throw new IOException("文件夹导出目录层级越界");
-                }
-                Files.createDirectories(targetDirectory);
             }
         } catch (IOException | RuntimeException exception) {
-            if (hasCheckpoint && (hadPriorMoves || movedDirectoryCount > 0)) {
-                throw new ExportMoveOutException("章节目录部分移出，保留 staging 和检查点等待重试 taskId="
-                        + taskId, exception);
+            if (movedDirectoryCount > 0 || hasMovedBatchDirectory(plans, stagingDir)) {
+                throw new ExportMoveOutException("批量目录部分移动，保留检查点供重试 taskId=" + taskId, exception);
             }
             ExportStagingCleanup.afterFailure(stagingDir, exception);
-            if (hasCheckpoint) {
-                try {
-                    Files.deleteIfExists(checkpointPath);
-                } catch (IOException cleanupFailure) {
-                    exception.addSuppressed(cleanupFailure);
-                }
+            try {
+                Files.deleteIfExists(checkpointPath);
+            } catch (IOException cleanupFailure) {
+                exception.addSuppressed(cleanupFailure);
             }
             throw exception;
         }
@@ -253,22 +257,75 @@ public class ExportServiceImpl implements ExportService {
         try {
             Files.move(stagingDir, finalDir, StandardCopyOption.ATOMIC_MOVE);
         } catch (AtomicMoveNotSupportedException exception) {
-            throw new ExportMoveOutException("文件夹目录已整理，但原子发布暂不可用；保留 staging 供重试 taskId="
-                    + taskId, exception);
+            throw new ExportMoveOutException("批量目录已整理但原子发布不可用，保留暂存目录供重试 taskId=" + taskId,
+                    exception);
         } catch (IOException exception) {
-            throw new ExportMoveOutException("文件夹目录已整理，但发布失败；保留 staging 供重试 taskId="
-                    + taskId, exception);
+            throw new ExportMoveOutException("批量目录已整理但发布失败，保留暂存目录供重试 taskId=" + taskId,
+                    exception);
         }
-        detachManagedDirectories(comicId, plan.sourceRootKey(), taskId);
-        return new ExportOutput(taskId, comicId, taskId + "/" + plan.rootDirName(), plan.estimatedSize());
+        for (DirectoryExportPlan plan : plans) {
+            detachManagedDirectories(plan.comicId(), plan.sourceRootKey(), taskId);
+        }
+        return batchOutput(taskId, plans);
     }
 
-    /** 只根据漫画、目录、章节和媒体数据库记录生成计划，不访问单个媒体文件。 */
-    private DirectoryExportPlan buildDirectoryPlan(Long comicId, ExportCollectResult result) throws IOException {
-        String rootDirName = ComicTitleSanitizer.sanitize(result.comic().getTitle());
+    private List<DirectoryExportPlan> buildBatchDirectoryPlans(List<Long> comicIds) throws IOException {
+        List<ExportCollectResult> results = new ArrayList<>(comicIds.size());
+        for (Long comicId : comicIds) {
+            ExportCollectResult result = exportCollector.collect(comicId);
+            if (result.allMedia().isEmpty()) {
+                throw new IOException("选中漫画没有可导出的媒体：comicId=" + comicId);
+            }
+            results.add(result);
+        }
+        Map<Long, String> comicDirectoryNames = uniqueComicDirectoryNames(results);
+        List<DirectoryExportPlan> plans = new ArrayList<>(results.size());
+        for (ExportCollectResult result : results) {
+            Long comicId = result.comic().getId();
+            plans.add(buildDirectoryPlan(comicId, comicDirectoryNames.get(comicId), result));
+        }
+        return List.copyOf(plans);
+    }
+
+    private Map<Long, String> uniqueComicDirectoryNames(List<ExportCollectResult> results) {
+        Map<Long, String> names = new HashMap<>(results.size());
+        Set<String> usedNames = new HashSet<>();
+        for (ExportCollectResult result : results) {
+            Long comicId = result.comic().getId();
+            String baseName = sanitizeComicFolderName(result.comic().getTitle(), comicId);
+            String candidate = baseName;
+            if (usedNames.contains(candidate.toLowerCase(Locale.ROOT))) {
+                candidate = baseName + "_" + comicId;
+            }
+            int suffix = 2;
+            while (!usedNames.add(candidate.toLowerCase(Locale.ROOT))) {
+                candidate = baseName + "_" + comicId + "_" + suffix++;
+            }
+            names.put(comicId, candidate);
+        }
+        return names;
+    }
+
+    private String sanitizeComicFolderName(String title, Long comicId) {
+        String safeTitle = ComicTitleSanitizer.sanitize(title == null ? "" : title)
+                .replaceAll("[\\x00-\\x1F]", "").replaceAll("[. ]+$", "");
+        if (safeTitle.isBlank()) {
+            safeTitle = "漫画_" + comicId;
+        }
+        String reservedName = safeTitle.split("\\.", 2)[0].toUpperCase(Locale.ROOT);
+        if (Set.of("CON", "PRN", "AUX", "NUL", "COM1", "COM2", "COM3", "COM4", "COM5", "COM6",
+                "COM7", "COM8", "COM9", "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6",
+                "LPT7", "LPT8", "LPT9").contains(reservedName)) {
+            return safeTitle + "_" + comicId;
+        }
+        return safeTitle;
+    }
+
+    /** 只根据漫画、目录、章节和媒体数据库记录生成移动计划，不逐文件扫描或移动。 */
+    private DirectoryExportPlan buildDirectoryPlan(Long comicId, String rootDirName, ExportCollectResult result)
+            throws IOException {
         String sourceRootKey = selectDirectorySourceRoot(comicId);
         Map<Long, String> catalogPaths = buildCatalogPaths(result.catalogs(), comicId);
-        Set<String> catalogDirectories = new HashSet<>(catalogPaths.values());
         Map<Long, List<MediaRecord>> mediaByChapter = result.allMedia().stream()
                 .collect(Collectors.groupingBy(MediaRecord::getChapterId));
         Map<Long, String> chapterDirectories = new HashMap<>(result.chapters().size());
@@ -280,33 +337,22 @@ public class ExportServiceImpl implements ExportService {
             }
             chapterDirectories.put(chapter.getId(), chapterDirectory);
         }
-
-        Map<Long, String> mediaTargetPaths = new HashMap<>(result.allMedia().size());
         Set<String> usedMediaPaths = new HashSet<>();
-        long estimatedMediaBytes = 0L;
+        long estimatedSize = 0L;
         for (ChapterRecord chapter : result.chapters()) {
             String chapterDirectory = chapterDirectories.get(chapter.getId());
             for (MediaRecord media : mediaByChapter.getOrDefault(chapter.getId(), List.of())) {
                 String sourceRelativePath = directoryMediaPath(media, sourceRootKey, comicId, chapter.getId());
-                String fileName = Path.of(sourceRelativePath).getFileName().toString();
-                String targetPath = chapterDirectory + "/" + fileName;
+                String targetPath = chapterDirectory + "/" + Path.of(sourceRelativePath).getFileName();
                 if (!usedMediaPaths.add(targetPath.toLowerCase(Locale.ROOT))) {
                     throw new ExportManifestBuildException("文件夹导出失败：媒体目标路径冲突 comicId=" + comicId);
                 }
-                mediaTargetPaths.put(media.getId(), targetPath);
                 long mediaSize = StorageRootKeys.LQ.equals(sourceRootKey)
                         ? (media.getLqSize() == null ? 0L : media.getLqSize())
                         : (media.getHqSize() == null ? 0L : media.getHqSize());
-                estimatedMediaBytes = addSizes(comicId, media.getId(), estimatedMediaBytes, mediaSize);
+                estimatedSize = addSizes(comicId, media.getId(), estimatedSize, mediaSize);
             }
         }
-
-        String metadataJson = metadataJsonExporter.exportDirectoryJson(result, mediaTargetPaths);
-        String comicInfoXml = ComicInfoXmlBuilder.build(result.comic(), result.chapters());
-        long estimatedSize = addSizes(comicId, null, estimatedMediaBytes,
-                metadataJson.getBytes(StandardCharsets.UTF_8).length);
-        estimatedSize = addSizes(comicId, null, estimatedSize, comicInfoXml.getBytes(StandardCharsets.UTF_8).length);
-
         List<DirectoryExportPlan.ChapterMove> chapterMoves = new ArrayList<>();
         StorageRoot sourceRoot = StorageRootResolver.optional(storageProperties, sourceRootKey);
         if (sourceRoot == null || !sourceRoot.exists()) {
@@ -314,29 +360,51 @@ public class ExportServiceImpl implements ExportService {
         }
         for (ChapterRecord chapter : result.chapters()) {
             Path sourceDirectory = sourceRoot.resolve(comicId + "/" + chapter.getId());
-            boolean hasMedia = !mediaByChapter.getOrDefault(chapter.getId(), List.of()).isEmpty();
+            List<MediaRecord> chapterMedia = mediaByChapter.getOrDefault(chapter.getId(), List.of());
+            boolean hasMedia = !chapterMedia.isEmpty();
             if (Files.exists(sourceDirectory, LinkOption.NOFOLLOW_LINKS)) {
                 if (!Files.isDirectory(sourceDirectory, LinkOption.NOFOLLOW_LINKS)
                         || Files.isSymbolicLink(sourceDirectory)) {
                     throw new IOException("章节源路径不是普通目录：chapterId=" + chapter.getId());
                 }
-                chapterMoves.add(new DirectoryExportPlan.ChapterMove(chapter.getId(),
-                        comicId + "/" + chapter.getId(), rootDirName + "/" + chapterDirectories.get(chapter.getId())));
+                if (hasMedia) {
+                    validateMediaOnlyDirectory(sourceDirectory, chapterMedia, sourceRootKey, comicId, chapter.getId());
+                    chapterMoves.add(new DirectoryExportPlan.ChapterMove(chapter.getId(), comicId + "/" + chapter.getId(),
+                            rootDirName + "/" + chapterDirectories.get(chapter.getId())));
+                }
             } else if (hasMedia) {
                 throw new IOException("章节目录缺失：chapterId=" + chapter.getId());
             }
         }
-
         Set<String> structureDirectories = new HashSet<>();
-        catalogDirectories.forEach(path -> structureDirectories.add(rootDirName + "/" + path));
-        chapterDirectories.values().forEach(path -> structureDirectories.add(rootDirName + "/" + path));
-        DirectoryExportPlan plan = new DirectoryExportPlan(rootDirName, sourceRootKey, metadataJson,
-                comicInfoXml, List.copyOf(structureDirectories), chapterMoves, estimatedSize);
-        validateDirectoryMovePlan(comicId, plan, null);
-        return plan;
+        catalogPaths.values().forEach(directory -> structureDirectories.add(rootDirName + "/" + directory));
+        chapterDirectories.values().forEach(directory -> structureDirectories.add(rootDirName + "/" + directory));
+        return new DirectoryExportPlan(comicId, rootDirName, sourceRootKey,
+                List.copyOf(structureDirectories), chapterMoves, estimatedSize);
     }
 
-    /** HQ 整本目录非空时统一使用 HQ；仅当 HQ 漫画目录没有直接子项时才回退整本到 LQ。 */
+    private void validateMediaOnlyDirectory(Path sourceDirectory, List<MediaRecord> chapterMedia,
+                                            String sourceRootKey, Long comicId, Long chapterId) throws IOException {
+        Set<String> expectedFileNames = new HashSet<>();
+        for (MediaRecord media : chapterMedia) {
+            String relativePath = directoryMediaPath(media, sourceRootKey, comicId, chapterId);
+            expectedFileNames.add(Path.of(relativePath).getFileName().toString());
+        }
+        try (DirectoryStream<Path> entries = Files.newDirectoryStream(sourceDirectory)) {
+            for (Path entry : entries) {
+                String fileName = entry.getFileName().toString();
+                if (!Files.isRegularFile(entry, LinkOption.NOFOLLOW_LINKS) || Files.isSymbolicLink(entry)
+                        || !expectedFileNames.remove(fileName)) {
+                    throw new IOException("章节源目录包含非媒体文件或未登记文件：comicId=" + comicId
+                            + ", chapterId=" + chapterId);
+                }
+            }
+        }
+        if (!expectedFileNames.isEmpty()) {
+            throw new IOException("章节源目录缺少数据库登记的媒体文件：comicId=" + comicId + ", chapterId=" + chapterId);
+        }
+    }
+
     private String selectDirectorySourceRoot(Long comicId) throws IOException {
         StorageRoot hqRoot = StorageRootResolver.optional(storageProperties, StorageRootKeys.HQ);
         if (hqRoot == null || !hqRoot.exists()) {
@@ -344,8 +412,7 @@ public class ExportServiceImpl implements ExportService {
         }
         Path hqComicDirectory = hqRoot.resolve(String.valueOf(comicId));
         if (Files.exists(hqComicDirectory, LinkOption.NOFOLLOW_LINKS)) {
-            if (!Files.isDirectory(hqComicDirectory, LinkOption.NOFOLLOW_LINKS)
-                    || Files.isSymbolicLink(hqComicDirectory)) {
+            if (!Files.isDirectory(hqComicDirectory, LinkOption.NOFOLLOW_LINKS) || Files.isSymbolicLink(hqComicDirectory)) {
                 throw new IOException("HQ 漫画路径不是普通目录");
             }
             try (DirectoryStream<Path> children = Files.newDirectoryStream(hqComicDirectory)) {
@@ -359,8 +426,7 @@ public class ExportServiceImpl implements ExportService {
             throw new IOException("HQ 漫画目录为空且 LQ 存储根不可用");
         }
         Path lqComicDirectory = lqRoot.resolve(String.valueOf(comicId));
-        if (!Files.isDirectory(lqComicDirectory, LinkOption.NOFOLLOW_LINKS)
-                || Files.isSymbolicLink(lqComicDirectory)) {
+        if (!Files.isDirectory(lqComicDirectory, LinkOption.NOFOLLOW_LINKS) || Files.isSymbolicLink(lqComicDirectory)) {
             throw new IOException("HQ 漫画目录为空且 LQ 漫画目录不可用");
         }
         return StorageRootKeys.LQ;
@@ -395,110 +461,105 @@ public class ExportServiceImpl implements ExportService {
         return expectedPrefix + fileName;
     }
 
-    private DirectoryExportPlan loadMoveCheckpoint(Path checkpointPath, Long taskId) throws ExportMoveOutException {
+    private List<DirectoryExportPlan> loadBatchMoveCheckpoint(Path checkpointPath, Long taskId)
+            throws ExportMoveOutException {
         try {
-            return DirectoryMoveCheckpoint.load(checkpointPath);
+            return BatchDirectoryMoveCheckpoint.load(checkpointPath);
         } catch (IOException | RuntimeException exception) {
-            throw new ExportMoveOutException("目录移动检查点不可读，保留任务等待人工恢复 taskId=" + taskId,
-                    exception);
+            throw new ExportMoveOutException("批量目录移动检查点不可读，保留任务等待恢复 taskId=" + taskId, exception);
         }
     }
 
-    private void validateDirectoryMovePlan(Long comicId, DirectoryExportPlan plan, Path stagingDir)
-            throws IOException {
-        if (plan.rootDirName().isBlank() || Path.of(plan.rootDirName()).isAbsolute()
-                || Path.of(plan.rootDirName()).getNameCount() != 1
-                || ".".equals(plan.rootDirName()) || "..".equals(plan.rootDirName())) {
-            throw new IOException("文件夹导出漫画根目录名非法");
-        }
-        StorageRoot sourceRoot = StorageRootResolver.optional(storageProperties, plan.sourceRootKey());
-        if (sourceRoot == null) {
-            throw new IOException("文件夹导出来源存储根未配置");
-        }
-        Path comicDirectory = sourceRoot.resolve(String.valueOf(comicId)).toAbsolutePath().normalize();
-        for (DirectoryExportPlan.ChapterMove move : plan.chapterMoves()) {
-            if (!move.sourceRelativePath().equals(comicId + "/" + move.chapterId())) {
-                throw new IOException("目录移动检查点章节源路径与章节 ID 不符");
+    private void validateBatchDirectoryPlans(List<DirectoryExportPlan> plans, Path stagingDir) throws IOException {
+        Set<String> rootNames = new HashSet<>();
+        for (DirectoryExportPlan plan : plans) {
+            String rootName = plan.rootDirName();
+            if (rootName.isBlank() || Path.of(rootName).isAbsolute() || Path.of(rootName).getNameCount() != 1
+                    || ".".equals(rootName) || "..".equals(rootName)
+                    || !rootNames.add(rootName.toLowerCase(Locale.ROOT))) {
+                throw new IOException("批量文件夹导出漫画目录名非法或重复");
             }
-            Path source = sourceRoot.resolve(move.sourceRelativePath()).toAbsolutePath().normalize();
-            Path target = validatedRelativePath(move.targetRelativePath());
-            if (!source.startsWith(comicDirectory) || !comicDirectory.equals(source.getParent())
-                    || target.isAbsolute() || target.getNameCount() < 2
-                    || !plan.rootDirName().equals(target.getName(0).toString())
-                    || target.startsWith("..")) {
-                throw new IOException("目录移动检查点包含越界源或目标路径");
+            StorageRoot sourceRoot = StorageRootResolver.optional(storageProperties, plan.sourceRootKey());
+            if (sourceRoot == null || !sourceRoot.exists()) {
+                throw new IOException("文件夹导出来源存储根不可用");
             }
-        }
-        if (stagingDir != null) {
+            Path comicDirectory = sourceRoot.resolve(String.valueOf(plan.comicId())).toAbsolutePath().normalize();
+            for (DirectoryExportPlan.ChapterMove move : plan.chapterMoves()) {
+                Path source = sourceRoot.resolve(move.sourceRelativePath()).toAbsolutePath().normalize();
+                Path target = validatedRelativePath(move.targetRelativePath());
+                if (!move.sourceRelativePath().equals(plan.comicId() + "/" + move.chapterId())
+                        || !source.startsWith(comicDirectory) || !comicDirectory.equals(source.getParent())
+                        || target.isAbsolute() || target.getNameCount() < 2
+                        || !rootName.equals(target.getName(0).toString()) || target.startsWith("..")) {
+                    throw new IOException("批量目录移动计划包含越界源或目标路径");
+                }
+                validateDirectoryPathComponents(target);
+            }
             Path normalizedStaging = stagingDir.toAbsolutePath().normalize();
             for (String directory : plan.catalogDirectories()) {
-                Path target = normalizedStaging.resolve(validatedRelativePath(directory)).normalize();
-                if (!target.startsWith(normalizedStaging)) {
-                    throw new IOException("目录移动检查点包含越界目录路径");
+                Path relativeDirectory = validatedRelativePath(directory);
+                if (!normalizedStaging.resolve(relativeDirectory).normalize().startsWith(normalizedStaging)) {
+                    throw new IOException("批量目录移动计划包含越界结构目录");
                 }
+                validateDirectoryPathComponents(relativeDirectory);
             }
         }
     }
 
-    /** 已发布目录重投只检查章节目录级结构，不枚举其中的媒体文件。 */
-    private Optional<ExportOutput> cleanupPublishedDirectoryExport(Long taskId, Long comicId, StorageRoot exportRoot)
-            throws IOException {
-        Path finalDir = exportRoot.resolve(String.valueOf(taskId));
-        if (!Files.exists(finalDir, LinkOption.NOFOLLOW_LINKS)) {
-            return Optional.empty();
-        }
-        Path checkpoint = exportRoot.resolve(".moveout-" + taskId + ".checkpoint");
-        if (!Files.isRegularFile(checkpoint, LinkOption.NOFOLLOW_LINKS)) {
-            throw new IOException("文件夹导出发布冲突：缺少目录移动检查点 taskId=" + taskId);
-        }
-        if (!Files.isDirectory(finalDir, LinkOption.NOFOLLOW_LINKS) || Files.isSymbolicLink(finalDir)) {
-            throw new IOException("文件夹导出发布冲突：任务路径不是普通目录 taskId=" + taskId);
-        }
-        List<Path> roots;
-        try (DirectoryStream<Path> children = Files.newDirectoryStream(finalDir)) {
-            roots = new ArrayList<>();
-            for (Path child : children) {
-                if (Files.isDirectory(child, LinkOption.NOFOLLOW_LINKS)) {
-                    roots.add(child);
-                }
+    private void validateDirectoryPathComponents(Path relativePath) throws IOException {
+        for (Path component : relativePath) {
+            String name = component.toString();
+            String reservedName = name.split("\\.", 2)[0].toUpperCase(Locale.ROOT);
+            if (name.isBlank() || name.endsWith(".") || name.endsWith(" ")
+                    || name.matches(".*[<>:\"/\\\\|?*\\x00-\\x1F].*")
+                    || Set.of("CON", "PRN", "AUX", "NUL", "COM1", "COM2", "COM3", "COM4", "COM5", "COM6",
+                    "COM7", "COM8", "COM9", "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6",
+                    "LPT7", "LPT8", "LPT9").contains(reservedName)) {
+                throw new IOException("批量导出目录名称不受目标文件系统支持");
             }
         }
-        if (roots.size() != 1) {
-            throw new IOException("文件夹导出发布冲突：任务根目录数量不正确 taskId=" + taskId);
+    }
+
+    private void verifyPublishedBatchDirectory(Path finalDir, List<DirectoryExportPlan> plans, Long taskId)
+            throws IOException {
+        if (!Files.isDirectory(finalDir, LinkOption.NOFOLLOW_LINKS) || Files.isSymbolicLink(finalDir)) {
+            throw new IOException("批量导出发布路径不是普通目录 taskId=" + taskId);
         }
-        Path rootDirectory = roots.getFirst();
-        DirectoryExportPlan plan = loadMoveCheckpoint(checkpoint, taskId);
-        if (!rootDirectory.getFileName().toString().equals(plan.rootDirName())) {
-            throw new IOException("文件夹导出发布冲突：漫画根目录名与检查点不符 taskId=" + taskId);
-        }
-        try {
-            verifyMetadata(rootDirectory.resolve("metadata.json"), plan.metadataJson());
-            if (plan.comicInfoXml() != null) {
-                verifyMetadata(rootDirectory.resolve("ComicInfo.xml"), plan.comicInfoXml());
+        for (DirectoryExportPlan plan : plans) {
+            Path comicDirectory = finalDir.resolve(plan.rootDirName());
+            if (!Files.isDirectory(comicDirectory, LinkOption.NOFOLLOW_LINKS)) {
+                throw new ExportMoveOutException("已发布批量导出缺少漫画目录 taskId=" + taskId
+                        + ", comicId=" + plan.comicId(), new IOException("漫画目录不存在"));
             }
             for (DirectoryExportPlan.ChapterMove move : plan.chapterMoves()) {
-                Path target = rootDirectory.getParent().resolve(move.targetRelativePath()).normalize();
-                if (!target.startsWith(rootDirectory.getParent().toAbsolutePath().normalize())
+                Path target = finalDir.resolve(validatedRelativePath(move.targetRelativePath())).normalize();
+                if (!target.startsWith(finalDir.toAbsolutePath().normalize())
                         || !Files.isDirectory(target, LinkOption.NOFOLLOW_LINKS)) {
-                    throw new IOException("已发布目录缺少章节目录：chapterId=" + move.chapterId());
+                    throw new ExportMoveOutException("已发布批量导出缺少章节目录 taskId=" + taskId
+                            + ", chapterId=" + move.chapterId(), new IOException("章节目录不存在"));
                 }
             }
-        } catch (IOException exception) {
-            throw new ExportMoveOutException("已发布目录结构校验失败，保留检查点等待恢复 taskId=" + taskId,
-                    exception);
         }
-        detachManagedDirectories(comicId, plan.sourceRootKey(), taskId);
-        return Optional.of(new ExportOutput(taskId, comicId,
-                taskId + "/" + plan.rootDirName(), plan.estimatedSize()));
     }
 
-    private void verifyMetadata(Path path, String expectedValue) throws IOException {
-        byte[] expected = expectedValue.getBytes(StandardCharsets.UTF_8);
-        if (!Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS)
-                || Files.size(path) != expected.length
-                || !java.util.Arrays.equals(Files.readAllBytes(path), expected)) {
-            throw new IOException("导出元数据与目录移动检查点不符");
+    private boolean hasMovedBatchDirectory(List<DirectoryExportPlan> plans, Path stagingDir) {
+        for (DirectoryExportPlan plan : plans) {
+            for (DirectoryExportPlan.ChapterMove move : plan.chapterMoves()) {
+                if (!Files.exists(sourcePath(plan.sourceRootKey(), move.sourceRelativePath()), LinkOption.NOFOLLOW_LINKS)
+                        && Files.isDirectory(stagingDir.resolve(move.targetRelativePath()), LinkOption.NOFOLLOW_LINKS)) {
+                    return true;
+                }
+            }
         }
+        return false;
+    }
+
+    private ExportOutput batchOutput(Long taskId, List<DirectoryExportPlan> plans) throws IOException {
+        long totalSize = 0L;
+        for (DirectoryExportPlan plan : plans) {
+            totalSize = addSizes(plan.comicId(), null, totalSize, plan.estimatedSize());
+        }
+        return new ExportOutput(taskId, plans.getFirst().comicId(), String.valueOf(taskId), totalSize);
     }
 
     /** 原件和派生目录均按目录 rename 脱离管理；不递归删除目录内文件。 */
@@ -518,8 +579,7 @@ public class ExportServiceImpl implements ExportService {
                 Files.deleteIfExists(metadataRoot.resolve(comicId + ".json"));
             }
         } catch (IOException | RuntimeException exception) {
-            throw new ExportMoveOutException("原件目录移出未完成，保留导出产物并等待重试 comicId=" + comicId,
-                    exception);
+            throw new ExportMoveOutException("原件目录移出未完成，保留导出产物并等待重试 comicId=" + comicId, exception);
         }
     }
 
@@ -552,7 +612,6 @@ public class ExportServiceImpl implements ExportService {
         }
     }
 
-    /** 目录 rename 必须同卷；HQ 空时改用 LQ 后也按所选根检查卷。 */
     private void requireSameFileStore(StorageRoot exportRoot, String sourceRootKey, Long comicId,
                                       boolean hasCheckpoint) throws IOException {
         StorageRoot sourceRoot = StorageRootResolver.optional(storageProperties, sourceRootKey);
@@ -562,44 +621,32 @@ public class ExportServiceImpl implements ExportService {
                     || !Files.isDirectory(comicDirectory, LinkOption.NOFOLLOW_LINKS)
                     || Files.isSymbolicLink(comicDirectory)
                     || !Files.getFileStore(exportRoot.getPath()).equals(Files.getFileStore(comicDirectory))) {
-                throw new IOException("文件夹目录移动要求来源存储根与 EXPORT 位于同一卷 comicId=" + comicId);
+                throw new IOException("目录移动要求来源存储根与 EXPORT 位于同一卷 comicId=" + comicId);
             }
         } catch (IOException exception) {
             if (hasCheckpoint) {
-                throw new ExportMoveOutException("目录移动恢复被阻止：来源与 EXPORT 卷状态已变化 comicId=" + comicId,
-                        exception);
+                throw new ExportMoveOutException("目录移动恢复被阻止：卷状态已变化 comicId=" + comicId, exception);
             }
             throw exception;
         }
     }
 
-    private void writeDirectoryEntry(Path target, byte[] content) throws IOException {
-        Files.createDirectories(target.getParent());
-        Files.write(target, content);
-    }
-
     private Path validatedRelativePath(String relativePath) throws IOException {
-        if (relativePath == null || relativePath.isBlank() || relativePath.contains("\\")
-                || relativePath.contains(":") || relativePath.startsWith("/")) {
-            throw new IOException("目录移动检查点包含非法相对路径");
+        if (relativePath == null || relativePath.isBlank()) {
+            throw new IOException("相对路径为空");
         }
-        for (String segment : relativePath.split("/", -1)) {
-            if (segment.isBlank() || ".".equals(segment) || "..".equals(segment)) {
-                throw new IOException("目录移动检查点包含非法路径段");
-            }
+        Path path = Path.of(relativePath).normalize();
+        if (path.isAbsolute() || path.startsWith("..")) {
+            throw new IOException("相对路径越界");
         }
-        return Path.of(relativePath).normalize();
+        return path;
     }
 
     private Path sourcePath(String rootKey, String relativePath) {
         StorageRoot root = StorageRootResolver.optional(storageProperties, rootKey);
-        if (root == null) {
-            throw new IllegalStateException("文件夹导出来源存储根不可用: " + rootKey);
-        }
         return root.resolve(relativePath);
     }
 
-    /** 供 handler 发失败事件使用。 */
     public String classifyExportError(Exception exception) {
         String message = exception.getMessage() != null ? exception.getMessage() : exception.getClass().getSimpleName();
         if (message.contains("ZIP") || message.contains("zip")) {

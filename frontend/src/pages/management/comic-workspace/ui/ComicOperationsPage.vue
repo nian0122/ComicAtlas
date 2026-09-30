@@ -43,11 +43,31 @@
               <el-select v-model="exportFormat" style="width: 120px" aria-label="导出格式">
                 <el-option label="ZIP" value="ZIP" />
                 <el-option label="CBZ" value="CBZ" />
-                <el-option label="文件夹" value="DIRECTORY" />
               </el-select>
-              <AppButton @click="createExport">
-                {{ exportFormat === 'DIRECTORY' ? '导出漫画文件夹' : '导出漫画压缩包' }}
+              <AppButton @click="createExport"> 导出漫画压缩包 </AppButton>
+              <AppButton variant="danger" :disabled="directoryExporting" @click="exportDirectory">
+                {{ directoryExporting ? '创建中…' : '移出并导出文件夹' }}
               </AppButton>
+            </div>
+            <div v-if="directoryExportTask" class="directory-export-status" role="status">
+              <span v-if="directoryExportTask.status === 'PENDING'"
+                >文件夹导出 #{{ directoryExportTask.id }}：等待处理</span
+              >
+              <span v-else-if="directoryExportTask.status === 'RUNNING'">
+                文件夹导出 #{{ directoryExportTask.id }}：正在移动媒体目录（{{ directoryExportTask.progress }}%）
+              </span>
+              <span v-else-if="directoryExportTask.status === 'SUCCESS'">
+                文件夹导出完成：{{ directoryExportTask.physicalPath || directoryExportTask.outputPath }}
+              </span>
+              <span v-else class="directory-export-status__error">
+                文件夹导出失败：{{ directoryExportTask.errorMsg || '任务处理失败' }}
+              </span>
+              <div class="actions">
+                <AppButton v-if="directoryExportTask.status === 'SUCCESS'" variant="secondary" @click="openDirectory">
+                  打开导出目录
+                </AppButton>
+                <AppButton variant="text" @click="clearDirectoryExportTask">关闭</AppButton>
+              </div>
             </div>
           </div>
           <el-table
@@ -184,8 +204,11 @@ const polling = ref(true)
 const loading = ref(false)
 const error = ref('')
 const activeTab = ref('operations')
-const exportFormat = ref<'ZIP' | 'CBZ' | 'DIRECTORY'>('ZIP')
+const exportFormat = ref<'ZIP' | 'CBZ'>('ZIP')
+const directoryExporting = ref(false)
+const directoryExportTask = ref<Awaited<ReturnType<typeof exportApi.getTask>>['data'] | null>(null)
 let timer: ReturnType<typeof setInterval> | undefined
+let directoryExportTimer: ReturnType<typeof setTimeout> | undefined
 
 const statusMeta = computed(() => (comic.value ? comicStatusMeta(comic.value.status) : comicStatusMeta('DRAFT')))
 const blockedRows = computed<readonly BlockedRow[]>(() =>
@@ -254,20 +277,57 @@ function refreshMetadata(): void {
   void runAction('刷新元数据', () => storageService.requestMetadataRefresh(comicId.value))
 }
 function createExport(): void {
-  const label = exportFormat.value === 'DIRECTORY' ? '导出漫画文件夹' : `${exportFormat.value} 导出`
-  if (exportFormat.value === 'DIRECTORY') {
-    void ElMessageBox.confirm(
-      '文件夹导出会把漫画原件移出系统管理。完成后漫画将从资料库移除，之后不能在本系统阅读或恢复；请确认导出目录已妥善保管。',
-      '确认移出原件并取消管理',
+  const label = `${exportFormat.value} 导出`
+  void runAction(label, () => exportApi.createExport(comicId.value, exportFormat.value))
+}
+async function exportDirectory(): Promise<void> {
+  if (!comic.value || directoryExporting.value) return
+  try {
+    await ElMessageBox.confirm(
+      '将移动这本漫画的媒体目录，并从 ComicAtlas 移除该漫画。完成后无法在本系统阅读或恢复。',
+      '确认移出并导出文件夹',
       { type: 'warning', confirmButtonText: '移出并导出', cancelButtonText: '取消' },
     )
-      .then(() => runAction(label, () => exportApi.createExport(comicId.value, exportFormat.value)))
-      .catch((reason: unknown) => {
-        if (reason !== 'cancel' && reason !== 'close') ElMessage.error(errorMessage(reason))
-      })
-    return
+    directoryExporting.value = true
+    const response = await exportApi.createBatchDirectoryExport([comic.value.id])
+    directoryExportTask.value = response.data
+    scheduleDirectoryExportRefresh()
+    ElMessage.success(`文件夹导出任务 ${response.data.id} 已创建`)
+    await loadState(true)
+  } catch (reason: unknown) {
+    if (reason !== 'cancel' && reason !== 'close') ElMessage.error(errorMessage(reason))
+  } finally {
+    directoryExporting.value = false
   }
-  void runAction(label, () => exportApi.createExport(comicId.value, exportFormat.value))
+}
+function scheduleDirectoryExportRefresh(): void {
+  if (directoryExportTimer !== undefined) clearTimeout(directoryExportTimer)
+  if (!directoryExportTask.value || ['SUCCESS', 'FAILED'].includes(directoryExportTask.value.status)) return
+  directoryExportTimer = setTimeout(() => void refreshDirectoryExportTask(), 2000)
+}
+async function refreshDirectoryExportTask(): Promise<void> {
+  const taskId = directoryExportTask.value?.id
+  if (!taskId) return
+  try {
+    const response = await exportApi.getTask(taskId)
+    directoryExportTask.value = response.data
+  } catch (reason: unknown) {
+    ElMessage.error(errorMessage(reason))
+  }
+  scheduleDirectoryExportRefresh()
+}
+async function openDirectory(): Promise<void> {
+  if (!directoryExportTask.value) return
+  try {
+    await exportApi.openDir(directoryExportTask.value.id)
+  } catch (reason: unknown) {
+    ElMessage.error(errorMessage(reason))
+  }
+}
+function clearDirectoryExportTask(): void {
+  if (directoryExportTimer !== undefined) clearTimeout(directoryExportTimer)
+  directoryExportTimer = undefined
+  directoryExportTask.value = null
 }
 async function trashComic(): Promise<void> {
   await ElMessageBox.confirm('漫画将移入回收站，可在需要时恢复。', '确认回收', { type: 'warning' })
@@ -300,6 +360,7 @@ onMounted(() => {
 })
 onBeforeUnmount(() => {
   if (timer !== undefined) clearInterval(timer)
+  if (directoryExportTimer !== undefined) clearTimeout(directoryExportTimer)
 })
 </script>
 
@@ -363,6 +424,18 @@ onBeforeUnmount(() => {
 }
 .export-actions {
   align-items: center;
+}
+.directory-export-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  padding: var(--space-md) 0;
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+}
+.directory-export-status__error {
+  color: var(--danger);
 }
 .blocked-table {
   margin-top: var(--space-3);

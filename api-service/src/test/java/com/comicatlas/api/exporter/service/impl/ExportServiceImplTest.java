@@ -38,12 +38,16 @@ class ExportServiceImplTest {
     Path tempDir;
 
     @Test
-    void createDirectoryExportTask_locksComicUntilMoveOutCompletes() {
-        Comic comic = new Comic();
-        comic.setId(42L);
-        comic.setStatus(ComicStatus.READY);
+    void createBatchDirectoryExportTask_locksAllComicsAndPersistsSelection() {
+        Comic firstComic = new Comic();
+        firstComic.setId(42L);
+        firstComic.setStatus(ComicStatus.READY);
+        Comic secondComic = new Comic();
+        secondComic.setId(43L);
+        secondComic.setStatus(ComicStatus.READY);
         ComicMapper comicMapper = mock(ComicMapper.class);
-        when(comicMapper.selectByIdForUpdate(42L)).thenReturn(comic);
+        when(comicMapper.selectByIdForUpdate(42L)).thenReturn(firstComic);
+        when(comicMapper.selectByIdForUpdate(43L)).thenReturn(secondComic);
         ExportTaskMapper taskMapper = mock(ExportTaskMapper.class);
         doAnswer(invocation -> {
             ((ExportTask) invocation.getArgument(0)).setId(71L);
@@ -58,10 +62,17 @@ class ExportServiceImplTest {
         ExportServiceImpl exportService = new ExportServiceImpl(comicMapper, taskMapper,
                 mock(OutboxService.class), managementTaskService, props);
 
-        exportService.createExportTask(42L, ExportFormats.DIRECTORY);
+        ExportTaskVO result = exportService.createBatchDirectoryExportTask(List.of(43L, 42L));
 
-        assertThat(comic.getStatus()).isEqualTo(ComicStatus.EXPORTING);
-        verify(comicMapper).updateById(comic);
+        assertThat(firstComic.getStatus()).isEqualTo(ComicStatus.EXPORTING);
+        assertThat(secondComic.getStatus()).isEqualTo(ComicStatus.EXPORTING);
+        assertThat(result.getComicIds()).containsExactly(42L, 43L);
+        verify(comicMapper).updateById(firstComic);
+        verify(comicMapper).updateById(secondComic);
+        org.mockito.ArgumentCaptor<ExportTask> exportTaskCaptor = org.mockito.ArgumentCaptor.forClass(ExportTask.class);
+        verify(taskMapper).insert(exportTaskCaptor.capture());
+        assertThat(exportTaskCaptor.getValue().getComicIds()).isEqualTo("42,43");
+        assertThat(exportTaskCaptor.getValue().getFormat()).isEqualTo(ExportFormats.BATCH_DIRECTORY);
     }
 
     @Test

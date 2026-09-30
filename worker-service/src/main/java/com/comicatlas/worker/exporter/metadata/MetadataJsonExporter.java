@@ -7,9 +7,8 @@ import com.comicatlas.worker.shared.metadata.MetadataExporter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
-import java.util.Map;
 
-/** 元数据 JSON 生成：collect → map → build（导出与元数据刷新共用）。 */
+/** 元数据 JSON 生成：collect → map → build（归档导出与元数据刷新共用）。 */
 @Component
 @RequiredArgsConstructor
 public class MetadataJsonExporter implements MetadataExporter {
@@ -28,8 +27,4 @@ public class MetadataJsonExporter implements MetadataExporter {
         return metadataJsonBuilder.build(modelMapper.toV3(collected));
     }
 
-    /** 文件夹导出的 metadata.json 引用导出目录内的相对媒体路径。 */
-    public String exportDirectoryJson(ExportCollectResult collected, Map<Long, String> mediaPaths) {
-        return metadataJsonBuilder.build(modelMapper.toV3(collected, mediaPaths));
-    }
 }

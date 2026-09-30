@@ -2,12 +2,11 @@ package com.comicatlas.worker.exporter.model;
 
 import java.util.List;
 
-/** 文件夹移出计划：只记录漫画目录和章节目录，不展开媒体文件系统清单。 */
+/** 单本漫画的文件夹移出计划：只记录章节目录，不展开媒体文件清单。 */
 public record DirectoryExportPlan(
+        Long comicId,
         String rootDirName,
         String sourceRootKey,
-        String metadataJson,
-        String comicInfoXml,
         List<String> catalogDirectories,
         List<ChapterMove> chapterMoves,
         long estimatedSize) {

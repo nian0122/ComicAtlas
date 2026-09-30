@@ -380,87 +380,6 @@ class ExportServiceTest {
     }
 
     @Test
-    void directoryExport_usesAvailableSpaceInsteadOfZipTotalLimit() throws Exception {
-        workerConfig.getZip().setMaxTotalSize(4L);
-        workerConfig.getDirectoryExport().setMinimumFreeSpaceBytes(0L);
-        MediaRecord media = media(1L, 10L, "1/10/001.jpg", 1);
-        when(exportCollector.collect(1L)).thenReturn(result(comic(1L, "标题"),
-                List.of(chapter(10L, "第一章", 1)), List.of(media)));
-        when(metadataJsonExporter.exportDirectoryJson(any(ExportCollectResult.class), anyMap())).thenReturn("{}");
-        when(exportFileResolver.resolve(media)).thenReturn(new StorageRef("HQ", "1/10/001.jpg"));
-        writeFile("hq/1/10/001.jpg", "media-content-larger-than-zip-cap");
-        stubResolverToRoot();
-
-        ExportService.ExportOutput output = service.export(1L, 99L, "DIRECTORY");
-
-        assertTrue(Files.isRegularFile(storageProperties.getRoots().get("EXPORT").getPath()
-                .resolve(output.fileName()).resolve("第一章/001.jpg")));
-        assertFalse(Files.exists(storageProperties.getRoots().get("EXPORT").getPath().resolve(".staging-99")));
-        assertFalse(Files.exists(storageProperties.getRoots().get("HQ").getPath().resolve("1")),
-                "文件夹导出成功后 HQ 原件应从系统管理中移出");
-    }
-
-    @Test
-    void directoryExport_preservesAndReusesCompletedStagingAfterPublishFailure() throws Exception {
-        MediaRecord media = media(1L, 10L, "1/10/001.jpg", 1);
-        ExportCollectResult collected = result(comic(1L, "标题"),
-                List.of(chapter(10L, "第一章", 1)), List.of(media));
-        when(exportCollector.collect(1L)).thenReturn(collected);
-        when(metadataJsonExporter.exportDirectoryJson(eq(collected), anyMap())).thenReturn("{}");
-        when(exportFileResolver.resolve(media)).thenReturn(new StorageRef("HQ", "1/10/001.jpg"));
-        Path sourceFile = writeFile("hq/1/10/001.jpg", "media-content");
-        stubResolverToRoot();
-        ExportService realService = new ExportServiceImpl(exportCollector, exportFileResolver, zipBuilder,
-                metadataJsonExporter, storageProperties, workerConfig, archivePublisher);
-        Path exportRoot = storageProperties.getRoots().get("EXPORT").getPath();
-        Path stagingDir = exportRoot.resolve(".staging-99");
-        Path finalDir = exportRoot.resolve("99");
-        java.util.concurrent.atomic.AtomicBoolean failFirstPublish = new java.util.concurrent.atomic.AtomicBoolean(true);
-        try (MockedStatic<Files> mockedFiles = mockStatic(Files.class,
-                withSettings().defaultAnswer(invocation -> {
-                    if ("move".equals(invocation.getMethod().getName())
-                            && stagingDir.equals(invocation.getArgument(0))
-                            && finalDir.equals(invocation.getArgument(1))
-                            && failFirstPublish.compareAndSet(true, false)) {
-                        throw new IOException("Windows 暂时拒绝目录移动");
-                    }
-                    return invocation.callRealMethod();
-                }))) {
-            IOException failure = assertThrows(IOException.class,
-                    () -> realService.export(1L, 99L, "DIRECTORY"));
-
-            assertTrue(failure.getMessage().contains("保留 staging 供重试"));
-            assertTrue(Files.isDirectory(stagingDir.resolve("标题/第一章")));
-            assertTrue(Files.isRegularFile(exportRoot.resolve(".moveout-99.checkpoint")));
-
-            ExportService.ExportOutput retriedOutput = realService.export(1L, 99L, "DIRECTORY");
-
-            assertTrue(Files.isRegularFile(exportRoot.resolve(retriedOutput.fileName()).resolve("第一章/001.jpg")));
-            assertFalse(Files.exists(sourceFile.getParent()), "章节目录应直接移动出 HQ");
-            assertFalse(Files.exists(tempDir.resolve("hq/1/10")), "章节目录应直接移动出 HQ");
-            assertTrue(Files.isRegularFile(exportRoot.resolve(".moveout-99.checkpoint")));
-        }
-    }
-
-    @Test
-    void directoryExport_failsBeforeCopyWhenVolumeSpaceIsInsufficient() throws Exception {
-        workerConfig.getDirectoryExport().setMinimumFreeSpaceBytes(Long.MAX_VALUE / 2);
-        MediaRecord media = media(1L, 10L, "1/10/001.jpg", 1);
-        when(exportCollector.collect(1L)).thenReturn(result(comic(1L, "标题"),
-                List.of(chapter(10L, "第一章", 1)), List.of(media)));
-        when(metadataJsonExporter.exportDirectoryJson(any(ExportCollectResult.class), anyMap())).thenReturn("{}");
-        when(exportFileResolver.resolve(media)).thenReturn(new StorageRef("HQ", "1/10/001.jpg"));
-        writeFile("hq/1/10/001.jpg", "media-content");
-        stubResolverToRoot();
-
-        IOException exception = assertThrows(IOException.class, () -> service.export(1L, 100L, "DIRECTORY"));
-
-        assertTrue(exception.getMessage().contains("文件夹导出空间不足"));
-        assertFalse(Files.exists(storageProperties.getRoots().get("EXPORT").getPath().resolve(".staging-100")));
-        assertFalse(Files.exists(storageProperties.getRoots().get("EXPORT").getPath().resolve("100")));
-    }
-
-    @Test
     void export_wrapsResolverFailurePreservingCause() throws Exception {
         MediaRecord m1 = media(1L, 10L, "1/10/001.jpg", 1);
         when(exportCollector.collect(1L)).thenReturn(result(comic(1L, "标题"), List.of(chapter(10L, "第一章", 1)), List.of(m1)));
@@ -556,33 +475,59 @@ class ExportServiceTest {
     }
 
     @Test
-    void export_directoryWritesRestoredHierarchyWithoutArchive() throws Exception {
-        MediaRecord media = media(1L, 10L, "1/10/原始文件.jpg", 1);
-        ChapterRecord chapter = chapter(10L, "第01话", 1);
-        chapter.setCatalogId(101L);
-        ExportCollectResult collected = result(comic(1L, "测试标题"), List.of(chapter),
-                List.of(catalog(100L, null, "第一卷"), catalog(101L, 100L, "附录")), List.of(media));
-        when(exportCollector.collect(1L)).thenReturn(collected);
-        when(metadataJsonExporter.exportDirectoryJson(eq(collected), anyMap())).thenReturn("{}");
-        when(exportFileResolver.resolve(media)).thenReturn(new StorageRef("HQ", "1/10/原始文件.jpg"));
-        writeFile("hq/1/10/原始文件.jpg", "image-content");
+    void batchDirectoryExport_movesChapterDirectoriesAndContainsMediaOnly() throws Exception {
+        MediaRecord firstMedia = media(1L, 10L, "1/10/original.jpg", 1);
+        MediaRecord secondMedia = media(2L, 20L, "2/20/clip.mp4", 1);
+        ChapterRecord firstChapter = chapter(10L, "第01话", 1);
+        firstChapter.setCatalogId(101L);
+        ChapterRecord secondChapter = chapter(20L, "短片", 1);
+        ExportCollectResult firstResult = result(comic(1L, "测试标题"), List.of(firstChapter),
+                List.of(catalog(100L, null, "第一卷"), catalog(101L, 100L, "附录")), List.of(firstMedia));
+        ExportCollectResult secondResult = result(comic(2L, "测试标题"), List.of(secondChapter), List.of(), List.of(secondMedia));
+        when(exportCollector.collect(1L)).thenReturn(firstResult);
+        when(exportCollector.collect(2L)).thenReturn(secondResult);
+        writeFile("hq/1/10/original.jpg", "image-content");
+        writeFile("hq/2/20/clip.mp4", "video-content");
         stubResolverToRoot();
         ZipBuilder realZipBuilder = new ZipBuilder(workerConfig);
         ExportService realService = new ExportServiceImpl(exportCollector, exportFileResolver, realZipBuilder,
                 metadataJsonExporter, storageProperties, workerConfig, new ExportArchivePublisher(realZipBuilder));
 
-        ExportService.ExportOutput output = realService.export(1L, 101L, "DIRECTORY");
+        ExportService.ExportOutput output = realService.exportBatchDirectory(List.of(1L, 2L), 101L);
 
         Path exportRoot = storageProperties.getRoots().get("EXPORT").getPath();
-        Path comicRoot = exportRoot.resolve(output.fileName());
-        assertEquals("101/测试标题", output.fileName());
-        assertTrue(Files.isDirectory(comicRoot));
-        assertEquals("image-content", Files.readString(comicRoot.resolve("第一卷/附录/第01话/原始文件.jpg")));
-        assertTrue(Files.isRegularFile(comicRoot.resolve("metadata.json")));
-        try (var files = Files.list(exportRoot.resolve("101"))) {
-            assertTrue(files.noneMatch(path -> path.getFileName().toString().endsWith(".zip")),
-                    "文件夹导出不应生成 ZIP 文件");
-        }
+        Path taskDirectory = exportRoot.resolve(output.fileName());
+        assertEquals("101", output.fileName());
+        assertTrue(Files.isRegularFile(taskDirectory.resolve("测试标题/第一卷/附录/第01话/original.jpg")));
+        assertTrue(Files.isRegularFile(taskDirectory.resolve("测试标题_2/短片/clip.mp4")));
+        assertFalse(Files.exists(taskDirectory.resolve("测试标题/metadata.json")));
+        assertFalse(Files.exists(taskDirectory.resolve("测试标题/ComicInfo.xml")));
+        assertFalse(Files.exists(storageProperties.getRoots().get("HQ").getPath().resolve("1")));
+        assertFalse(Files.exists(storageProperties.getRoots().get("HQ").getPath().resolve("2")));
+        assertTrue(Files.isRegularFile(taskDirectory.resolve("测试标题/第一卷/附录/第01话/original.jpg")),
+                "媒体目录应移动到导出结构而不是逐文件复制");
+    }
+
+    @Test
+    void batchDirectoryExport_preflightsEveryComicBeforeMovingAnyDirectory() throws Exception {
+        MediaRecord firstMedia = media(1L, 10L, "1/10/original.jpg", 1);
+        MediaRecord secondMedia = media(2L, 20L, "2/20/clip.mp4", 1);
+        when(exportCollector.collect(1L)).thenReturn(result(comic(1L, "漫画甲"),
+                List.of(chapter(10L, "第一章", 1)), List.of(firstMedia)));
+        when(exportCollector.collect(2L)).thenReturn(result(comic(2L, "漫画乙"),
+                List.of(chapter(20L, "短片", 1)), List.of(secondMedia)));
+        Path firstMediaFile = writeFile("hq/1/10/original.jpg", "image-content");
+        writeFile("hq/2/20/clip.mp4", "video-content");
+        writeFile("hq/2/20/unregistered.txt", "unexpected-content");
+        stubResolverToRoot();
+
+        IOException failure = assertThrows(IOException.class,
+                () -> service.exportBatchDirectory(List.of(1L, 2L), 102L));
+
+        assertTrue(failure.getMessage().contains("非媒体文件"));
+        assertTrue(Files.isRegularFile(firstMediaFile), "整批预检失败时前一本漫画的原件也必须保留");
+        assertFalse(Files.exists(storageProperties.getRoots().get("EXPORT").getPath().resolve(".staging-102")));
+        assertFalse(Files.exists(storageProperties.getRoots().get("EXPORT").getPath().resolve("102")));
     }
 
     @Test

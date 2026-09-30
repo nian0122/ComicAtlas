@@ -58,23 +58,23 @@
             <article v-for="tag in filteredTags" :key="tag.id" class="tag-card">
               <span class="tag-card__name" :title="tag.name">{{ tag.name }}</span>
               <div class="tag-card__actions">
-                <button
-                  type="button"
+                <AppButton
+                  variant="text"
                   class="tag-action"
                   :aria-label="`编辑标签 ${tag.name}`"
                   @click="startEditTag(tag)"
                 >
                   编辑
-                </button>
+                </AppButton>
                 <span class="tag-card__divider" aria-hidden="true"></span>
-                <button
-                  type="button"
+                <AppButton
+                  variant="text"
                   class="tag-action tag-action--delete"
                   :aria-label="`删除标签 ${tag.name}`"
                   @click="onDeleteTag(tag)"
                 >
                   删除
-                </button>
+                </AppButton>
               </div>
             </article>
           </div>

@@ -35,8 +35,6 @@ public class WorkerConfig {
     private Proxy proxy = new Proxy();
     /** ZIP 导入导出安全限制。 */
     private Zip zip = new Zip();
-    /** 普通文件夹导出配置。 */
-    private DirectoryExport directoryExport = new DirectoryExport();
     /** 封面生成参数。 */
     private Cover cover = new Cover();
     /** 外部进程 IO 线程池参数。 */
@@ -250,12 +248,6 @@ public class WorkerConfig {
         private long maxTotalSize = 30L * 1024 * 1024 * 1024;
     }
 
-    /** 文件夹导出时要求保留在目标卷上的最小可用空间。 */
-    @Data
-    public static class DirectoryExport {
-        private long minimumFreeSpaceBytes = 1024L * 1024 * 1024;
-    }
-
     /**
      * 启动校验分卷（split ZIP）容量配置边界：splitSize 必须落在 Commons Compress
      * 分卷支持范围（64 KiB..4 GiB）；maxEntrySize 必须满足 0 &lt; maxEntrySize &lt;= maxTotalSize。
@@ -296,10 +288,6 @@ public class WorkerConfig {
                     "worker.zip.maxEntrySize 必须满足 0 < maxEntrySize <= maxTotalSize，"
                             + "当前 maxEntrySize=" + zipConfig.getMaxEntrySize()
                             + ", maxTotalSize=" + zipConfig.getMaxTotalSize());
-        }
-        if (directoryExport == null || directoryExport.getMinimumFreeSpaceBytes() < 0) {
-            throw new IllegalArgumentException(
-                    "worker.directoryExport.minimumFreeSpaceBytes 必须大于等于 0");
         }
     }
 

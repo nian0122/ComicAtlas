@@ -22,7 +22,9 @@ public class ExportTask {
     private Long managementTaskId;
     /** 被导出的漫画 ID */
     private Long comicId;
-    /** 导出格式：ZIP（默认）、CBZ 或 DIRECTORY。 */
+    /** 批量文件夹导出的漫画 ID，逗号分隔；单本 ZIP/CBZ 导出为空。 */
+    private String comicIds;
+    /** 导出格式：ZIP、CBZ 或 BATCH_DIRECTORY。 */
     private String format;
     /** 任务状态：PENDING/RUNNING/SUCCESS/FAILED */
     private ExportTaskStatus status;      // PENDING, RUNNING, SUCCESS, FAILED

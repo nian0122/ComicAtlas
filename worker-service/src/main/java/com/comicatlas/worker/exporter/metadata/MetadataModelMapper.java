@@ -18,18 +18,13 @@ import java.util.stream.Collectors;
 
 /**
  * worker entity(Export*) → MetadataV3 通用模型映射。
- * 普通元数据导出保留 DB 中的 HQ 相对路径；文件夹导出改写为漫画目录内的可移植路径。
+ * 普通元数据导出保留 DB 中的 HQ 相对路径。
  * 非法路径由 MetadataV3 校验。
  */
 @Component
 public class MetadataModelMapper {
 
     public MetadataV3 toV3(ExportCollectResult result) {
-        return toV3(result, Map.of());
-    }
-
-    /** 文件夹导出使用可移植的漫画内路径，而不是源存储中的 HQ 引用。 */
-    public MetadataV3 toV3(ExportCollectResult result, Map<Long, String> mediaPaths) {
         ComicRecord comic = result.comic();
         MetadataV3.Comic comicInfo = new MetadataV3.Comic(
                 comic.getTitle() != null ? comic.getTitle() : "",
@@ -53,9 +48,7 @@ public class MetadataModelMapper {
             ChapterRecord chapter = result.chapters().get(i);
             List<MetadataV3.MediaItem> mediaItems = new ArrayList<>();
             for (MediaRecord media : mediaByChapter.getOrDefault(chapter.getId(), List.of())) {
-                String hqPath = mediaPaths.containsKey(media.getId())
-                        ? mediaPaths.get(media.getId())
-                        : requireHqPath(media);
+                String hqPath = requireHqPath(media);
                 mediaItems.add(new MetadataV3.MediaItem(
                         extractFileName(hqPath),
                         media.getPageNumber() != null ? media.getPageNumber() : 0,
