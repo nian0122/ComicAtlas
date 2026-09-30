@@ -133,25 +133,33 @@
 
     <section v-else class="comic-table-section">
       <div class="comic-grid">
-        <div v-for="comic in store.list" :key="comic.id" class="comic-row" @click="goEdit(comic.id)">
+        <article
+          v-for="comic in store.list"
+          :key="comic.id"
+          class="comic-card"
+          :class="{ 'is-selected': selectedIds.includes(comic.id) }"
+        >
           <el-checkbox
             class="comic-checkbox"
             :model-value="selectedIds.includes(comic.id)"
+            :aria-label="`选择漫画：${comic.title}`"
             @change="() => toggleSelect(comic.id)"
             @click.stop
           />
-          <div class="comic-cover">
-            <img v-if="comic.coverUrl" :src="comic.coverUrl" alt="" @error="hideBrokenImage" />
-          </div>
-          <div class="comic-info">
-            <h3 class="comic-title">{{ comic.title }}</h3>
-            <p class="comic-meta">
-              <span>{{ comic.author || '未知作者' }}</span>
-              <span>· {{ comic.pageCount }} 页</span>
-              <span>· {{ statusLabel(comic.status) }}</span>
-            </p>
-          </div>
-        </div>
+          <button class="comic-card-open" type="button" @click="goEdit(comic.id)">
+            <span class="comic-cover">
+              <img v-if="comic.coverUrl" :src="comic.coverUrl" :alt="`${comic.title} 封面`" @error="hideBrokenImage" />
+              <span class="comic-status-badge">{{ statusLabel(comic.status) }}</span>
+            </span>
+            <span class="comic-info">
+              <span class="comic-title" :title="comic.title">{{ comic.title }}</span>
+              <span class="comic-meta">
+                <span>{{ comic.author || '未知作者' }}</span>
+                <span>{{ comic.pageCount }} 页</span>
+              </span>
+            </span>
+          </button>
+        </article>
       </div>
 
       <div class="pagination-wrapper">
@@ -487,45 +495,45 @@ function formatBytes(bytes: number | undefined): string {
 }
 
 .comic-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-  overflow: hidden;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(205px, 1fr));
+  align-items: start;
+  gap: var(--space-lg);
   margin-bottom: var(--space-xl);
 }
 
-.comic-row {
+.comic-card {
   position: relative;
-  display: flex;
-  align-items: center;
-  gap: var(--space-base);
-  min-height: 82px;
-  padding: var(--space-3) var(--space-5);
-  background: var(--bg-primary);
-  border-bottom: 1px solid var(--border);
-  cursor: pointer;
-  transition: background-color var(--transition-fast);
-}
-
-.comic-row:hover {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--card-radius);
   background: var(--bg-surface);
-  box-shadow: inset 2px 0 var(--color-brand);
+  box-shadow: var(--card-shadow);
+  transition:
+    transform var(--transition-fast),
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast);
 }
 
-.comic-row:last-child {
-  border-bottom: 0;
+.comic-card:hover {
+  transform: translateY(-3px);
+  border-color: var(--border-strong);
+  box-shadow: var(--card-shadow-hover);
+}
+
+.comic-card.is-selected {
+  border-color: var(--accent);
+  box-shadow:
+    0 0 0 1px var(--accent),
+    var(--card-shadow);
 }
 
 .comic-cover {
   position: relative;
-  width: 40px;
-  height: 60px;
-  flex-shrink: 0;
-  border-radius: var(--radius-sm);
   overflow: hidden;
   background: var(--bg-secondary);
+  aspect-ratio: 2 / 3;
 }
 
 .comic-cover::before {
@@ -535,7 +543,7 @@ function formatBytes(bytes: number | undefined): string {
   place-items: center;
   content: 'CA';
   color: var(--text-muted);
-  font-size: 10px;
+  font-size: 22px;
   font-weight: 800;
 }
 
@@ -551,32 +559,95 @@ function formatBytes(bytes: number | undefined): string {
   display: none;
 }
 
+.comic-checkbox {
+  position: absolute;
+  top: var(--space-sm);
+  left: var(--space-sm);
+  z-index: 2;
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border: 1px solid rgb(255 255 255 / 28%);
+  border-radius: var(--radius-sm);
+  background: rgb(10 10 10 / 72%);
+  backdrop-filter: blur(8px);
+}
+
+.comic-checkbox :deep(.el-checkbox__label) {
+  display: none;
+}
+
+.comic-status-badge {
+  position: absolute;
+  top: var(--space-sm);
+  right: var(--space-sm);
+  max-width: calc(100% - 58px);
+  overflow: hidden;
+  padding: 5px 8px;
+  border: 1px solid rgb(255 255 255 / 20%);
+  border-radius: var(--radius-pill);
+  background: rgb(10 10 10 / 72%);
+  color: #f3f3f3;
+  font-size: 10px;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  backdrop-filter: blur(8px);
+}
+
+.comic-card-open {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.comic-card-open:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -3px;
+}
+
 .comic-info {
-  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
   min-width: 0;
+  padding: var(--space-sm) var(--space-base) var(--space-base);
 }
 
 .comic-title {
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--text-primary);
-  margin: 0 0 var(--space-xs);
   display: -webkit-box;
+  min-height: 2.7em;
   overflow: hidden;
-  line-break: strict;
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.35;
   overflow-wrap: anywhere;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
 }
 
 .comic-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  min-width: 0;
+  overflow: hidden;
   font-size: 12px;
   color: var(--text-secondary);
-  margin: 0;
 }
 
-.comic-meta span + span {
-  margin-left: 6px;
+.comic-meta span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .pagination-wrapper {
@@ -628,6 +699,11 @@ function formatBytes(bytes: number | undefined): string {
 }
 
 @media (max-width: 680px) {
+  .comic-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-md);
+  }
+
   .batch-toolbar {
     align-items: flex-start;
     flex-direction: column;
