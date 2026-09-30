@@ -333,6 +333,11 @@ public class ExportServiceImpl implements ExportService {
         Set<String> usedChapterDirectories = new HashSet<>();
         for (ChapterRecord chapter : result.chapters()) {
             String chapterDirectory = buildChapterDirectory(chapter, catalogPaths, comicId);
+            if (result.chapters().size() == 1 && chapter.getCatalogId() == null
+                    && chapterDirectory.equalsIgnoreCase(sanitizeComicFolderName(result.comic().getTitle(), comicId))) {
+                // 单章节漫画以漫画名作为章节名时，图片原本就在漫画根目录，避免重复创建同名子目录。
+                chapterDirectory = "";
+            }
             if (!usedChapterDirectories.add(chapterDirectory.toLowerCase(Locale.ROOT))) {
                 throw new ExportManifestBuildException("文件夹导出失败：章节目录重名 comicId=" + comicId);
             }
@@ -354,7 +359,8 @@ public class ExportServiceImpl implements ExportService {
             String chapterDirectory = chapterDirectories.get(chapter.getId());
             for (MediaRecord media : mediaByChapter.getOrDefault(chapter.getId(), List.of())) {
                 String sourceRelativePath = directoryMediaPath(media, sourceRootKey, comicId, chapter.getId());
-                String targetPath = chapterDirectory + "/" + Path.of(sourceRelativePath).getFileName();
+                String mediaFileName = Path.of(sourceRelativePath).getFileName().toString();
+                String targetPath = chapterDirectory.isEmpty() ? mediaFileName : chapterDirectory + "/" + mediaFileName;
                 if (!usedMediaPaths.add(targetPath.toLowerCase(Locale.ROOT))) {
                     throw new ExportManifestBuildException("文件夹导出失败：媒体目标路径冲突 comicId=" + comicId);
                 }
@@ -382,8 +388,10 @@ public class ExportServiceImpl implements ExportService {
                 }
                 if (hasMedia) {
                     validateMediaOnlyDirectory(sourceDirectory, chapterMedia, sourceRootKey, comicId, chapter.getId());
+                    String targetRelativePath = chapterDirectories.get(chapter.getId()).isEmpty()
+                            ? rootDirName : rootDirName + "/" + chapterDirectories.get(chapter.getId());
                     chapterMoves.add(new DirectoryExportPlan.ChapterMove(chapter.getId(), sourceRelativePath,
-                            rootDirName + "/" + chapterDirectories.get(chapter.getId())));
+                            targetRelativePath));
                 } else if (hasDirectoryEntries(sourceDirectory)) {
                     throw new IOException("无媒体章节源目录包含未登记文件：comicId=" + comicId
                             + ", chapterId=" + chapter.getId());
@@ -394,7 +402,8 @@ public class ExportServiceImpl implements ExportService {
         }
         Set<String> structureDirectories = new HashSet<>();
         catalogPaths.values().forEach(directory -> structureDirectories.add(rootDirName + "/" + directory));
-        chapterDirectories.values().forEach(directory -> structureDirectories.add(rootDirName + "/" + directory));
+        chapterDirectories.values().forEach(directory -> structureDirectories.add(
+                directory.isEmpty() ? rootDirName : rootDirName + "/" + directory));
         return new DirectoryExportPlan(comicId, rootDirName, sourceRootKey,
                 List.copyOf(structureDirectories), chapterMoves, estimatedSize);
     }
@@ -521,7 +530,7 @@ public class ExportServiceImpl implements ExportService {
                 if (relativeSource.getNameCount() < 2
                         || !plan.comicId().toString().equals(relativeSource.getName(0).toString())
                         || !source.startsWith(comicDirectory) || source.equals(comicDirectory)
-                        || target.isAbsolute() || target.getNameCount() < 2
+                        || target.isAbsolute() || target.getNameCount() < 1
                         || !rootName.equals(target.getName(0).toString()) || target.startsWith("..")) {
                     throw new IOException("批量目录移动计划包含越界源或目标路径");
                 }

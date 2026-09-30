@@ -529,6 +529,26 @@ class ExportServiceTest {
     }
 
     @Test
+    void batchDirectoryExport_doesNotRepeatComicNameForSingleRootChapter() throws Exception {
+        MediaRecord rootMedia = media(126L, 126L, "126/0/000.jpg", 1);
+        ChapterRecord rootChapter = chapter(126L, "根目录漫画", 1);
+        when(exportCollector.collect(126L)).thenReturn(result(comic(126L, "根目录漫画"),
+                List.of(rootChapter), List.of(rootMedia)));
+        writeFile("hq/126/0/000.jpg", "root-chapter-image");
+        stubResolverToRoot();
+        ZipBuilder realZipBuilder = new ZipBuilder(workerConfig);
+        ExportService realService = new ExportServiceImpl(exportCollector, exportFileResolver, realZipBuilder,
+                metadataJsonExporter, storageProperties, workerConfig, new ExportArchivePublisher(realZipBuilder));
+
+        ExportService.ExportOutput output = realService.exportBatchDirectory(List.of(126L), 104L);
+
+        Path comicDirectory = storageProperties.getRoots().get("EXPORT").getPath()
+                .resolve(output.fileName()).resolve("根目录漫画");
+        assertTrue(Files.isRegularFile(comicDirectory.resolve("000.jpg")));
+        assertFalse(Files.exists(comicDirectory.resolve("根目录漫画")), "漫画名不应重复嵌套为章节目录");
+    }
+
+    @Test
     void batchDirectoryExport_preflightsEveryComicBeforeMovingAnyDirectory() throws Exception {
         MediaRecord firstMedia = media(1L, 10L, "1/10/original.jpg", 1);
         MediaRecord secondMedia = media(2L, 20L, "2/20/clip.mp4", 1);
