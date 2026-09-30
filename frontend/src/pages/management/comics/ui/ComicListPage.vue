@@ -46,8 +46,7 @@
         <el-option label="有 LQ" value="HAS_LQ" />
         <el-option label="无 LQ" value="NO_LQ" />
         <el-option label="未生成" value="NOT_GENERATED" />
-        <el-option label="排队中" value="QUEUED" />
-        <el-option label="生成中" value="GENERATING" />
+        <el-option label="排队/生成中" value="QUEUED" />
         <el-option label="缺失" value="MISSING" />
         <el-option label="失败" value="FAILED" />
       </el-select>

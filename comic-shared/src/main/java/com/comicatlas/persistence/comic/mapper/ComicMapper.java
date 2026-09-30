@@ -169,7 +169,9 @@ public interface ComicMapper extends BaseMapper<Comic> {
                     WHERE status_lq_chapter.comic_id = c.id
                     <if test='activeMediaOnly'> AND status_lq_chapter.status = 'READY' AND status_lq_page.status = 'READY' </if>
                       AND status_lq_page.media_type = 'IMAGE'
-                      AND status_lq_page.lq_status = #{query.lqStatus}
+                      AND (status_lq_page.lq_status = #{query.lqStatus}
+                           OR (#{query.lqStatus} IN ('QUEUED', 'GENERATING')
+                               AND status_lq_page.lq_status IN ('QUEUED', 'GENERATING')))
                 )
             </if>
             <if test='query.lqStatus == "NO_LQ"'>
