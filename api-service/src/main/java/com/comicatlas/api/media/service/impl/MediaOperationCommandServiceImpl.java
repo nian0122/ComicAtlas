@@ -64,17 +64,13 @@ public class MediaOperationCommandServiceImpl implements MediaOperationCommandSe
 
     // ======================== LQ 生成 ========================
 
+    @Transactional
     public OperationSubmitResultDTO requestLqForComic(Long comicId, boolean regenerate) {
-        List<Chapter> chapters = chapterMapper.selectByComicIdOrderByGlobalOrder(comicId);
         TaskType operation = regenerate ? TaskType.LQ_REGENERATE : TaskType.LQ_GENERATE;
-
-        List<CreateManagementTaskRequest.TaskTarget> targets = new ArrayList<>();
-        for (Chapter chapter : chapters) {
-            List<Media> eligible = eligibleLqPages(chapter.getId(), regenerate);
-            if (!eligible.isEmpty()) {
-                targets.add(target("CHAPTER", chapter.getId(), operation));
-            }
-        }
+        List<Media> candidates = mediaMapper.selectLqCandidatesByComicId(comicId, regenerate);
+        List<CreateManagementTaskRequest.TaskTarget> targets = candidates.stream()
+                .map(Media::getChapterId).distinct()
+                .map(chapterId -> target("CHAPTER", chapterId, operation)).toList();
         if (targets.isEmpty()) {
             log.info("漫画 {} 无待生成 LQ 的章节，跳过", comicId);
             return OperationSubmitResultDTO.of(null, operation.name(), null, 0);
@@ -83,8 +79,12 @@ public class MediaOperationCommandServiceImpl implements MediaOperationCommandSe
         ManagementTaskResponse task = createTask(operation, "生成低质量图片", "COMIC", targets);
         List<ManagementTaskItemResponse> items = managementTaskService.getTaskItems(task.getId());
 
+        List<Long> targetChapterIds = items.stream().map(ManagementTaskItemResponse::getTargetId).toList();
+        int queuedCount = mediaMapper.markLqQueuedByChapterIds(targetChapterIds, regenerate);
+        if (queuedCount != candidates.size()) {
+            throw new ConflictException("LQ 候选页面状态已变化，请重新提交");
+        }
         for (ManagementTaskItemResponse item : items) {
-            markLqQueued(item.getTargetId());
             enqueue(operation, item, "CHAPTER", item.getTargetId());
         }
         log.info("LQ 命令已提交: comicId={}, regenerate={}, taskId={}, items={}",
@@ -92,6 +92,7 @@ public class MediaOperationCommandServiceImpl implements MediaOperationCommandSe
         return OperationSubmitResultDTO.of(task.getId(), operation.name(), task.getStatus().name(), items.size());
     }
 
+    @Transactional
     public OperationSubmitResultDTO requestLqForChapter(Long chapterId, boolean regenerate) {
         Chapter chapter = chapterMapper.selectById(chapterId);
         if (chapter == null) {
@@ -99,7 +100,7 @@ public class MediaOperationCommandServiceImpl implements MediaOperationCommandSe
         }
         TaskType operation = regenerate ? TaskType.LQ_REGENERATE : TaskType.LQ_GENERATE;
 
-        List<Media> eligible = eligibleLqPages(chapterId, regenerate);
+        List<Media> eligible = mediaMapper.selectLqCandidatesByChapterId(chapterId, regenerate);
         if (eligible.isEmpty()) {
             log.info("章节 {} 无待生成 LQ 的页面，跳过", chapterId);
             return OperationSubmitResultDTO.of(null, operation.name(), null, 0);
@@ -109,23 +110,14 @@ public class MediaOperationCommandServiceImpl implements MediaOperationCommandSe
                 List.of(target("CHAPTER", chapterId, operation)));
         ManagementTaskItemResponse item = managementTaskService.getTaskItems(task.getId()).get(0);
 
-        markLqQueued(chapterId);
+        int queuedCount = mediaMapper.markLqQueuedByChapterIds(List.of(chapterId), regenerate);
+        if (queuedCount != eligible.size()) {
+            throw new ConflictException("LQ 候选页面状态已变化，请重新提交");
+        }
         enqueue(operation, item, "CHAPTER", chapterId);
         log.info("LQ 命令已提交: chapterId={}, regenerate={}, taskId={}",
                 chapterId, regenerate, task.getId());
         return OperationSubmitResultDTO.of(task.getId(), operation.name(), task.getStatus().name(), 1);
-    }
-
-    private List<Media> eligibleLqPages(Long chapterId, boolean regenerate) {
-        List<Media> mediaItems = mediaMapper.selectImagesByChapterId(chapterId);
-        return mediaItems.stream()
-                .filter(media -> media.getHqStatus() != HqStatus.DELETED)
-                .filter(media -> regenerate || media.getLqStatus() != LqStatus.READY)
-                .toList();
-    }
-
-    private void markLqQueued(Long chapterId) {
-        mediaMapper.markLqQueued(chapterId);
     }
 
     // ======================== HQ 删除 ========================

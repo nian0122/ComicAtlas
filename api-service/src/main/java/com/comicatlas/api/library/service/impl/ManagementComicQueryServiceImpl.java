@@ -47,7 +47,7 @@ public class ManagementComicQueryServiceImpl implements ManagementComicQueryServ
         } else {
             query.setOrder("asc");
         }
-        IPage<Comic> comics = comicMapper.selectPage(new Page<>(safePage, safeSize), query);
+        IPage<Comic> comics = comicMapper.selectPage(new Page<>(safePage, safeSize), query, true);
         Page<ManagementComicListVO> result = new Page<>(safePage, safeSize, comics.getTotal());
         result.setRecords(comics.getRecords().stream().map(this::toListVO).toList());
         return result;

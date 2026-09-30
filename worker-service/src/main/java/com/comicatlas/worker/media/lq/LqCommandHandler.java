@@ -14,7 +14,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
+import java.util.Map;
 
 /** LQ 生成命令适配器，负责命令分派及结果事件发布。 */
 @Slf4j
@@ -45,8 +45,11 @@ public class LqCommandHandler {
     }
 
     public void generateComic(ManagementCommandRequestedEvent command) {
-        List<MediaRecord> pages = mediaMapper.selectByComicId(command.targetId());
-        List<Long> chapterIds = pages.stream().map(MediaRecord::getChapterId).filter(Objects::nonNull).distinct().toList();
+        List<MediaRecord> pages = mediaMapper.selectLqCandidatesByComicId(command.targetId());
+        Map<Long, List<MediaRecord>> pagesByChapter = pages.stream()
+                .filter(page -> page.getChapterId() != null)
+                .collect(java.util.stream.Collectors.groupingBy(MediaRecord::getChapterId));
+        List<Long> chapterIds = List.copyOf(pagesByChapter.keySet());
         if (chapterIds.isEmpty()) {
             publisher.failed(command, "漫画无页面: " + command.targetId());
             return;
@@ -55,7 +58,7 @@ public class LqCommandHandler {
         List<LqSizeResult> sizes = new ArrayList<>();
         for (Long chapterId : chapterIds) {
             LqChapterProcessingService.ChapterProcessResult result = chapterProcessingService.process(
-                    chapterId, isRegenerate(command));
+                    chapterId, pagesByChapter.get(chapterId), isRegenerate(command));
             sizes.addAll(result.lqSizes());
             if (!result.failedPages().isEmpty()) {
                 failedChapters.add(chapterId);

@@ -269,7 +269,8 @@ class MediaOperationPipelineIT {
         rabbitTemplate.convertAndSend("comic.management", "command.completed",
                 new ManagementCommandCompletedEvent(UUID.randomUUID(), Instant.now(), 1,
                         cmd.taskId(), cmd.itemId(), cmd.attempt(), "LQ_GENERATE", "CHAPTER",
-                        chapter1.getId(), null, List.of(new LqSizeResult(generatedPage.getId(), 123L))));
+                        chapter1.getId(), null, List.of(new LqSizeResult(generatedPage.getId(), 123L,
+                                generatedPage.getHqPath().replaceFirst("\\.[^.]+$", ".webp")))));
 
         await(() -> managementTaskService.getTask(cmd.taskId()).getStatus() == ManagementTaskStatus.SUCCEEDED,
                 "LQ 部分跳过结果落库");
@@ -283,6 +284,43 @@ class MediaOperationPipelineIT {
         assertThat(skipped.getLqRoot()).isNull();
         assertThat(skipped.getLqPath()).isNull();
         assertThat(skipped.getLqSize()).isZero();
+    }
+
+    @Test
+    @DisplayName("LQ 排队只包含 READY 章节和 READY 页面")
+    void lqCommand_只排队活动生命周期页面() {
+        List<Media> pages = imagePages(chapter1.getId());
+        mediaMapper.update(null, new LambdaUpdateWrapper<Media>()
+                .eq(Media::getId, pages.get(1).getId())
+                .set(Media::getStatus, MediaLifecycleStatus.TRASHED));
+
+        OperationSubmitResultDTO result = commandService.requestLqForChapter(chapter1.getId(), false);
+
+        assertThat(result.getItemCount()).isEqualTo(1);
+        assertThat(lqStatuses(chapter1.getId())).containsExactly("QUEUED", "NOT_GENERATED");
+    }
+
+    @Test
+    @DisplayName("LQ 结果迟到时不覆盖已回收页面")
+    void lqCompleted_lateResultDoesNotChangeTrashedPage() throws Exception {
+        OperationSubmitResultDTO result = commandService.requestLqForChapter(chapter1.getId(), false);
+        ManagementCommandRequestedEvent command = readSingleCommand(result.getTaskId());
+        Media trashedPage = imagePages(chapter1.getId()).get(1);
+        mediaMapper.update(null, new LambdaUpdateWrapper<Media>()
+                .eq(Media::getId, trashedPage.getId())
+                .set(Media::getStatus, MediaLifecycleStatus.TRASHED));
+
+        rabbitTemplate.convertAndSend("comic.management", "command.completed",
+                new ManagementCommandCompletedEvent(UUID.randomUUID(), Instant.now(), 1,
+                        command.taskId(), command.itemId(), command.attempt(), "LQ_GENERATE", "CHAPTER",
+                        chapter1.getId(), null, lqResults(chapter1.getId())));
+
+        await(() -> managementTaskService.getTask(command.taskId()).getStatus() == ManagementTaskStatus.SUCCEEDED,
+                "LQ 迟到完成事件处理");
+        Media refreshedTrashedPage = mediaMapper.selectById(trashedPage.getId());
+        assertThat(refreshedTrashedPage.getStatus()).isEqualTo(MediaLifecycleStatus.TRASHED);
+        assertThat(refreshedTrashedPage.getLqStatus()).isEqualTo(LqStatus.QUEUED);
+        assertThat(refreshedTrashedPage.getLqPath()).isNull();
     }
 
     @Test
@@ -767,7 +805,8 @@ class MediaOperationPipelineIT {
 
     private List<LqSizeResult> lqResults(Long chapterId) {
         return imagePages(chapterId).stream()
-                .map(media -> new LqSizeResult(media.getId(), 100L + media.getPageNumber()))
+                .map(media -> new LqSizeResult(media.getId(), 100L + media.getPageNumber(),
+                        media.getHqPath().replaceFirst("\\.[^.]+$", ".webp")))
                 .toList();
     }
 

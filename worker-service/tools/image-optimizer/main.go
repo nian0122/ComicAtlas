@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -38,6 +39,7 @@ type CLIConfig struct {
 	Quiet             bool
 	JSON              bool
 	Extensions        map[string]bool
+	IncludeFiles      map[string]bool
 }
 
 // PageResult 单页处理结果
@@ -85,6 +87,7 @@ func main() {
 	quiet := flag.Bool("quiet", false, "安静模式")
 	jsonMode := flag.Bool("json", false, "JSON 输出模式")
 	extensions := flag.String("ext", defaultExtensions, "支持的文件扩展名")
+	includeList := flag.String("include-list", "", "可选 JSON 文件名列表；指定后只处理列表中的相对路径")
 	flag.Parse()
 
 	if *scanDir == "" {
@@ -115,6 +118,16 @@ func main() {
 		os.Exit(2)
 	}
 
+	var includedFiles map[string]bool
+	if *includeList != "" {
+		var err error
+		includedFiles, err = readIncludeList(*includeList)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "错误: -include-list 无效: %v\n", err)
+			os.Exit(2)
+		}
+	}
+
 	cfg := &CLIConfig{
 		ComicID:           *comicID,
 		ChapterID:         *chapterID,
@@ -129,6 +142,7 @@ func main() {
 		Quiet:             *quiet,
 		JSON:              *jsonMode,
 		Extensions:        parseExtensions(*extensions),
+		IncludeFiles:      includedFiles,
 	}
 
 	if _, err := os.Stat(cfg.ScanDir); os.IsNotExist(err) {
@@ -161,6 +175,26 @@ func main() {
 	}
 }
 
+func readIncludeList(filePath string) (map[string]bool, error) {
+	content, err := os.ReadFile(filePath)
+	if err != nil {
+		return nil, err
+	}
+	var paths []string
+	if err := json.Unmarshal(content, &paths); err != nil {
+		return nil, err
+	}
+	includedFiles := make(map[string]bool, len(paths))
+	for _, path := range paths {
+		normalizedPath := filepath.ToSlash(filepath.Clean(filepath.FromSlash(strings.TrimSpace(path))))
+		if normalizedPath == "." || filepath.IsAbs(path) || normalizedPath == ".." || strings.HasPrefix(normalizedPath, "../") {
+			return nil, fmt.Errorf("路径必须是安全的相对路径")
+		}
+		includedFiles[normalizedPath] = true
+	}
+	return includedFiles, nil
+}
+
 func parseExtensions(s string) map[string]bool {
 	m := make(map[string]bool)
 	for _, ext := range strings.Split(s, ",") {
@@ -181,6 +215,54 @@ func run(cfg *CLIConfig) *RunResult {
 	for i := 0; i < cfg.Workers; i++ {
 		wg.Add(1)
 		go worker(i, tasks, &wg, cfg, result, decodeBudget)
+	}
+	if cfg.IncludeFiles != nil {
+		includedPaths := make([]string, 0, len(cfg.IncludeFiles))
+		for relativePath := range cfg.IncludeFiles {
+			includedPaths = append(includedPaths, relativePath)
+		}
+		sort.Strings(includedPaths)
+		for _, relativePath := range includedPaths {
+			sourcePath := filepath.Join(cfg.ScanDir, filepath.FromSlash(relativePath))
+			fileInfo, err := os.Lstat(sourcePath)
+			if err != nil || !fileInfo.Mode().IsRegular() {
+				atomic.AddInt32(&result.Total, 1)
+				atomic.AddInt32(&result.Failed, 1)
+				pageNumber := inferPageNumber(strings.TrimSuffix(filepath.Base(relativePath), filepath.Ext(relativePath)))
+				result.mu.Lock()
+				result.Pages = append(result.Pages, PageResult{
+					PageNumber: pageNumber,
+					SourcePath: filepath.ToSlash(relativePath),
+					Status:     "failed",
+					Reason:     "候选源文件不存在或不是普通文件",
+				})
+				result.mu.Unlock()
+				continue
+			}
+			if !cfg.Extensions[strings.ToLower(filepath.Ext(relativePath))] || fileInfo.Size() == 0 {
+				atomic.AddInt32(&result.Total, 1)
+				atomic.AddInt32(&result.Failed, 1)
+				pageNumber := inferPageNumber(strings.TrimSuffix(filepath.Base(relativePath), filepath.Ext(relativePath)))
+				reason := "不支持的图片格式"
+				if fileInfo.Size() == 0 {
+					reason = "空文件"
+				}
+				result.mu.Lock()
+				result.Pages = append(result.Pages, PageResult{
+					PageNumber: pageNumber,
+					SourcePath: filepath.ToSlash(relativePath),
+					Status:     "failed",
+					InputSize:  fileInfo.Size(),
+					Reason:     reason,
+				})
+				result.mu.Unlock()
+				continue
+			}
+			queueImageTask(cfg, result, tasks, sourcePath, relativePath, fileInfo)
+		}
+		close(tasks)
+		wg.Wait()
+		return result
 	}
 
 	_ = filepath.Walk(cfg.ScanDir, func(path string, info os.FileInfo, err error) error {
@@ -208,48 +290,47 @@ func run(cfg *CLIConfig) *RunResult {
 		if err != nil {
 			return nil
 		}
-
-		baseName := strings.TrimSuffix(filepath.Base(relPath), filepath.Ext(relPath))
-		pageNum := inferPageNumber(baseName)
-		lqPath := filepath.Join(cfg.OutputDir, filepath.Dir(relPath), baseName+".webp")
-
-		atomic.AddInt32(&result.Total, 1)
-
-		if !cfg.Force {
-			if lqInfo, statErr := os.Stat(lqPath); statErr == nil {
-				if lqInfo.ModTime().Unix() >= info.ModTime().Unix() {
-					atomic.AddInt32(&result.Skipped, 1)
-					if !cfg.Quiet {
-						fmt.Fprintf(os.Stderr, "跳过: %s | 已存在最新版本 (%s)\n", relPath, formatSize(lqInfo.Size()))
-					}
-					result.mu.Lock()
-					result.Pages = append(result.Pages, PageResult{
-						PageNumber: pageNum,
-						SourcePath: filepath.ToSlash(relPath),
-						Status:     "skipped",
-						InputSize:  info.Size(),
-						OutputSize: lqInfo.Size(),
-						Reason:     "exists",
-						OutputPath: relativeLqPath(cfg.OutputDir, lqPath),
-					})
-					result.mu.Unlock()
-					return nil
-				}
-			}
-		}
-
-		tasks <- imageTask{
-			HQPath:       path,
-			LQPath:       lqPath,
-			RelativePath: relPath,
-			PageNumber:   pageNum,
-		}
+		queueImageTask(cfg, result, tasks, path, relPath, info)
 		return nil
 	})
 
 	close(tasks)
 	wg.Wait()
 	return result
+}
+
+func queueImageTask(cfg *CLIConfig, result *RunResult, tasks chan<- imageTask,
+	sourcePath string, relativePath string, fileInfo os.FileInfo) {
+	baseName := strings.TrimSuffix(filepath.Base(relativePath), filepath.Ext(relativePath))
+	pageNumber := inferPageNumber(baseName)
+	lqPath := filepath.Join(cfg.OutputDir, filepath.Dir(relativePath), baseName+".webp")
+	atomic.AddInt32(&result.Total, 1)
+	if !cfg.Force {
+		if lqInfo, statErr := os.Stat(lqPath); statErr == nil && lqInfo.ModTime().Unix() >= fileInfo.ModTime().Unix() {
+			atomic.AddInt32(&result.Skipped, 1)
+			if !cfg.Quiet {
+				fmt.Fprintf(os.Stderr, "跳过: %s | 已存在最新版本 (%s)\n", relativePath, formatSize(lqInfo.Size()))
+			}
+			result.mu.Lock()
+			result.Pages = append(result.Pages, PageResult{
+				PageNumber: pageNumber,
+				SourcePath: filepath.ToSlash(relativePath),
+				Status:     "skipped",
+				InputSize:  fileInfo.Size(),
+				OutputSize: lqInfo.Size(),
+				Reason:     "exists",
+				OutputPath: relativeLqPath(cfg.OutputDir, lqPath),
+			})
+			result.mu.Unlock()
+			return
+		}
+	}
+	tasks <- imageTask{
+		HQPath:       sourcePath,
+		LQPath:       lqPath,
+		RelativePath: relativePath,
+		PageNumber:   pageNumber,
+	}
 }
 
 type imageTask struct {

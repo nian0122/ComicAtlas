@@ -91,14 +91,50 @@ class ComicNaturalOrderMySqlTest {
             query.setKeyword("排序第");
             query.setSort("title");
             query.setOrder("asc");
-            var page = mapper.selectPage(new Page<>(2, 5), query);
+            var page = mapper.selectPage(new Page<>(2, 5), query, false);
             assertEquals(12, page.getTotal());
             assertEquals(List.of("排序第6话", "排序第7话", "排序第8话", "排序第9话", "排序第10话"),
                     page.getRecords().stream().map(Comic::getTitle).toList());
             query.setOrder("desc");
-            assertEquals(List.of("排序第12话", "排序第11话"), mapper.selectPage(new Page<>(1, 2), query)
+            assertEquals(List.of("排序第12话", "排序第11话"), mapper.selectPage(new Page<>(1, 2), query, false)
                     .getRecords().stream().map(Comic::getTitle).toList());
             assertEquals(List.of("排序第1话", "排序第2话"), mapper.selectTitlesLike("%排序第%", 2));
+        }
+    }
+
+    @Test
+    void managementMediaFiltersIgnoreRecycledChapterAndPageRows() throws Exception {
+        try (var session = sessionFactory.openSession()) {
+            ComicMapper mapper = session.getMapper(ComicMapper.class);
+            Comic comic = new Comic();
+            comic.setTitle("生命周期筛选验证");
+            comic.setStatus(ComicStatus.READY);
+            mapper.insert(comic);
+            try (PreparedStatement insertChapter = session.getConnection().prepareStatement(
+                    "INSERT INTO chapter (comic_id, title, chapter_no, status) VALUES (?, '回收章节', '1', 'TRASHED')",
+                    java.sql.Statement.RETURN_GENERATED_KEYS)) {
+                insertChapter.setLong(1, comic.getId());
+                insertChapter.executeUpdate();
+                try (var keys = insertChapter.getGeneratedKeys()) {
+                    keys.next();
+                    try (PreparedStatement insertPage = session.getConnection().prepareStatement(
+                            "INSERT INTO page (chapter_id, page_number, hq_status, lq_status, status, media_type) "
+                                    + "VALUES (?, 1, 'READY', 'READY', 'TRASHED', 'IMAGE')")) {
+                        insertPage.setLong(1, keys.getLong(1));
+                        insertPage.executeUpdate();
+                    }
+                }
+            }
+
+            ComicListQuery query = new ComicListQuery();
+            query.setHqStatus("HAS_HQ");
+            assertEquals(0, mapper.selectPage(new Page<>(1, 10), query, true).getTotal());
+            assertEquals(1, mapper.selectPage(new Page<>(1, 10), query, false).getTotal());
+            query.setHqStatus(null);
+            query.setLqStatus("HAS_LQ");
+            assertEquals(0, mapper.selectPage(new Page<>(1, 10), query, true).getTotal());
+            assertEquals(1, mapper.selectPage(new Page<>(1, 10), query, false).getTotal());
+            session.rollback();
         }
     }
 
@@ -140,7 +176,7 @@ class ComicNaturalOrderMySqlTest {
             query.setKeyword("同值");
             query.setSort("title");
             query.setOrder("desc");
-            assertEquals(List.of("同值02", "同值2", "同值2"), mapper.selectPage(new Page<>(1, 10), query)
+            assertEquals(List.of("同值02", "同值2", "同值2"), mapper.selectPage(new Page<>(1, 10), query, false)
                     .getRecords().stream().map(Comic::getTitle).toList());
             assertEquals(List.of("同值02", "同值2"), mapper.selectTitlesLike("%同值%", 10));
             session.rollback();

@@ -112,9 +112,6 @@ public interface ComicMapper extends BaseMapper<Comic> {
                     </otherwise>
                 </choose>
             </if>
-            <if test='query.status != null and query.status != ""'>
-                AND c.status = #{query.status}
-            </if>
             <if test='query.category != null and query.category != ""'>
                 <choose>
                     <when test='query.category == &quot;_NONE&quot;'>
@@ -132,28 +129,36 @@ public interface ComicMapper extends BaseMapper<Comic> {
                 AND EXISTS (
                     SELECT 1 FROM chapter hq_chapter
                     JOIN page hq_page ON hq_page.chapter_id = hq_chapter.id
-                    WHERE hq_chapter.comic_id = c.id AND hq_page.hq_status = 'READY'
+                    WHERE hq_chapter.comic_id = c.id
+                    <if test='activeMediaOnly'> AND hq_chapter.status = 'READY' AND hq_page.status = 'READY' </if>
+                      AND hq_page.hq_status = 'READY'
                 )
             </if>
             <if test='query.hqStatus == "NO_HQ"'>
                 AND NOT EXISTS (
                     SELECT 1 FROM chapter no_hq_chapter
                     JOIN page no_hq_page ON no_hq_page.chapter_id = no_hq_chapter.id
-                    WHERE no_hq_chapter.comic_id = c.id AND no_hq_page.hq_status = 'READY'
+                    WHERE no_hq_chapter.comic_id = c.id
+                    <if test='activeMediaOnly'> AND no_hq_chapter.status = 'READY' AND no_hq_page.status = 'READY' </if>
+                      AND no_hq_page.hq_status = 'READY'
                 )
             </if>
             <if test='query.hqStatus != null and query.hqStatus != "" and query.hqStatus != "HAS_HQ" and query.hqStatus != "NO_HQ"'>
                 AND EXISTS (
                     SELECT 1 FROM chapter status_hq_chapter
                     JOIN page status_hq_page ON status_hq_page.chapter_id = status_hq_chapter.id
-                    WHERE status_hq_chapter.comic_id = c.id AND status_hq_page.hq_status = #{query.hqStatus}
+                    WHERE status_hq_chapter.comic_id = c.id
+                    <if test='activeMediaOnly'> AND status_hq_chapter.status = 'READY' AND status_hq_page.status = 'READY' </if>
+                      AND status_hq_page.hq_status = #{query.hqStatus}
                 )
             </if>
             <if test='query.lqStatus == "HAS_LQ"'>
                 AND EXISTS (
                     SELECT 1 FROM chapter has_lq_chapter
                     JOIN page has_lq_page ON has_lq_page.chapter_id = has_lq_chapter.id
-                    WHERE has_lq_chapter.comic_id = c.id AND has_lq_page.media_type = 'IMAGE'
+                    WHERE has_lq_chapter.comic_id = c.id
+                    <if test='activeMediaOnly'> AND has_lq_chapter.status = 'READY' AND has_lq_page.status = 'READY' </if>
+                      AND has_lq_page.media_type = 'IMAGE'
                       AND has_lq_page.lq_status = 'READY'
                 )
             </if>
@@ -161,7 +166,9 @@ public interface ComicMapper extends BaseMapper<Comic> {
                 AND EXISTS (
                     SELECT 1 FROM chapter status_lq_chapter
                     JOIN page status_lq_page ON status_lq_page.chapter_id = status_lq_chapter.id
-                    WHERE status_lq_chapter.comic_id = c.id AND status_lq_page.media_type = 'IMAGE'
+                    WHERE status_lq_chapter.comic_id = c.id
+                    <if test='activeMediaOnly'> AND status_lq_chapter.status = 'READY' AND status_lq_page.status = 'READY' </if>
+                      AND status_lq_page.media_type = 'IMAGE'
                       AND status_lq_page.lq_status = #{query.lqStatus}
                 )
             </if>
@@ -169,7 +176,9 @@ public interface ComicMapper extends BaseMapper<Comic> {
                 AND NOT EXISTS (
                     SELECT 1 FROM chapter no_lq_chapter
                     JOIN page no_lq_page ON no_lq_page.chapter_id = no_lq_chapter.id
-                    WHERE no_lq_chapter.comic_id = c.id AND no_lq_page.media_type = 'IMAGE'
+                    WHERE no_lq_chapter.comic_id = c.id
+                    <if test='activeMediaOnly'> AND no_lq_chapter.status = 'READY' AND no_lq_page.status = 'READY' </if>
+                      AND no_lq_page.media_type = 'IMAGE'
                       AND no_lq_page.lq_status = 'READY'
                 )
             </if>
@@ -190,7 +199,8 @@ public interface ComicMapper extends BaseMapper<Comic> {
         , c.id ASC
         </script>
     """)
-    IPage<Comic> selectPage(Page<Comic> page, @Param("query") ComicListQuery query);
+    IPage<Comic> selectPage(Page<Comic> page, @Param("query") ComicListQuery query,
+                            @Param("activeMediaOnly") boolean activeMediaOnly);
 
     @Update("UPDATE comic SET reaction = #{reaction}, reaction_at = #{reactionAt} WHERE id = #{comicId} AND status = 'READY'")
     int updateReaction(@Param("comicId") Long comicId, @Param("reaction") MediaReaction reaction,

@@ -1,8 +1,10 @@
 package com.comicatlas.api.task.policy;
 
 import com.comicatlas.contract.common.enums.ComicStatus;
+import com.comicatlas.contract.common.enums.ChapterLifecycleStatus;
 import com.comicatlas.contract.common.enums.HqStatus;
 import com.comicatlas.contract.common.enums.LqStatus;
+import com.comicatlas.contract.common.enums.MediaLifecycleStatus;
 import com.comicatlas.persistence.comic.entity.Chapter;
 import com.comicatlas.persistence.comic.entity.Comic;
 import com.comicatlas.persistence.comic.entity.Media;
@@ -49,13 +51,19 @@ public class MediaOperationEligibilityService {
         mergeLifecycleOperation(lifecycleOperations, OperationPolicyService.OP_RECOVER, allowed, blocked);
         mergeLifecycleOperation(lifecycleOperations, OperationPolicyService.OP_PURGE, allowed, blocked);
 
+        if (comic.getStatus() != ComicStatus.READY) {
+            return buildComicOperations(comic, allowed, blocked, false, false, false, false, false);
+        }
+
         boolean anyLqWork = false;
         boolean anyLqReady = false;
         boolean anyHqWork = false;
         boolean hqPreconditionBlocked = false;
         boolean anyTranscode = false;
 
-        List<Chapter> chapters = chapterMapper.selectByComicIdOrderByGlobalOrder(comicId);
+        List<Chapter> chapters = chapterMapper.selectByComicIdOrderByGlobalOrder(comicId).stream()
+                .filter(chapter -> chapter.getStatus() == ChapterLifecycleStatus.READY)
+                .toList();
         if (chapters.isEmpty()) {
             return buildComicOperations(comic, allowed, blocked, false, false, false, false, false);
         }
@@ -125,6 +133,14 @@ public class MediaOperationEligibilityService {
     }
 
     public AllowedOperations forChapter(Long chapterId) {
+        Chapter chapter = chapterMapper.selectById(chapterId);
+        if (chapter == null || chapter.getStatus() != ChapterLifecycleStatus.READY) {
+            return AllowedOperations.none("章节不存在或生命周期状态不是 READY");
+        }
+        Comic comic = comicMapper.selectById(chapter.getComicId());
+        if (comic == null || comic.getStatus() != ComicStatus.READY) {
+            return AllowedOperations.none("所属漫画生命周期状态不是 READY");
+        }
         ChapterOps ops = collectChapterAssetOps(chapterId);
         Set<String> allowed = new LinkedHashSet<>();
         Map<String, String> blocked = new LinkedHashMap<>();
@@ -178,7 +194,8 @@ public class MediaOperationEligibilityService {
 
     private ChapterOps collectChapterAssetOps(List<Media> mediaItems) {
         List<Media> imagePages = mediaItems.stream()
-                .filter(p -> "IMAGE".equals(p.getMediaType()))
+                .filter(p -> "IMAGE".equals(p.getMediaType())
+                        && p.getStatus() == MediaLifecycleStatus.READY)
                 .toList();
         List<Media> deletableHq = imagePages.stream()
                 .filter(p -> p.getHqStatus() == HqStatus.READY || p.getHqStatus() == HqStatus.MISSING)
@@ -192,7 +209,8 @@ public class MediaOperationEligibilityService {
         ops.hqDeleteBlocked = deletableHq.stream().anyMatch(p -> p.getLqStatus() != LqStatus.READY);
         ops.hqDeleteAllowed = !deletableHq.isEmpty() && !ops.hqDeleteBlocked;
         ops.transcodeAllowed = mediaItems.stream().anyMatch(p ->
-                "VIDEO".equals(p.getMediaType())
+                p.getStatus() == MediaLifecycleStatus.READY
+                        && "VIDEO".equals(p.getMediaType())
                         && p.getHqStatus() != HqStatus.DELETED
                         && p.getTranscodeStatus() != TranscodeStatus.READY
                         && p.getTranscodeStatus() != TranscodeStatus.QUEUED

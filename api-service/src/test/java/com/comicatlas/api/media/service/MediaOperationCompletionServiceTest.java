@@ -39,7 +39,7 @@ class MediaOperationCompletionServiceTest {
     void applyLqCompleted_updatesReadyPagesInFixedBatches() {
         Long chapterId = 42L;
         List<LqSizeResult> results = lqResults(1001);
-        when(mediaMapper.resetLqNotGeneratedByChapter(chapterId)).thenReturn(1002);
+        when(mediaMapper.resetActiveLqPendingByChapter(chapterId)).thenReturn(1002);
         when(mediaMapper.updateLqReadyBatch(eq(chapterId), anyList()))
                 .thenAnswer(invocation -> ((List<?>) invocation.getArgument(1)).size());
 
@@ -49,7 +49,7 @@ class MediaOperationCompletionServiceTest {
         ArgumentCaptor<List<Media>> batchCaptor = ArgumentCaptor.forClass(List.class);
         verify(mediaMapper, times(3)).updateLqReadyBatch(eq(chapterId), batchCaptor.capture());
         assertThat(batchCaptor.getAllValues()).extracting(List::size).containsExactly(500, 500, 1);
-        verify(mediaMapper).resetLqNotGeneratedByChapter(chapterId);
+        verify(mediaMapper).resetActiveLqPendingByChapter(chapterId);
         verify(comicStatsService).refreshByChapter(chapterId);
     }
 

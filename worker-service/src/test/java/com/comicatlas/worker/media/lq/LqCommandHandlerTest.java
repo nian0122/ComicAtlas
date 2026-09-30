@@ -69,27 +69,52 @@ class LqCommandHandlerTest {
     @Test
     @DisplayName("LQ_REGENERATE 命令向优化器传 force=true")
     void regenerateCommand_passesForceTrue() {
-        when(mediaMapper.selectByChapterId(42L)).thenReturn(List.of(media("7/42/001.jpg")));
-        when(optimizer.generateLq(eq(7L), eq(42L), any(Path.class), any(Path.class), eq(true)))
+        when(mediaMapper.selectLqCandidatesByChapterId(42L)).thenReturn(List.of(media("7/42/001.jpg")));
+        when(optimizer.generateLq(eq(7L), eq(42L), any(Path.class), any(Path.class), eq(true), anyList()))
                 .thenReturn(successResult());
         ManagementCommandRequestedEvent regen = cmd("LQ_REGENERATE");
 
         handler.generateChapter(regen);
 
-        verify(optimizer).generateLq(eq(7L), eq(42L), any(Path.class), any(Path.class), eq(true));
+        verify(optimizer).generateLq(eq(7L), eq(42L), any(Path.class), any(Path.class), eq(true), anyList());
         verify(publisher).completed(eq(regen), anyList());
     }
 
     @Test
     @DisplayName("LQ_GENERATE 命令向优化器传 force=false")
     void generateCommand_passesForceFalse() {
-        when(mediaMapper.selectByChapterId(42L)).thenReturn(List.of(media("7/42/001.jpg")));
-        when(optimizer.generateLq(eq(7L), eq(42L), any(Path.class), any(Path.class), eq(false)))
+        when(mediaMapper.selectLqCandidatesByChapterId(42L)).thenReturn(List.of(media("7/42/001.jpg")));
+        when(optimizer.generateLq(eq(7L), eq(42L), any(Path.class), any(Path.class), eq(false), anyList()))
                 .thenReturn(successResult());
 
         handler.generateChapter(cmd("LQ_GENERATE"));
 
-        verify(optimizer).generateLq(eq(7L), eq(42L), any(Path.class), any(Path.class), eq(false));
+        verify(optimizer).generateLq(eq(7L), eq(42L), any(Path.class), any(Path.class), eq(false), anyList());
+    }
+
+    @Test
+    @DisplayName("漫画级命令批量读取页面并按章节分组处理")
+    void comicCommand_readsCandidatePagesOnce() {
+        MediaRecord firstPage = media("7/42/001.jpg");
+        firstPage.setChapterId(42L);
+        MediaRecord secondPage = media("7/43/001.jpg");
+        secondPage.setChapterId(43L);
+        when(mediaMapper.selectLqCandidatesByComicId(7L)).thenReturn(List.of(firstPage, secondPage));
+        when(optimizer.generateLq(eq(7L), eq(42L), any(Path.class), any(Path.class), eq(false), anyList()))
+                .thenReturn(successResult());
+        when(optimizer.generateLq(eq(7L), eq(43L), any(Path.class), any(Path.class), eq(false), anyList()))
+                .thenReturn(successResult());
+        ManagementCommandRequestedEvent comicCommand = new ManagementCommandRequestedEvent(
+                UUID.randomUUID(), Instant.now(), 1, 1L, 1L, 1,
+                "LQ_GENERATE", "COMIC", 7L);
+
+        handler.generateComic(comicCommand);
+
+        verify(mediaMapper).selectLqCandidatesByComicId(7L);
+        verify(mediaMapper, org.mockito.Mockito.never()).selectLqCandidatesByChapterId(any());
+        verify(optimizer).generateLq(eq(7L), eq(42L), any(Path.class), any(Path.class), eq(false), anyList());
+        verify(optimizer).generateLq(eq(7L), eq(43L), any(Path.class), any(Path.class), eq(false), anyList());
+        verify(publisher).completed(eq(comicCommand), anyList());
     }
 
     @Test
@@ -98,7 +123,7 @@ class LqCommandHandlerTest {
         MediaRecord media = media("7/42/001.jpg");
         media.setId(99L);
         media.setPageNumber(1);
-        when(mediaMapper.selectByChapterId(42L)).thenReturn(List.of(media));
+        when(mediaMapper.selectLqCandidatesByChapterId(42L)).thenReturn(List.of(media));
         ImageOptimizer.PageResult pageResult = new ImageOptimizer.PageResult();
         pageResult.setPageNumber(1L);
         pageResult.setStatus("processed");
@@ -109,7 +134,7 @@ class LqCommandHandlerTest {
         failedResult.setStatus("failed");
         ImageOptimizer.RunResult runResult = new ImageOptimizer.RunResult();
         runResult.setPages(List.of(pageResult, failedResult));
-        when(optimizer.generateLq(eq(7L), eq(42L), any(Path.class), any(Path.class), eq(false)))
+        when(optimizer.generateLq(eq(7L), eq(42L), any(Path.class), any(Path.class), eq(false), anyList()))
                 .thenReturn(runResult);
         ManagementCommandRequestedEvent command = cmd("LQ_GENERATE");
 
@@ -131,7 +156,7 @@ class LqCommandHandlerTest {
         MediaRecord secondCover = media("7/42/0001-cover.jpg");
         secondCover.setId(103L);
         secondCover.setPageNumber(3);
-        when(mediaMapper.selectByChapterId(42L))
+        when(mediaMapper.selectLqCandidatesByChapterId(42L))
                 .thenReturn(List.of(firstCover, ordinaryPage, secondCover));
 
         ImageOptimizer.PageResult processedPage = new ImageOptimizer.PageResult();
@@ -150,7 +175,7 @@ class LqCommandHandlerTest {
         failedSecondCover.setStatus("failed");
         ImageOptimizer.RunResult runResult = new ImageOptimizer.RunResult();
         runResult.setPages(List.of(processedPage, failedFirstCover, failedSecondCover));
-        when(optimizer.generateLq(eq(7L), eq(42L), any(Path.class), any(Path.class), eq(false)))
+        when(optimizer.generateLq(eq(7L), eq(42L), any(Path.class), any(Path.class), eq(false), anyList()))
                 .thenReturn(runResult);
         ManagementCommandRequestedEvent command = cmd("LQ_GENERATE");
 

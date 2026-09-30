@@ -11,6 +11,7 @@ import org.mockito.ArgumentCaptor;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -56,7 +57,7 @@ class ImageOptimizerTest {
     void generateLq_forceTrue_commandContainsForce() throws Exception {
         Path hqDir = Files.createDirectories(tempDir.resolve("hq"));
 
-        optimizer.generateLq(1L, 2L, hqDir, tempDir.resolve("lq"), true);
+        optimizer.generateLq(1L, 2L, hqDir, tempDir.resolve("lq"), true, List.of());
 
         ArgumentCaptor<ProcessBuilder> captor = ArgumentCaptor.forClass(ProcessBuilder.class);
         verify(processRunner).run(captor.capture(), anyLong(), anyString());
@@ -69,7 +70,7 @@ class ImageOptimizerTest {
     void generateLq_usesOneHourTimeoutByDefault() throws Exception {
         Path hqDir = Files.createDirectories(tempDir.resolve("hq"));
 
-        optimizer.generateLq(1L, 2L, hqDir, tempDir.resolve("lq"), false);
+        optimizer.generateLq(1L, 2L, hqDir, tempDir.resolve("lq"), false, List.of());
 
         verify(processRunner).run(any(ProcessBuilder.class), eq(3600L), eq("LQ优化"));
     }
@@ -79,7 +80,7 @@ class ImageOptimizerTest {
     void generateLq_forceFalse_commandWithoutForce() throws Exception {
         Path hqDir = Files.createDirectories(tempDir.resolve("hq"));
 
-        optimizer.generateLq(1L, 2L, hqDir, tempDir.resolve("lq"), false);
+        optimizer.generateLq(1L, 2L, hqDir, tempDir.resolve("lq"), false, List.of());
 
         ArgumentCaptor<ProcessBuilder> captor = ArgumentCaptor.forClass(ProcessBuilder.class);
         verify(processRunner).run(captor.capture(), anyLong(), anyString());
@@ -95,7 +96,7 @@ class ImageOptimizerTest {
         when(config.getImage()).thenReturn(imageConfig);
         Path hqDir = Files.createDirectories(tempDir.resolve("hq"));
 
-        optimizer.generateLq(1L, 2L, hqDir, tempDir.resolve("lq"), false);
+        optimizer.generateLq(1L, 2L, hqDir, tempDir.resolve("lq"), false, List.of());
 
         ArgumentCaptor<ProcessBuilder> captor = ArgumentCaptor.forClass(ProcessBuilder.class);
         verify(processRunner).run(captor.capture(), anyLong(), anyString());
@@ -103,6 +104,23 @@ class ImageOptimizerTest {
                 .containsSubsequence("-workers", "4")
                 .containsSubsequence("-max-long-edge", "3840")
                 .containsSubsequence("-max-inflight-pixels", "80000000");
+    }
+
+    @Test
+    @DisplayName("候选页白名单写入临时清单并传给优化器")
+    void generateLq_passesCandidateIncludeList() throws Exception {
+        Path hqDir = Files.createDirectories(tempDir.resolve("hq"));
+
+        optimizer.generateLq(1L, 2L, hqDir, tempDir.resolve("lq"), false,
+                List.of("001.jpg", "sub/002.png"));
+
+        ArgumentCaptor<ProcessBuilder> captor = ArgumentCaptor.forClass(ProcessBuilder.class);
+        verify(processRunner).run(captor.capture(), anyLong(), anyString());
+        List<String> command = captor.getValue().command();
+        int includeListIndex = command.indexOf("-include-list");
+        assertThat(includeListIndex).isGreaterThanOrEqualTo(0);
+        Path includeList = Path.of(command.get(includeListIndex + 1));
+        assertThat(Files.exists(includeList)).isFalse();
     }
 
     @Test
@@ -114,7 +132,7 @@ class ImageOptimizerTest {
                 .thenReturn(new ExternalProcessRunner.ExternalProcessResult(crashExitCode, ""));
         Path hqDir = Files.createDirectories(tempDir.resolve("hq"));
 
-        assertThatThrownBy(() -> optimizer.generateLq(1L, 2L, hqDir, tempDir.resolve("lq"), false))
+        assertThatThrownBy(() -> optimizer.generateLq(1L, 2L, hqDir, tempDir.resolve("lq"), false, List.of()))
                 .isInstanceOf(RuntimeException.class)
                 .hasMessageContaining(String.valueOf(crashExitCode))
                 .hasMessageContaining("stdout 为空");
@@ -127,7 +145,7 @@ class ImageOptimizerTest {
                 .thenReturn(new ExternalProcessRunner.ExternalProcessResult(137, ""));
         Path hqDir = Files.createDirectories(tempDir.resolve("hq"));
 
-        assertThatThrownBy(() -> optimizer.generateLq(1L, 2L, hqDir, tempDir.resolve("lq"), false))
+        assertThatThrownBy(() -> optimizer.generateLq(1L, 2L, hqDir, tempDir.resolve("lq"), false, List.of()))
                 .isInstanceOf(RuntimeException.class)
                 .hasMessageContaining("exitCode=137")
                 .hasMessageContaining("容器内存不足");
@@ -142,7 +160,7 @@ class ImageOptimizerTest {
                                 + "{\"pageNumber\":1,\"status\":\"failed\",\"reason\":\"decode error\"}]}"));
         Path hqDir = Files.createDirectories(tempDir.resolve("hq"));
 
-        ImageOptimizer.RunResult parsed = optimizer.generateLq(1L, 2L, hqDir, tempDir.resolve("lq"), false);
+        ImageOptimizer.RunResult parsed = optimizer.generateLq(1L, 2L, hqDir, tempDir.resolve("lq"), false, List.of());
 
         assertThat(parsed.getFailed()).isEqualTo(1);
         assertThat(parsed.getPages()).singleElement().satisfies(page ->
@@ -160,7 +178,7 @@ class ImageOptimizerTest {
                                 + "\"outputFormat\":\"webp\"}],\"success\":false}"));
         Path hqDir = Files.createDirectories(tempDir.resolve("hq"));
 
-        ImageOptimizer.RunResult parsed = optimizer.generateLq(1L, 2L, hqDir, tempDir.resolve("lq"), false);
+        ImageOptimizer.RunResult parsed = optimizer.generateLq(1L, 2L, hqDir, tempDir.resolve("lq"), false, List.of());
 
         assertThat(parsed.getSuccess()).isFalse();
         assertThat(parsed.getPages()).singleElement().satisfies(page -> {

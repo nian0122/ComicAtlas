@@ -160,43 +160,61 @@
 
     <!-- LQ 结果专用批量回写：每批单条 CASE UPDATE，避免逐页数据库往返。 -->
     <update id="updateLqReadyBatch">
-        UPDATE page
-        SET lq_status = 'READY',
-            lq_root = 'LQ',
-            lq_path = CASE id
+        UPDATE page media_page
+        JOIN chapter chapter ON chapter.id = media_page.chapter_id
+        JOIN comic comic ON comic.id = chapter.comic_id
+        SET media_page.lq_status = 'READY',
+            media_page.lq_root = 'LQ',
+            media_page.version = media_page.version + 1,
+            media_page.lq_path = CASE media_page.id
             <foreach collection="mediaList" item="media">
                 WHEN #{media.id} THEN #{media.lqPath}
             </foreach>
             END,
-            lq_size = CASE id
+            media_page.lq_size = CASE media_page.id
             <foreach collection="mediaList" item="media">
                 WHEN #{media.id} THEN #{media.lqSize}
             </foreach>
             END
-        WHERE chapter_id = #{chapterId}
-          AND media_type = 'IMAGE'
-          AND id IN
+        WHERE media_page.chapter_id = #{chapterId}
+          AND comic.status = 'READY'
+          AND chapter.status = 'READY'
+          AND media_page.status = 'READY'
+          AND media_page.media_type = 'IMAGE'
+          AND media_page.id IN
         <foreach collection="mediaList" item="media" open="(" separator="," close=")">
             #{media.id}
         </foreach>
     </update>
 
-    <update id="resetLqNotGeneratedByChapter">
-        UPDATE page
-        SET lq_status = 'NOT_GENERATED',
-            lq_root = NULL,
-            lq_path = NULL,
-            lq_size = 0
-        WHERE chapter_id = #{chapterId}
-          AND media_type = 'IMAGE'
+    <update id="resetActiveLqPendingByChapter">
+        UPDATE page media_page
+        JOIN chapter chapter ON chapter.id = media_page.chapter_id
+        JOIN comic comic ON comic.id = chapter.comic_id
+        SET media_page.lq_status = 'NOT_GENERATED',
+            media_page.lq_root = NULL,
+            media_page.lq_path = NULL,
+            media_page.lq_size = 0,
+            media_page.version = media_page.version + 1
+        WHERE media_page.chapter_id = #{chapterId}
+          AND comic.status = 'READY'
+          AND chapter.status = 'READY'
+          AND media_page.status = 'READY'
+          AND media_page.media_type = 'IMAGE'
+          AND media_page.lq_status IN ('QUEUED', 'GENERATING')
     </update>
 
     <update id="markLqFailedByChapter">
-        UPDATE page
-        SET lq_status = 'FAILED'
-        WHERE chapter_id = #{chapterId}
-          AND media_type = 'IMAGE'
-          AND lq_status IN ('QUEUED', 'GENERATING')
+        UPDATE page media_page
+        JOIN chapter chapter ON chapter.id = media_page.chapter_id
+        JOIN comic comic ON comic.id = chapter.comic_id
+        SET media_page.lq_status = 'FAILED', media_page.version = media_page.version + 1
+        WHERE media_page.chapter_id = #{chapterId}
+          AND comic.status = 'READY'
+          AND chapter.status = 'READY'
+          AND media_page.status = 'READY'
+          AND media_page.media_type = 'IMAGE'
+          AND media_page.lq_status IN ('QUEUED', 'GENERATING')
     </update>
 
     <update id="applyUploadCompleted">

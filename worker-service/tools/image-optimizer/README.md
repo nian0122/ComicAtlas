@@ -29,8 +29,11 @@ image-optimizer.exe \
   -quality 70 \
   -max-long-edge 3840 \
   -workers 4 \
+  -include-list "C:/Temp/lq-candidates.json" \
   -json
 ```
+
+`-include-list` 接受 JSON 字符串数组，内容为相对于 `-scan-dir` 的文件路径。Worker 会按数据库中仍处于活动生命周期的图片生成清单；指定后工具逐项读取并处理清单，不遍历章节目录，清单中的文件缺失会明确回报失败。省略该参数时使用扫描模式，遍历目录并识别支持的图片文件。
 
 ### 手动调用模式（文本输出）
 
@@ -58,6 +61,7 @@ image-optimizer.exe \
 | `-quiet` | 否 | false | 安静模式 |
 | `-json` | 否 | false | JSON 输出模式 |
 | `-ext` | 否 | .jpg,.jpeg,.png,.webp,.gif | 支持的扩展名 |
+| `-include-list` | 否 | - | JSON 相对路径数组；指定后进入任务模式，仅处理列表内文件且不扫描目录 |
 
 ## JSON 输出格式
 

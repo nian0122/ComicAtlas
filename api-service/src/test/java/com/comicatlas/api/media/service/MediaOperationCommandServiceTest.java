@@ -280,6 +280,31 @@ class MediaOperationCommandServiceTest {
     }
 
     @Test
+    void requestLqForComic_一次批量查询候选页并按章节排队() {
+        Media firstPage = image(31L, 11L, HqStatus.READY, LqStatus.NOT_GENERATED);
+        Media secondPage = image(32L, 12L, HqStatus.READY, LqStatus.FAILED);
+        when(mediaMapper.selectLqCandidatesByComicId(1L, false)).thenReturn(List.of(firstPage, secondPage));
+
+        ManagementTaskResponse task = new ManagementTaskResponse();
+        task.setId(100L);
+        task.setStatus(ManagementTaskStatus.QUEUED);
+        when(managementTaskService.createTask(any(), any(), any())).thenReturn(task);
+        ManagementTaskItemResponse firstItem = managementItem(201L, 11L);
+        ManagementTaskItemResponse secondItem = managementItem(202L, 12L);
+        when(managementTaskService.getTaskItems(100L)).thenReturn(List.of(firstItem, secondItem));
+        when(mediaMapper.markLqQueuedByChapterIds(List.of(11L, 12L), false)).thenReturn(2);
+
+        OperationSubmitResultDTO result = service.requestLqForComic(1L, false);
+
+        assertEquals(100L, result.getTaskId());
+        assertEquals(2, result.getItemCount());
+        verify(mediaMapper).selectLqCandidatesByComicId(1L, false);
+        verify(mediaMapper).markLqQueuedByChapterIds(List.of(11L, 12L), false);
+        verify(chapterMapper, never()).selectByComicIdOrderByGlobalOrder(1L);
+        verify(outboxService, times(2)).enqueue(any(), any(), any(), any(), any(), anyInt());
+    }
+
+    @Test
     void requestLqForChapter_READY无需重复生成() {
         Chapter chapter = new Chapter();
         chapter.setId(9L);
@@ -287,7 +312,7 @@ class MediaOperationCommandServiceTest {
 
         Media readyWebpLq = image(31L, 9L, HqStatus.READY, LqStatus.READY);
         readyWebpLq.setLqPath("236/1089/037.webp");
-        when(mediaMapper.selectImagesByChapterId(9L)).thenReturn(List.of(readyWebpLq));
+        when(mediaMapper.selectLqCandidatesByChapterId(9L, false)).thenReturn(List.of());
 
         OperationSubmitResultDTO result = service.requestLqForChapter(9L, false);
 

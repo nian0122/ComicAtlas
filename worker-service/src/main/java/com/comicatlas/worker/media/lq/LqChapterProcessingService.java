@@ -26,7 +26,12 @@ public class LqChapterProcessingService {
     private final StorageProperties storageProperties;
 
     public ChapterProcessResult process(Long chapterId, boolean force) {
-        List<MediaRecord> pages = mediaMapper.selectByChapterId(chapterId);
+        List<MediaRecord> pages = mediaMapper.selectLqCandidatesByChapterId(chapterId);
+        return process(chapterId, pages, force);
+    }
+
+    /** 使用漫画级批量预取的候选页处理章节，避免循环内再次访问数据库。 */
+    public ChapterProcessResult process(Long chapterId, List<MediaRecord> pages, boolean force) {
         if (pages.isEmpty()) {
             return new ChapterProcessResult(List.of(), List.of());
         }
@@ -37,10 +42,13 @@ public class LqChapterProcessingService {
             return new ChapterProcessResult(List.of(-1), List.of());
         }
         String relativeDir = StoragePathParser.directoryOf(pages.get(0).getHqPath());
+        List<String> includeFiles = pages.stream().map(MediaRecord::getHqPath)
+                .filter(path -> path != null && !path.isBlank())
+                .map(path -> relativePath(relativeDir, path)).distinct().toList();
         ImageOptimizer.RunResult result = optimizer.generateLq(comicId, chapterId,
-                hqRoot.resolve(relativeDir), lqRoot.resolve(relativeDir), force);
+                hqRoot.resolve(relativeDir), lqRoot.resolve(relativeDir), force, includeFiles);
         if (result.getPages() == null) {
-            return new ChapterProcessResult(List.of(), List.of());
+            return new ChapterProcessResult(List.of(-1), List.of());
         }
         Map<String, MediaRecord> mediaBySourcePath = pages.stream().filter(page -> page.getHqPath() != null)
                 .collect(Collectors.toMap(page -> relativePath(relativeDir, page.getHqPath()), Function.identity(), (first, ignored) -> first));

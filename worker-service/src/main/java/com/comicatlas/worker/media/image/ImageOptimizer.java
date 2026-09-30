@@ -38,7 +38,9 @@ public class ImageOptimizer {
      * @param force     是否强制重新生成（忽略已存在的 LQ 产物，对应 LQ_REGENERATE）
      * @return Go 工具返回的详细结果
      */
-    public RunResult generateLq(Long comicId, Long chapterId, Path hqDir, Path lqDir, boolean force) {
+    /** 仅处理数据库确认处于活动生命周期的候选文件。 */
+    public RunResult generateLq(Long comicId, Long chapterId, Path hqDir, Path lqDir, boolean force,
+                                List<String> includeFiles) {
         String hqDirStr = hqDir.toString();
         String lqDirStr = lqDir.toString();
 
@@ -70,6 +72,25 @@ public class ImageOptimizer {
                 "-max-inflight-pixels", String.valueOf(config.getImage().getMaxInflightPixels()),
                 "-json"
         ));
+        Path includeListPath = null;
+        if (includeFiles != null) {
+            try {
+                includeListPath = Files.createTempFile("comic-atlas-lq-include-", ".json");
+                objectMapper.writeValue(includeListPath.toFile(), includeFiles);
+            } catch (java.io.IOException e) {
+                if (includeListPath != null) {
+                    try {
+                        Files.deleteIfExists(includeListPath);
+                    } catch (java.io.IOException cleanupException) {
+                        e.addSuppressed(cleanupException);
+                    }
+                }
+                throw new RuntimeException("创建 LQ 候选文件清单失败: comicId=" + comicId
+                        + ", chapterId=" + chapterId, e);
+            }
+            cmd.add("-include-list");
+            cmd.add(includeListPath.toString());
+        }
         if (force) {
             cmd.add("-force");
         }
@@ -79,7 +100,17 @@ public class ImageOptimizer {
                 comicId, chapterId, hqDirStr, lqDirStr, workers,
                 config.getImage().getMaxLongEdge(), config.getImage().getMaxInflightPixels(),
                 config.getLqQuality(), force);
-        return runOptimizer(cmd, comicId, chapterId);
+        try {
+            return runOptimizer(cmd, comicId, chapterId);
+        } finally {
+            if (includeListPath != null) {
+                try {
+                    Files.deleteIfExists(includeListPath);
+                } catch (java.io.IOException e) {
+                    log.warn("无法清理 LQ 候选文件清单: comicId={}, chapterId={}", comicId, chapterId);
+                }
+            }
+        }
     }
 
     private RunResult runOptimizer(List<String> cmd, Long comicId, Long chapterId) {

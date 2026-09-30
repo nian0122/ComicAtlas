@@ -58,15 +58,15 @@ public class MediaOperationCompletionServiceImpl implements MediaOperationComple
 
     /**
      * LQ 生成完成：仅 Worker 回传有效产物大小的 IMAGE 页置 READY；
-     * 未回传的跳过页置 NOT_GENERATED 并清空 LQ 引用，禁止数据库声称存在实际不存在的文件。
+     * 仅任务排队期间仍活动的未回传页置 NOT_GENERATED；已有 READY 产物不被清除。
      * 完成后重算整本统计（lqSize/hqSize/totalPages/pageCount）。
      */
     public void applyLqCompleted(Long chapterId, List<LqSizeResult> lqSizes) {
-        int imagePages = mediaMapper.resetLqNotGeneratedByChapter(chapterId);
+        int pendingPages = mediaMapper.resetActiveLqPendingByChapter(chapterId);
         int readyPages = updateLqReadyInBatches(chapterId, lqSizes);
         comicStatsService.refreshByChapter(chapterId);
         log.info("LQ 完成业务更新: chapterId={}, readyPages={}, notGeneratedPages={}",
-                chapterId, readyPages, Math.max(0, imagePages - readyPages));
+                chapterId, readyPages, Math.max(0, pendingPages - readyPages));
     }
 
     // ======================== HQ 删除 Completed ========================
@@ -165,7 +165,7 @@ public class MediaOperationCompletionServiceImpl implements MediaOperationComple
 
     /** LQ 生成开始：QUEUED → GENERATING。 */
     public void transitionLqGenerating(Long chapterId) {
-        mediaMapper.transitionLqGenerating(chapterId);
+        mediaMapper.transitionLqGeneratingActive(chapterId);
     }
 
     /** HQ 删除开始：DELETE_QUEUED → DELETING。 */

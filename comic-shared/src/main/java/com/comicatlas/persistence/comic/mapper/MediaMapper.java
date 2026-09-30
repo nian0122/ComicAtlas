@@ -108,11 +108,27 @@ public interface MediaMapper extends BaseMapper<Media> {
     List<String> selectReservedHqPathsByChapterId(@Param("chapterId") Long chapterId,
                                                    @Param("excludedMediaId") Long excludedMediaId);
 
-    @Select("SELECT id, chapter_id, page_number, hq_root, hq_path, lq_root, lq_path, hq_status, lq_status, "
-            + "transcode_status, status, lq_size, width, height, hq_size, media_type, duration, container, "
-            + "video_codec, audio_codec FROM page WHERE chapter_id = #{chapterId} AND media_type = 'IMAGE' "
-            + "ORDER BY page_number ASC")
-    List<Media> selectImagesByChapterId(@Param("chapterId") Long chapterId);
+    /** 批量查询 READY 章节中可生成 LQ 的活动图片，供漫画级操作避免逐章查询。 */
+    @Select("<script>SELECT media_page.id, media_page.chapter_id, media_page.page_number, media_page.hq_status, media_page.lq_status, media_page.status, media_page.media_type "
+            + "FROM page media_page JOIN chapter chapter ON chapter.id = media_page.chapter_id "
+            + "JOIN comic comic ON comic.id = chapter.comic_id "
+            + "WHERE chapter.comic_id = #{comicId} AND comic.status = 'READY' AND chapter.status = 'READY' AND media_page.status = 'READY' "
+            + "AND media_page.media_type = 'IMAGE' AND media_page.hq_status &lt;&gt; 'DELETED' "
+            + "<if test='regenerate == false'> AND media_page.lq_status &lt;&gt; 'READY' </if> "
+            + "ORDER BY chapter.global_order, media_page.page_number</script>")
+    List<Media> selectLqCandidatesByComicId(@Param("comicId") Long comicId,
+                                            @Param("regenerate") boolean regenerate);
+
+    /** 查询单章节中符合生命周期与 HQ 条件的 LQ 候选页。 */
+    @Select("<script>SELECT media_page.id, media_page.chapter_id, media_page.page_number, media_page.hq_status, media_page.lq_status, media_page.status, media_page.media_type "
+            + "FROM page media_page JOIN chapter chapter ON chapter.id = media_page.chapter_id "
+            + "JOIN comic comic ON comic.id = chapter.comic_id "
+            + "WHERE media_page.chapter_id = #{chapterId} AND comic.status = 'READY' AND chapter.status = 'READY' AND media_page.status = 'READY' "
+            + "AND media_page.media_type = 'IMAGE' AND media_page.hq_status &lt;&gt; 'DELETED' "
+            + "<if test='regenerate == false'> AND media_page.lq_status &lt;&gt; 'READY' </if> "
+            + "ORDER BY media_page.page_number</script>")
+    List<Media> selectLqCandidatesByChapterId(@Param("chapterId") Long chapterId,
+                                              @Param("regenerate") boolean regenerate);
 
     @Select("<script>SELECT id, chapter_id, page_number, hq_root, hq_path, lq_root, lq_path, hq_status, lq_status, "
             + "transcode_status, status, lq_size, width, height, hq_size, media_type, duration, container, video_codec, audio_codec, version "
@@ -144,8 +160,17 @@ public interface MediaMapper extends BaseMapper<Media> {
     @Select("<script>SELECT COUNT(*) FROM page WHERE chapter_id IN <foreach collection='chapterIds' item='chapterId' open='(' separator=',' close=')'>#{chapterId}</foreach> AND status NOT IN ('DELETED','TRASHED')</script>")
     long countActiveByChapterIds(@Param("chapterIds") List<Long> chapterIds);
 
-    @Update("UPDATE page SET lq_status = 'QUEUED' WHERE chapter_id = #{chapterId} AND media_type = 'IMAGE' AND hq_status <> 'DELETED'")
-    int markLqQueued(@Param("chapterId") Long chapterId);
+    /** 批量排队，只影响 READY 章节和 READY 页面；候选条件与任务选择保持一致。 */
+    @Update("<script>UPDATE page media_page JOIN chapter chapter ON chapter.id = media_page.chapter_id "
+            + "JOIN comic comic ON comic.id = chapter.comic_id "
+            + "SET media_page.lq_status = 'QUEUED', media_page.version = media_page.version + 1 "
+            + "WHERE comic.status = 'READY' AND chapter.status = 'READY' AND media_page.status = 'READY' "
+            + "AND media_page.media_type = 'IMAGE' AND media_page.hq_status &lt;&gt; 'DELETED' "
+            + "<if test='regenerate == false'> AND media_page.lq_status &lt;&gt; 'READY' </if> "
+            + "AND media_page.chapter_id IN <foreach collection='chapterIds' item='chapterId' open='(' separator=',' close=')'>#{chapterId}</foreach> "
+            + "</script>")
+    int markLqQueuedByChapterIds(@Param("chapterIds") List<Long> chapterIds,
+                                 @Param("regenerate") boolean regenerate);
 
     @Update("UPDATE page SET transcode_status = 'NOT_NEEDED' WHERE id = #{mediaId} AND transcode_status = 'REQUIRED'")
     int markTranscodeNotNeeded(@Param("mediaId") Long mediaId);
@@ -162,8 +187,13 @@ public interface MediaMapper extends BaseMapper<Media> {
     @Update("UPDATE page SET transcode_status = 'FAILED' WHERE id = #{mediaId} AND transcode_status IN ('QUEUED', 'TRANSCODING')")
     int markTranscodeFailed(@Param("mediaId") Long mediaId);
 
-    @Update("UPDATE page SET lq_status = 'GENERATING' WHERE chapter_id = #{chapterId} AND lq_status = 'QUEUED'")
-    int transitionLqGenerating(@Param("chapterId") Long chapterId);
+    /** 状态迁移只触及活动章节及活动页面。 */
+    @Update("UPDATE page media_page JOIN chapter chapter ON chapter.id = media_page.chapter_id "
+            + "JOIN comic comic ON comic.id = chapter.comic_id "
+            + "SET media_page.lq_status = 'GENERATING', media_page.version = media_page.version + 1 "
+            + "WHERE media_page.chapter_id = #{chapterId} AND comic.status = 'READY' AND chapter.status = 'READY' "
+            + "AND media_page.status = 'READY' AND media_page.media_type = 'IMAGE' AND media_page.lq_status = 'QUEUED'")
+    int transitionLqGeneratingActive(@Param("chapterId") Long chapterId);
 
     @Update("UPDATE page SET hq_status = 'DELETING' WHERE chapter_id = #{chapterId} AND hq_status = 'DELETE_QUEUED'")
     int transitionHqDeleting(@Param("chapterId") Long chapterId);
@@ -253,9 +283,9 @@ public interface MediaMapper extends BaseMapper<Media> {
     int updateLqReadyBatch(@Param("chapterId") Long chapterId,
                            @Param("mediaList") List<Media> mediaList);
 
-    /** LQ 完成回写前，将本章图片统一重置为未生成。 */
-    int resetLqNotGeneratedByChapter(@Param("chapterId") Long chapterId);
-
     /** LQ 失败回写时，将本章仍处于排队或生成中的图片统一置为失败。 */
     int markLqFailedByChapter(@Param("chapterId") Long chapterId);
+
+    /** 生成成功事件收尾未产出页：只重置本任务活动页，保留已有 READY LQ。 */
+    int resetActiveLqPendingByChapter(@Param("chapterId") Long chapterId);
 }

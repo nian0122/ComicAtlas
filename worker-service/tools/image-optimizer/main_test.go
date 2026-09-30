@@ -65,3 +65,37 @@ func TestRun_existingLqReportsActualOutputSize(t *testing.T) {
 		t.Fatalf("既有 LQ 必须回传实际大小，得到 %d", result.Pages[0].OutputSize)
 	}
 }
+
+func TestRun_includeListSkipsUnlistedFiles(t *testing.T) {
+	scanDir := t.TempDir()
+	outputDir := t.TempDir()
+	for _, name := range []string{"001.jpg", "002.jpg"} {
+		if err := os.WriteFile(filepath.Join(scanDir, name), []byte("source"), 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	result := run(&CLIConfig{
+		ScanDir: scanDir, OutputDir: outputDir, Workers: 1,
+		MaxLongEdge: defaultMaxLongEdge, MaxInflightPixels: defaultMaxInflightPixels,
+		Quiet: true, Extensions: parseExtensions(defaultExtensions),
+		IncludeFiles: map[string]bool{"002.jpg": true},
+	})
+	if result.Total != 1 || len(result.Pages) != 1 || result.Pages[0].SourcePath != "002.jpg" {
+		t.Fatalf("白名单外文件不应参与 LQ 处理: %+v", result)
+	}
+}
+
+func TestRun_includeListReportsMissingCandidate(t *testing.T) {
+	result := run(&CLIConfig{
+		ScanDir: t.TempDir(), OutputDir: t.TempDir(), Workers: 1,
+		MaxLongEdge: defaultMaxLongEdge, MaxInflightPixels: defaultMaxInflightPixels,
+		Quiet: true, Extensions: parseExtensions(defaultExtensions),
+		IncludeFiles: map[string]bool{"001.jpg": true},
+	})
+	if result.Total != 1 || result.Failed != 1 || len(result.Pages) != 1 {
+		t.Fatalf("清单中缺失的候选文件应明确失败，不能因目录扫描未发现而误报成功: %+v", result)
+	}
+	if result.Pages[0].SourcePath != "001.jpg" || result.Pages[0].Status != "failed" {
+		t.Fatalf("失败结果应能对应回清单候选: %+v", result.Pages[0])
+	}
+}

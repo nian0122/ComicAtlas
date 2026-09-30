@@ -53,7 +53,7 @@ public class ComicListQueryServiceImpl implements ComicListQueryService {
 
     private ComicListPage queryBasePage(ComicListQuery query) {
         Page<Comic> page = new Page<>(query.getPage(), query.getSize());
-        IPage<Comic> result = comicMapper.selectPage(page, query);
+        IPage<Comic> result = comicMapper.selectPage(page, query, false);
         List<Comic> comics = result.getRecords();
         if (comics.isEmpty()) {
             return ComicListPage.of(new ArrayList<>(), result.getTotal(), result.getCurrent(), result.getSize());

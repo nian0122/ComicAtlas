@@ -27,6 +27,7 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.same;
 import static org.mockito.Mockito.verify;
@@ -68,7 +69,7 @@ class ComicListServiceTest {
         history.setChapterId(101L);
         history.setPageNumber(25);
 
-        when(comicMapper.selectPage(any(Page.class), same(query))).thenReturn(comicPage);
+        when(comicMapper.selectPage(any(Page.class), same(query), eq(false))).thenReturn(comicPage);
         when(categoryMapper.selectBatchIds(List.of(10L))).thenReturn(List.of(category));
         when(historyMapper.selectByComicIds(List.of(1L, 2L))).thenReturn(List.of(history));
 
@@ -94,7 +95,7 @@ class ComicListServiceTest {
     void listComics_shouldSkipRelationQueries_whenPageIsEmpty() {
         ComicListQuery query = new ComicListQuery();
         Page<Comic> comicPage = new Page<>(1, 20, 0);
-        when(comicMapper.selectPage(any(Page.class), same(query))).thenReturn(comicPage);
+        when(comicMapper.selectPage(any(Page.class), same(query), eq(false))).thenReturn(comicPage);
 
         ComicListPage result = service.listComics(query);
 
@@ -122,7 +123,7 @@ class ComicListServiceTest {
 
         assertEquals(25, result.getRecords().get(0).getProgressPercent());
         assertEquals(101L, result.getRecords().get(0).getLastReadChapterId());
-        verify(comicMapper, never()).selectPage(any(Page.class), same(query));
+        verify(comicMapper, never()).selectPage(any(Page.class), same(query), eq(false));
         verify(historyMapper).selectByComicIds(List.of(1L));
     }
 
