@@ -15,6 +15,15 @@ http {
     }
     server {
         listen __PUBLIC_PORT__;
+        server_name diabetic-ai.online www.diabetic-ai.online;
+        client_max_body_size 1m;
+        location / {
+            __PERSONAL_SITE_LOCATION__
+        }
+    }
+
+    server {
+        listen __PUBLIC_PORT__ default_server;
         server_name _;
         client_max_body_size 16k;
         # 不允许不同代理对转义路径、矩阵参数产生不同解释。

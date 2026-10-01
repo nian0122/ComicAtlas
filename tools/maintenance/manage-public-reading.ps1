@@ -39,8 +39,21 @@ function Write-ReadingBundle {
     $localPort = Get-RequiredPort $settings 'PUBLIC_READING_LOCAL_PORT'
     $publicPort = Get-RequiredPort $settings 'PUBLIC_READING_REMOTE_PORT'
     $tunnelPort = Get-RequiredPort $settings 'PUBLIC_READING_TUNNEL_PORT'
+    $personalSiteMode = if ($settings.ContainsKey('PUBLIC_SITE_MODE')) { $settings['PUBLIC_SITE_MODE'] } else { 'closed' }
+    if ($personalSiteMode -notin @('closed', 'open')) { throw 'PUBLIC_SITE_MODE 只能是 closed 或 open' }
+    $personalSitePage = Get-Content (Join-Path $repositoryRoot 'site/personal-blog/index.html') -Raw
+    $icpFooter = ''
+    if ($personalSiteMode -eq 'open') {
+        $icpNumber = Get-RequiredSetting $settings 'PUBLIC_SITE_ICP_NUMBER'
+        if ($icpNumber -notmatch '^[\p{L}\p{N}-]+$') { throw 'PUBLIC_SITE_ICP_NUMBER 格式无效' }
+        $encodedIcpNumber = [System.Net.WebUtility]::HtmlEncode($icpNumber)
+        $icpFooter = "<a href=`"https://beian.miit.gov.cn/`" target=`"_blank`" rel=`"noopener noreferrer`">$encodedIcpNumber</a>"
+    }
     if ($publicPort -eq $tunnelPort) { throw '公网端口与内部隧道端口不能相同' }
     New-Item -ItemType Directory -Path $readingRoot -Force | Out-Null
+    $personalSiteRoot = Join-Path $readingRoot 'site'
+    New-Item -ItemType Directory -Path $personalSiteRoot -Force | Out-Null
+    [IO.File]::WriteAllText((Join-Path $personalSiteRoot 'index.html'), $personalSitePage.Replace('<!-- ICP_FOOTER -->', $icpFooter))
     Install-WindowsClient
     if (-not (Test-Path -LiteralPath $readingClient)) { Copy-Item -LiteralPath $frpcPath -Destination $readingClient }
     $publisher = @"
@@ -89,7 +102,13 @@ bindPort = $tunnelPort
     [IO.File]::WriteAllText($readingConfig, $publisher)
     [IO.File]::WriteAllText((Join-Path $readingRoot 'frpc-visitor.toml'), $visitor)
     $template = Get-Content (Join-Path $PSScriptRoot 'public-reading-nginx.conf.template') -Raw
-    [IO.File]::WriteAllText((Join-Path $readingRoot 'nginx.conf'), $template.Replace('__PUBLIC_PORT__', "$publicPort").Replace('__TUNNEL_PORT__', "$tunnelPort"))
+    $personalSiteLocation = if ($personalSiteMode -eq 'open') {
+        'root /opt/comicatlas-public-reading/site; index index.html; try_files $uri $uri/ =404;'
+    } else {
+        'return 403;'
+    }
+    $nginxConfiguration = $template.Replace('__PUBLIC_PORT__', "$publicPort").Replace('__TUNNEL_PORT__', "$tunnelPort").Replace('__PERSONAL_SITE_LOCATION__', $personalSiteLocation)
+    [IO.File]::WriteAllText((Join-Path $readingRoot 'nginx.conf'), $nginxConfiguration)
     foreach ($service in @('tunnel', 'nginx')) {
         $command = if ($service -eq 'tunnel') {
             '/usr/local/bin/frpc -c /opt/comicatlas-public-reading/frpc-visitor.toml'

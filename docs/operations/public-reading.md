@@ -22,7 +22,7 @@ pwsh -NoProfile -File tools/maintenance/manage-public-reading.ps1 -Action Prepar
 
 ## 远端安装
 
-前置条件：已有 `/usr/local/bin/frpc`（项目版本）和 `/usr/sbin/nginx`，选定公网与内部端口均未占用。复制生成的 `frpc-visitor.toml`、`nginx.conf` 和两个 unit 到 `/opt/comicatlas-public-reading/`；目录权限 0700，配置权限 0600。
+前置条件：已有 `/usr/local/bin/frpc`（项目版本）和 `/usr/sbin/nginx`，选定公网与内部端口均未占用。复制生成的 `frpc-visitor.toml`、`nginx.conf`、`site/index.html` 和两个 unit 到 `/opt/comicatlas-public-reading/`；目录权限 0700，配置权限 0600。
 
 ```sh
 /usr/local/bin/frpc verify -c /opt/comicatlas-public-reading/frpc-visitor.toml
@@ -87,3 +87,11 @@ pwsh -NoProfile -File scripts/qa/verify-public-reading.ps1 -BaseUrl 'http://<远
 - 新配置已生成并通过 Nginx 语法校验。独立公网阅读服务现监听 `0.0.0.0:80`；系统 Nginx 保持禁用，rag-diabetes 服务与数据未删除。
 - 公网 HTTP 白名单 26 项和浏览器主页、漫画库、静态资源检查全部通过，`/manage` 仍返回 403。
 - 原公网 8088 已停止响应；旧 Nginx 配置备份保存在远端 `/opt/comicatlas-public-reading/nginx.conf.8088`，项目数据仍保留。
+
+## 个人网站备案页
+
+`site/personal-blog/index.html` 是个人技术笔记的静态首页，不依赖数据库或 Miniflux。备案前 `.env` 使用 `PUBLIC_SITE_MODE=closed`，域名入口返回 403；这是首次备案期间保持网站关闭的状态。当前页面和关闭配置已部署到 `/opt/comicatlas-public-reading/site/` 与独立公网 Nginx，配置检查通过。
+
+备案申请可按实际情况填写网站名称“个人技术笔记”、网站内容为个人非经营性技术记录；不要申报实际不提供的服务。首次备案通过后，将 `.env` 中 `PUBLIC_SITE_MODE` 改为 `open`，并填写 `PUBLIC_SITE_ICP_NUMBER`，再运行 `tools/maintenance/manage-public-reading.ps1 -Action Prepare`。生成的 `nginx.conf` 和 `site/index.html` 更新至远端目录后，执行 Nginx 配置检查并重启 `comicatlas-reading-nginx`。生成脚本会在开放模式校验备案号并自动添加工信部备案查询链接。
+
+2026-10-01 备案期间暂停漫画公网映射：本机发布端已停止并移除登录自启任务，远端 `comicatlas-reading-tunnel` 已停止并禁用自启。独立 Nginx 仍监听 80 供备案域名关闭页使用；漫画公网入口不可用，本地服务和数据未停止或删除。
