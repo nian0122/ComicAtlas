@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { isMobileReadingDevice } from '@/shared/lib/device/index'
+import { isPublicReading } from '@/shared/config/access'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -173,6 +174,7 @@ const router = createRouter({
 // 移动端管理后台拦截守卫：
 // 移动阅读设备访问 /manage/* 时重定向到拦截提示页，其余路由零开销直接放行。
 router.beforeEach((to) => {
+  if (isPublicReading && to.path.startsWith('/manage')) return { name: 'home' }
   // 1. 非 /manage 路由直接放行（前缀检查放最前，保证阅读端路由零额外开销）
   if (!to.path.startsWith('/manage')) {
     return true

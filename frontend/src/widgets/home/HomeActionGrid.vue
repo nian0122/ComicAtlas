@@ -12,7 +12,7 @@
         <el-icon :size="18" class="action-arrow"><ArrowRight /></el-icon>
       </router-link>
 
-      <router-link to="/manage/import" class="action-card action-card--desktop-only hover-lift">
+      <router-link v-if="!isPublicReading" to="/manage/import" class="action-card action-card--desktop-only hover-lift">
         <div class="action-icon action-icon--import">
           <el-icon :size="28"><Download /></el-icon>
         </div>
@@ -39,6 +39,7 @@
 
 <script setup lang="ts">
 import { Collection, Download, Clock, ArrowRight } from '@element-plus/icons-vue'
+import { isPublicReading } from '@/shared/config/access'
 </script>
 
 <style scoped>
