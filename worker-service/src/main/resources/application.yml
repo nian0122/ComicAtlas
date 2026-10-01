@@ -78,6 +78,7 @@ worker:
     socks-port: ${SOCKS_PORT:7897}
   cover:
     quality: ${COVER_QUALITY:25}
+    max-long-edge: ${COVER_MAX_LONG_EDGE:400}
     timeout-seconds: ${COVER_TIMEOUT_SECONDS:600}
     frame-timeout-seconds: ${COVER_FRAME_TIMEOUT_SECONDS:120}
     workers: ${COVER_WORKERS:1}

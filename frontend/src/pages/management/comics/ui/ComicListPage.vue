@@ -148,7 +148,14 @@
           />
           <button class="comic-card-open" type="button" @click="goEdit(comic.id)">
             <span class="comic-cover">
-              <img v-if="comic.coverUrl" :src="comic.coverUrl" :alt="`${comic.title} 封面`" @error="hideBrokenImage" />
+              <img
+                v-if="comic.coverUrl"
+                :src="comic.coverUrl"
+                :alt="`${comic.title} 封面`"
+                loading="lazy"
+                decoding="async"
+                @error="hideBrokenImage"
+              />
               <span class="comic-status-badge">{{ statusLabel(comic.status) }}</span>
             </span>
             <span class="comic-info">
