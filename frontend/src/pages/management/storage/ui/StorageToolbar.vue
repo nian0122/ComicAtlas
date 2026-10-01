@@ -10,42 +10,72 @@ import { useTagStore } from '@/entities/tag'
 const props = defineProps<{
   filter: FilterState
   sort: SortState
+  total: number
+  loading: boolean
 }>()
-
 const router = useRouter()
-
+const categoryStore = useCategoryStore()
+const tagStore = useTagStore()
 const emit = defineEmits<{
   'update:filter': [value: FilterState]
   'update:sort': [value: SortState]
 }>()
 
-const hasActiveFilters = computed(
-  () =>
-    props.filter.hqStatus !== 'ALL' ||
-    props.filter.lqStatus !== 'ALL' ||
-    props.filter.keyword.trim().length > 0 ||
-    props.filter.category.length > 0 ||
-    props.filter.tag.length > 0,
-)
+const hqOptions = [
+  { label: '全部 HQ', value: 'ALL' },
+  { label: '还有 HQ', value: 'HAS_HQ' },
+  { label: '含 HQ 已删', value: 'NO_HQ' },
+] as const
+const lqOptions = [
+  { label: '全部 LQ', value: 'ALL' },
+  { label: '需要生成', value: 'NEEDS_LQ' },
+  { label: 'LQ 就绪', value: 'READY' },
+] as const
+const sortOptions = [
+  { label: '总大小', value: 'totalSize' },
+  { label: 'HQ 大小', value: 'hqSize' },
+  { label: 'LQ 大小', value: 'lqSize' },
+  { label: '标题', value: 'title' },
+] as const
 
-function goToTaskCenter() {
-  router.push('/manage/tasks')
-}
+const activeConditions = computed(() => {
+  const conditions: { key: keyof FilterState; label: string }[] = []
+  if (props.filter.keyword.trim()) conditions.push({ key: 'keyword', label: `标题：${props.filter.keyword.trim()}` })
+  if (props.filter.category)
+    conditions.push({
+      key: 'category',
+      label: props.filter.category === '_NONE' ? '未分类' : `分类：${props.filter.category}`,
+    })
+  if (props.filter.tag)
+    conditions.push({ key: 'tag', label: props.filter.tag === '_NONE' ? '无标签' : `标签：${props.filter.tag}` })
+  if (props.filter.hqStatus !== 'ALL')
+    conditions.push({
+      key: 'hqStatus',
+      label: hqOptions.find((option) => option.value === props.filter.hqStatus)?.label ?? 'HQ 状态',
+    })
+  if (props.filter.lqStatus !== 'ALL')
+    conditions.push({
+      key: 'lqStatus',
+      label: lqOptions.find((option) => option.value === props.filter.lqStatus)?.label ?? 'LQ 状态',
+    })
+  return conditions
+})
 
 function setFilter(patch: Partial<FilterState>) {
   emit('update:filter', { ...props.filter, ...patch })
 }
-
+function clearCondition(key: keyof FilterState) {
+  if (key === 'hqStatus') setFilter({ hqStatus: 'ALL' })
+  else if (key === 'lqStatus') setFilter({ lqStatus: 'ALL' })
+  else setFilter({ [key]: '' })
+}
 function clearFilters() {
   emit('update:filter', { hqStatus: 'ALL', lqStatus: 'ALL', keyword: '', category: '', tag: '' })
 }
-
 function setSort(patch: Partial<SortState>) {
   emit('update:sort', { ...props.sort, ...patch })
 }
 
-const categoryStore = useCategoryStore()
-const tagStore = useTagStore()
 onMounted(() => {
   void categoryStore.fetchList()
   void tagStore.fetchList()
@@ -53,201 +83,300 @@ onMounted(() => {
 </script>
 
 <template>
-  <div>
-    <section class="action-section">
-      <h2 class="section-title">操作</h2>
-      <div class="action-list">
-        <AppButton class="action-btn primary" @click="goToTaskCenter">在任务中心中恢复</AppButton>
-        <AppButton class="action-btn danger" disabled>清理未引用文件</AppButton>
+  <section class="storage-filter-panel" aria-label="存储记录筛选">
+    <div class="filter-heading">
+      <div class="filter-heading-copy">
+        <h2>筛选存储记录</h2>
+        <p>按漫画范围与文件状态，定位需要处理的内容</p>
       </div>
-    </section>
+      <AppButton variant="ghost" size="sm" @click="router.push('/manage/tasks')">前往任务中心</AppButton>
+    </div>
 
-    <section class="action-section">
-      <h2 class="section-title">存储优化</h2>
-      <div class="filter-bar">
-        <el-select
-          :model-value="props.filter.hqStatus"
-          placeholder="HQ 状态"
-          class="filter-select"
-          @update:model-value="setFilter({ hqStatus: $event })"
-        >
-          <el-option label="全部 HQ" value="ALL" />
-          <el-option label="还有 HQ" value="HAS_HQ" />
-          <el-option label="含 HQ 已删" value="NO_HQ" />
-        </el-select>
-        <el-select
-          :model-value="props.filter.lqStatus"
-          placeholder="LQ 状态"
-          class="filter-select"
-          @update:model-value="setFilter({ lqStatus: $event })"
-        >
-          <el-option label="全部 LQ" value="ALL" />
-          <el-option label="需要生成" value="NEEDS_LQ" />
-          <el-option label="LQ 就绪" value="READY" />
-        </el-select>
-        <el-select
-          :model-value="props.filter.category"
-          placeholder="分类"
-          class="filter-select"
-          clearable
-          @update:model-value="setFilter({ category: $event })"
-        >
-          <el-option label="未分类" value="_NONE" />
-          <el-option
-            v-for="category in categoryStore.list"
-            :key="category.id"
-            :label="category.name"
-            :value="category.name"
+    <div class="filter-group">
+      <h3>漫画范围</h3>
+      <div class="filter-grid filter-grid--scope">
+        <label class="filter-field filter-field--keyword">
+          <span>标题关键词</span>
+          <el-input
+            :model-value="filter.keyword"
+            placeholder="搜索标题"
+            aria-label="存储标题关键词"
+            clearable
+            @update:model-value="setFilter({ keyword: $event })"
           />
-        </el-select>
-        <el-select
-          :model-value="props.filter.tag"
-          placeholder="标签"
-          class="filter-select"
-          clearable
-          @update:model-value="setFilter({ tag: $event })"
-        >
-          <el-option label="无标签" value="_NONE" />
-          <el-option v-for="tag in tagStore.list" :key="tag.id" :label="tag.name" :value="tag.name" />
-        </el-select>
-        <el-select
-          :model-value="props.sort.field"
-          placeholder="排序"
-          class="filter-select"
-          @update:model-value="setSort({ field: $event })"
-        >
-          <el-option label="HQ 大小" value="hqSize" />
-          <el-option label="LQ 大小" value="lqSize" />
-          <el-option label="总大小" value="totalSize" />
-          <el-option label="标题" value="title" />
-        </el-select>
-        <el-select
-          :model-value="props.sort.order"
-          class="filter-select--mini"
-          @update:model-value="setSort({ order: $event })"
-        >
-          <el-option label="降序" value="desc" />
-          <el-option label="升序" value="asc" />
-        </el-select>
-        <el-input
-          :model-value="props.filter.keyword"
-          placeholder="搜索标题"
-          clearable
-          class="filter-input"
-          @update:model-value="setFilter({ keyword: $event })"
-        />
-        <AppButton v-if="hasActiveFilters" class="filter-reset" variant="text" @click="clearFilters"
-          >清空筛选</AppButton
-        >
+        </label>
+        <label class="filter-field">
+          <span>分类</span>
+          <el-select
+            :model-value="filter.category"
+            placeholder="全部分类"
+            aria-label="存储分类"
+            clearable
+            filterable
+            @update:model-value="setFilter({ category: $event })"
+          >
+            <el-option label="未分类" value="_NONE" />
+            <el-option
+              v-for="category in categoryStore.list"
+              :key="category.id"
+              :label="category.name"
+              :value="category.name"
+            />
+          </el-select>
+        </label>
+        <label class="filter-field">
+          <span>标签</span>
+          <el-select
+            :model-value="filter.tag"
+            placeholder="全部标签"
+            aria-label="存储标签"
+            clearable
+            filterable
+            @update:model-value="setFilter({ tag: $event })"
+          >
+            <el-option label="无标签" value="_NONE" />
+            <el-option v-for="tag in tagStore.list" :key="tag.id" :label="tag.name" :value="tag.name" />
+          </el-select>
+        </label>
       </div>
-    </section>
-  </div>
+    </div>
+
+    <div class="filter-group filter-group--storage">
+      <h3>文件状态与排序</h3>
+      <div class="filter-grid filter-grid--storage">
+        <label class="filter-field">
+          <span>HQ 原文件</span>
+          <el-select
+            :model-value="filter.hqStatus"
+            aria-label="存储 HQ 状态"
+            @update:model-value="setFilter({ hqStatus: $event })"
+          >
+            <el-option v-for="option in hqOptions" :key="option.value" v-bind="option" />
+          </el-select>
+        </label>
+        <label class="filter-field">
+          <span>LQ 衍生文件</span>
+          <el-select
+            :model-value="filter.lqStatus"
+            aria-label="存储 LQ 状态"
+            @update:model-value="setFilter({ lqStatus: $event })"
+          >
+            <el-option v-for="option in lqOptions" :key="option.value" v-bind="option" />
+          </el-select>
+        </label>
+        <label class="filter-field filter-field--sort">
+          <span>排序依据</span>
+          <el-select
+            :model-value="sort.field"
+            aria-label="存储排序依据"
+            @update:model-value="setSort({ field: $event })"
+          >
+            <el-option v-for="option in sortOptions" :key="option.value" v-bind="option" />
+          </el-select>
+        </label>
+        <label class="filter-field">
+          <span>排列顺序</span>
+          <el-select
+            :model-value="sort.order"
+            aria-label="存储排列顺序"
+            @update:model-value="setSort({ order: $event })"
+          >
+            <el-option label="降序" value="desc" /><el-option label="升序" value="asc" />
+          </el-select>
+        </label>
+      </div>
+    </div>
+
+    <div class="filter-feedback">
+      <div class="filter-result" aria-live="polite">
+        <span v-if="loading">正在筛选…</span>
+        <span v-else
+          >匹配 <strong>{{ total }}</strong> 本漫画</span
+        >
+        <span class="filter-summary-hint">{{ activeConditions.length ? '条件同时匹配' : '当前显示全部记录' }}</span>
+      </div>
+      <div v-if="activeConditions.length" class="filter-conditions" aria-label="当前存储筛选条件">
+        <AppButton
+          v-for="condition in activeConditions"
+          :key="condition.key"
+          size="sm"
+          class="filter-condition"
+          :aria-label="`清除${condition.label}`"
+          @click="clearCondition(condition.key)"
+        >
+          <span class="filter-condition-label">{{ condition.label }}</span
+          ><span class="filter-condition-close" aria-hidden="true">×</span>
+        </AppButton>
+        <AppButton variant="text" size="sm" @click="clearFilters">清空筛选</AppButton>
+      </div>
+      <p class="filter-note">筛选仅影响下方漫画列表，上方占用统计保持全库汇总。</p>
+    </div>
+  </section>
 </template>
 
 <style scoped>
-.action-section {
-  background: var(--bg-surface);
+.storage-filter-panel {
+  margin-bottom: var(--space-lg);
+  padding: var(--space-lg);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  padding: var(--space-lg);
-  margin-bottom: var(--space-xl);
+  background: var(--bg-surface);
 }
-.section-title {
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--text-primary);
-  margin: 0 0 var(--space-base);
-}
-.action-list {
+.filter-heading {
   display: flex;
-  gap: var(--space-base);
-  flex-wrap: wrap;
-}
-.action-btn {
-  padding: 8px 16px;
-  background: var(--bg-primary);
-  color: var(--text-primary);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-sm);
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all var(--transition-fast);
-}
-.action-btn:hover:not(:disabled) {
-  background: var(--bg-secondary);
-}
-.action-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-.action-btn.danger {
-  color: var(--danger);
-  border-color: var(--danger);
-}
-.action-btn.primary {
-  color: var(--accent);
-  border-color: var(--accent);
-}
-.filter-bar {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-sm);
-  margin-bottom: var(--space-base);
   align-items: center;
+  justify-content: space-between;
+  gap: var(--space-base);
+  margin-bottom: var(--space-lg);
 }
-.filter-select,
-.filter-input {
-  flex: 1 1 156px;
-  min-width: 140px;
+.filter-heading h2 {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: var(--text-md);
 }
-.filter-select--mini {
-  flex: 0 1 112px;
-  min-width: 104px;
+.filter-heading p {
+  margin: var(--space-xs) 0 0;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  line-height: 1.5;
 }
-.filter-input {
-  flex-basis: 220px;
+.filter-group h3 {
+  margin: 0 0 var(--space-sm);
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+  font-weight: 600;
 }
-.filter-reset {
-  flex: 0 0 auto;
-  padding-inline: 8px;
+.filter-group--storage {
+  margin-top: var(--space-lg);
+}
+.filter-grid {
+  display: grid;
+  gap: var(--space-base);
+}
+.filter-grid--scope {
+  grid-template-columns: minmax(0, 2fr) repeat(2, minmax(0, 1fr));
+}
+.filter-grid--storage {
+  grid-template-columns: repeat(3, minmax(0, 1fr)) minmax(0, 0.65fr);
+}
+.filter-field {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: var(--space-xs);
+}
+.filter-field > span {
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+.filter-field :deep(.el-select) {
+  width: 100%;
+}
+.storage-filter-panel :deep(.el-input__wrapper),
+.storage-filter-panel :deep(.el-select__wrapper) {
+  min-height: var(--control-height);
+  padding: 0 var(--space-3);
+  border-radius: var(--control-radius);
+  font-size: var(--text-sm);
+}
+.storage-filter-panel :deep(.el-input__inner),
+.storage-filter-panel :deep(.el-select__placeholder) {
+  font-size: var(--text-sm);
+}
+/* 标签和分类可搜索，内部输入框只承载文字，不叠加原生表单控件外观。 */
+.storage-filter-panel :deep(input.el-select__input) {
+  height: 24px;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  font-size: var(--text-sm);
+  line-height: 24px;
+}
+.storage-filter-panel :deep(input.el-select__input:hover),
+.storage-filter-panel :deep(input.el-select__input:focus) {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.filter-feedback {
+  margin-top: var(--space-lg);
+  padding-top: var(--space-base);
+  border-top: 1px solid var(--border);
+}
+.filter-result {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-sm);
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+}
+.filter-result strong {
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+.filter-summary-hint,
+.filter-note {
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+.filter-conditions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-top: var(--space-sm);
+}
+.filter-condition {
+  max-width: 100%;
+  min-height: var(--button-height-sm);
+  background: var(--control-bg);
+  border-color: var(--control-border);
+  border-radius: var(--control-radius);
   color: var(--text-secondary);
 }
-.filter-reset:hover {
-  color: var(--accent);
-  background: var(--accent-bg);
+.filter-condition :deep(> span) {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: var(--space-sm);
 }
-@media (max-width: 768px) {
-  .filter-bar {
-    display: flex;
-    align-items: stretch;
+.filter-condition-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.filter-condition-close {
+  flex-shrink: 0;
+  color: var(--text-muted);
+  font-size: var(--text-md);
+}
+.filter-note {
+  margin: var(--space-sm) 0 0;
+  line-height: 1.5;
+}
+@media (max-width: 900px) {
+  .filter-grid--scope,
+  .filter-grid--storage {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-  .filter-bar > .filter-select.el-select,
-  .filter-bar > .filter-select--mini.el-select,
-  .filter-bar > .filter-input.el-input {
-    flex-basis: 100%;
-    width: 100%;
+  .filter-field--keyword {
+    grid-column: 1 / -1;
   }
 }
-
-.filter-bar {
-  --el-border-color: var(--border);
-  --el-border-color-hover: var(--border-strong);
-  --el-border-color-light: var(--border);
-  --el-border-color-lighter: var(--border);
-}
-.filter-bar :deep(.el-select__wrapper),
-.filter-bar :deep(.el-input__wrapper) {
-  box-shadow: 0 0 0 1px var(--border) inset;
-}
-.filter-bar :deep(.el-select__wrapper:hover),
-.filter-bar :deep(.el-input__wrapper:hover) {
-  box-shadow: 0 0 0 1px var(--border-strong) inset;
-}
-.filter-bar :deep(.el-select__wrapper.is-focused),
-.filter-bar :deep(.el-input__wrapper.is-focus) {
-  box-shadow:
-    inset 0 0 0 1px var(--accent),
-    var(--shadow-sm) !important;
+@media (max-width: 540px) {
+  .storage-filter-panel {
+    padding: var(--space-base);
+  }
+  .filter-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .filter-grid {
+    gap: var(--space-sm);
+  }
 }
 </style>

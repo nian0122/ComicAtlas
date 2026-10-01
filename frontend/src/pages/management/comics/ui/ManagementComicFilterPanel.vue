@@ -216,6 +216,41 @@ const emit = defineEmits<{ apply: []; keyword: []; reset: [] }>()
 .filter-field :deep(.el-select) {
   width: 100%;
 }
+.comic-filter-panel :deep(.el-input__wrapper),
+.comic-filter-panel :deep(.el-select__wrapper) {
+  min-height: var(--control-height);
+  padding: 0 var(--space-3);
+  border-radius: var(--control-radius);
+  font-size: var(--text-sm);
+}
+.comic-filter-panel :deep(.el-input__inner),
+.comic-filter-panel :deep(.el-select__placeholder) {
+  font-size: var(--text-sm);
+}
+/* 多选内的搜索框不是独立表单控件，不能再次撑出完整控件的高度与边框。 */
+.comic-filter-panel :deep(input.el-select__input) {
+  height: 24px;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  font-size: var(--text-sm);
+  line-height: 24px;
+}
+.comic-filter-panel :deep(input.el-select__input:hover),
+.comic-filter-panel :deep(input.el-select__input:focus) {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.filter-field :deep(.el-tag) {
+  border-radius: var(--control-radius);
+  border-color: var(--control-border);
+  background: var(--control-bg-hover);
+  color: var(--text-primary);
+}
 .filter-help {
   color: var(--text-muted);
   font-size: var(--text-xs);
@@ -237,9 +272,9 @@ const emit = defineEmits<{ apply: []; keyword: []; reset: [] }>()
 }
 .filter-condition {
   color: var(--text-primary);
-  background: var(--bg-secondary);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
+  background: var(--control-bg-hover);
+  border: 1px solid var(--control-border);
+  border-radius: var(--control-radius);
   padding: var(--space-xs) var(--space-sm);
   overflow-wrap: anywhere;
 }

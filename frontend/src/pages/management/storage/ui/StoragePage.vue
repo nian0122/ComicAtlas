@@ -14,7 +14,12 @@
 
     <StorageSummary :stats="store.summary" />
 
-    <StorageToolbar v-model:filter="filterState" v-model:sort="sortState" />
+    <StorageToolbar
+      v-model:filter="filterState"
+      v-model:sort="sortState"
+      :total="store.serverTotal"
+      :loading="store.loading"
+    />
 
     <StorageTable
       :list="pagedList"
