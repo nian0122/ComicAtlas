@@ -275,13 +275,14 @@
 import { AppButton } from '@/shared/ui/button'
 import { ContentState } from '@/shared/ui/content-state'
 import { nextTick, ref, watch, onMounted, onBeforeUnmount } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
 import { Search, CircleClose, Sort } from '@element-plus/icons-vue'
 import { useComicStore } from '@/pages/reading/library/model/comic-store'
 import { categoryApi } from '@/entities/category'
 import { tagApi } from '@/entities/tag'
 import { useLibraryFilters } from '@/pages/reading/library/model/useLibraryFilters'
 import { useLibraryPageLayout } from '../model/useLibraryPageLayout'
+import { consumeLibraryScrollPosition, saveLibraryScrollPosition } from '../model/library-navigation'
 import { toPosterStatus } from '@/entities/comic'
 import { ComicPoster } from '@/entities/comic'
 import type { ComicListQuery, ComicListVO } from '@/entities/comic'
@@ -397,7 +398,7 @@ function parseRoutePage(): number | undefined {
   return Number.isInteger(page) && page > 0 ? page : undefined
 }
 
-function restoreFiltersFromStore() {
+function restoreFiltersFromStore(preserveLoadedList: boolean) {
   const routeTags = route.query.tags
   const hasRouteFilters = ['keyword', 'category', 'tags', 'tagMode', 'sort', 'order'].some(
     (key) => route.query[key] !== undefined,
@@ -418,8 +419,8 @@ function restoreFiltersFromStore() {
     tagMode: selectedTags.value.length > 1 ? tagMode.value : undefined,
     sort: sort.value,
     order: order.value,
-    // 桌面端从详情页返回时保留当前页；移动端始终从第一页构建滚动列表。
-    page: isMobileViewport.value ? 1 : (routePage ?? store.query.page ?? 1),
+    // 从详情返回时保留移动端已加载页数；正常进入移动端漫画库从第一页加载。
+    page: isMobileViewport.value && !preserveLoadedList ? 1 : (routePage ?? store.query.page ?? 1),
   })
 }
 
@@ -477,12 +478,25 @@ async function loadMoreFromScroll(isRetry = false) {
   }
 }
 
-onMounted(() => {
-  // 返回漫画库时恢复 Store 中的筛选条件，避免控件与实际查询状态不一致。
-  restoreFiltersFromStore()
+onMounted(async () => {
+  const savedScrollY = consumeLibraryScrollPosition()
+  const canRestoreLoadedList = savedScrollY !== null && store.list.length > 0
+  // 返回详情时复用已加载的漫画和筛选状态，避免滚动列表退回第一页。
+  restoreFiltersFromStore(canRestoreLoadedList)
   loadTags()
   loadCategories()
-  store.fetchList()
+  if (!canRestoreLoadedList) await store.fetchList()
+
+  if (savedScrollY !== null) {
+    await nextTick()
+    requestAnimationFrame(() => window.scrollTo({ top: savedScrollY, left: 0, behavior: 'auto' }))
+  }
+})
+
+onBeforeRouteLeave((to) => {
+  if (to.name === 'comic-detail') {
+    saveLibraryScrollPosition(window.scrollY)
+  }
 })
 
 watch(
