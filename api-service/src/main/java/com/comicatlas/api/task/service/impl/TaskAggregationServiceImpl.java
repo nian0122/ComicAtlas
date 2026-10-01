@@ -32,6 +32,10 @@ public class TaskAggregationServiceImpl implements TaskAggregationService {
         if (task == null) {
             return;
         }
+        if (task.getStatus().isTerminal()) {
+            // 并发的迟到事件可能携带较旧的 item 快照；终态任务不能被重新聚合回运行态。
+            return;
+        }
 
         long successCount = count(items, ManagementTaskStatus.SUCCEEDED);
         long failureCount = count(items, ManagementTaskStatus.FAILED);
