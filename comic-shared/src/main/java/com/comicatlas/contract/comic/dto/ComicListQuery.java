@@ -14,10 +14,6 @@ public class ComicListQuery {
     private String status;
     private String category;
     private String sourceType;
-    /** 漫画 HQ 聚合筛选：HAS_HQ=存在 HQ 文件，NO_HQ=不存在 HQ 文件。 */
-    private String hqStatus;
-    /** 漫画 LQ 筛选：QUEUED 匹配排队或生成中的活动媒体，GENERATING 仅匹配生成中的媒体。 */
-    private String lqStatus;
     private String sort = "createdAt";
     private String order = "desc";
     private Integer page = 1;

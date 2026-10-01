@@ -6,7 +6,7 @@
     </PageHeader>
 
     <StatGrid spaced class="repository-stats" aria-label="仓库统计" :columns="3">
-      <StatCard label="已索引漫画" :value="store.total.toLocaleString()" description="来自当前漫画目录" />
+      <StatCard label="匹配漫画" :value="store.total.toLocaleString()" description="当前筛选结果" />
       <StatCard
         label="存储池"
         :value="formatBytes(storageTotalBytes)"
@@ -19,86 +19,15 @@
       />
     </StatGrid>
 
-    <div class="filter-toolbar">
-      <el-input
-        v-model="filters.keyword"
-        placeholder="搜索标题/作者/标签"
-        clearable
-        class="filter-input"
-        @input="scheduleKeywordSearch"
-        @keyup.enter="applyKeywordSearchImmediately"
-        @clear="applyKeywordSearchImmediately"
-      />
-      <el-select v-model="filters.category" placeholder="分类" clearable class="filter-select" @change="applyFilters">
-        <el-option label="未分类" value="_NONE" />
-        <el-option v-for="c in categoryStore.list" :key="c.id" :label="c.name" :value="c.name" />
-      </el-select>
-      <el-select v-model="filters.status" placeholder="状态" clearable class="filter-select" @change="applyFilters">
-        <el-option v-for="s in STATUS_OPTIONS" :key="s.value" :label="s.label" :value="s.value" />
-      </el-select>
-      <el-select
-        v-model="filters.lqStatus"
-        placeholder="LQ 状态"
-        clearable
-        class="filter-select"
-        @change="applyFilters"
-      >
-        <el-option label="有 LQ" value="HAS_LQ" />
-        <el-option label="无 LQ" value="NO_LQ" />
-        <el-option label="未生成" value="NOT_GENERATED" />
-        <el-option label="排队/生成中" value="QUEUED" />
-        <el-option label="缺失" value="MISSING" />
-        <el-option label="失败" value="FAILED" />
-      </el-select>
-      <el-select
-        v-model="filters.hqStatus"
-        placeholder="HQ 状态"
-        clearable
-        class="filter-select"
-        @change="applyFilters"
-      >
-        <el-option label="有 HQ" value="HAS_HQ" />
-        <el-option label="无 HQ" value="NO_HQ" />
-        <el-option label="待处理" value="PENDING" />
-        <el-option label="删除排队中" value="DELETE_QUEUED" />
-        <el-option label="删除中" value="DELETING" />
-        <el-option label="已删除" value="DELETED" />
-        <el-option label="缺失" value="MISSING" />
-        <el-option label="失败" value="FAILED" />
-      </el-select>
-      <el-select
-        v-model="filters.tags"
-        multiple
-        collapse-tags
-        collapse-tags-tooltip
-        placeholder="标签"
-        clearable
-        class="filter-select--wide"
-        @change="applyFilters"
-      >
-        <el-option v-for="t in tagStore.list" :key="t.id" :label="t.name" :value="t.name" />
-        <el-option label="无标签" value="_NONE" />
-      </el-select>
-      <el-select
-        v-if="filters.tags.length > 0"
-        v-model="filters.tagMode"
-        class="filter-select--mini"
-        @change="applyFilters"
-      >
-        <el-option label="任一" value="OR" />
-        <el-option label="全部" value="AND" />
-        <el-option label="排除" value="NOT" />
-      </el-select>
-      <el-select v-model="filters.sort" placeholder="排序" class="filter-select" @change="applyFilters">
-        <el-option v-for="s in SORT_OPTIONS" :key="s.value" :label="s.label" :value="s.value" />
-      </el-select>
-      <el-select v-model="filters.order" placeholder="时间顺序" class="filter-select--mini" @change="applyFilters">
-        <el-option label="倒序" value="desc" />
-        <el-option label="正序" value="asc" />
-      </el-select>
-      <AppButton variant="text" @click="resetFilters">重置</AppButton>
-    </div>
-
+    <ManagementComicFilterPanel
+      v-model:filters="filters"
+      :categories="categoryStore.list"
+      :tags="tagStore.list"
+      :active-conditions="activeConditions"
+      @apply="applyFilters"
+      @keyword="scheduleKeywordSearch"
+      @reset="resetFilters"
+    />
     <div v-if="store.list.length > 0" class="batch-toolbar">
       <el-checkbox :model-value="selectAll" :indeterminate="isIndeterminate" @change="handleSelectAll">
         全选本页 ({{ selectedIds.length }} / {{ store.list.length }})
@@ -146,7 +75,7 @@
             @change="() => toggleSelect(comic.id)"
             @click.stop
           />
-          <button class="comic-card-open" type="button" @click="goEdit(comic.id)">
+          <AppButton class="comic-card-open" variant="ghost" @click="goEdit(comic.id)">
             <span class="comic-cover">
               <img
                 v-if="comic.coverUrl"
@@ -165,7 +94,7 @@
                 <span>{{ comic.pageCount }} 页</span>
               </span>
             </span>
-          </button>
+          </AppButton>
         </article>
       </div>
 
@@ -237,8 +166,10 @@ import { BatchComicOperationDialog } from '@/features/comic-batch-operations'
 import { exportApi, type StorageStats } from '@/entities/storage'
 import { storageService } from '@/features/storage'
 import { COMIC_STATUSES, comicStatusMeta } from '@/entities/comic'
+
 import type { ManagementTaskType } from '@/entities/task'
-import { useManagementComicFilters } from '@/pages/management/comics/model/useManagementComicFilters'
+import { useManagementComicListFilters } from '../model/management-comic-filters'
+import ManagementComicFilterPanel from './ManagementComicFilterPanel.vue'
 
 type ComicBatchOperation = Extract<ManagementTaskType, 'LQ_GENERATE' | 'METADATA_REFRESH' | 'COMIC_DELETE'>
 
@@ -259,19 +190,6 @@ function hideBrokenImage(event: Event) {
   image.hidden = true
 }
 
-const STATUS_OPTIONS = COMIC_STATUSES.map((value) => ({
-  label: comicStatusMeta(value).label,
-  value,
-}))
-
-const SORT_OPTIONS = [
-  { label: '创建时间', value: 'createdAt' },
-  { label: '更新时间', value: 'updatedAt' },
-  { label: '标题', value: 'title' },
-  { label: '页数', value: 'pageCount' },
-  { label: '上次阅读', value: 'lastReadTime' },
-]
-
 const selectedIds = ref<number[]>([])
 const showBatchDialog = ref(false)
 const showBatchOperationDialog = ref(false)
@@ -280,16 +198,10 @@ const exporting = ref(false)
 const directoryExportTask = ref<Awaited<ReturnType<typeof exportApi.getTask>>['data'] | null>(null)
 let directoryExportPollTimer: ReturnType<typeof setTimeout> | undefined
 
-const {
-  filters,
-  applyFilters,
-  scheduleKeywordSearch,
-  applyKeywordSearchImmediately,
-  resetFilters,
-  restoreFiltersFromStore,
-} = useManagementComicFilters(store, () => {
-  selectedIds.value = []
-})
+const { filters, applyFilters, scheduleKeywordSearch, activeConditions, resetFilters, restoreFilters } =
+  useManagementComicListFilters(store, () => {
+    selectedIds.value = []
+  })
 
 const selectAll = computed(() => store.list.length > 0 && selectedIds.value.length === store.list.length)
 const isIndeterminate = computed(() => selectedIds.value.length > 0 && selectedIds.value.length < store.list.length)
@@ -381,9 +293,9 @@ function clearDirectoryExportTask(): void {
   directoryExportTask.value = null
 }
 
-function statusLabel(s: string) {
-  const knownStatus = COMIC_STATUSES.find((value) => value === s)
-  return knownStatus ? comicStatusMeta(knownStatus).label : s
+function statusLabel(status: string) {
+  const knownStatus = COMIC_STATUSES.find((value) => value === status)
+  return knownStatus ? comicStatusMeta(knownStatus).label : status
 }
 
 function goEdit(id: number) {
@@ -403,7 +315,7 @@ function onPageSizeChange(size: number) {
 }
 
 onMounted(() => {
-  restoreFiltersFromStore()
+  restoreFilters()
   categoryStore.fetchList()
   tagStore.fetchList()
   store.fetchList()
@@ -439,38 +351,6 @@ function formatBytes(bytes: number | undefined): string {
 .manage-comic-list-page {
   width: 100%;
   max-width: none;
-}
-
-.filter-toolbar {
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
-  margin-bottom: var(--space-lg);
-  flex-wrap: wrap;
-}
-
-.filter-input {
-  width: 180px;
-}
-
-.filter-select {
-  width: 108px;
-}
-
-.filter-select--wide {
-  width: 162px;
-}
-
-.filter-select--mini {
-  width: 80px;
-}
-
-.filter-toolbar > :deep(.filter-input .el-input__wrapper),
-.filter-toolbar > :deep(.filter-select .el-select__wrapper),
-.filter-toolbar > :deep(.filter-select--wide .el-select__wrapper),
-.filter-toolbar > :deep(.filter-select--mini .el-select__wrapper) {
-  min-height: 36px;
-  border-radius: var(--radius-sm);
 }
 
 .batch-toolbar {
@@ -618,6 +498,12 @@ function formatBytes(bytes: number | undefined): string {
 .comic-card-open:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: -3px;
+}
+
+.comic-card-open :deep(> span) {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
 }
 
 .comic-info {

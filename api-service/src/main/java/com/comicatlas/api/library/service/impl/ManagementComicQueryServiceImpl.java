@@ -8,7 +8,7 @@ import com.comicatlas.contract.common.constant.HttpStatusCodes;
 import com.comicatlas.contract.common.exception.BusinessException;
 import com.comicatlas.contract.comic.dto.ComicDetailVO;
 import com.comicatlas.contract.comic.dto.ComicMetadataDTO;
-import com.comicatlas.contract.comic.dto.ComicListQuery;
+import com.comicatlas.api.library.dto.ManagementComicListQuery;
 import com.comicatlas.persistence.comic.assembler.ComicDetailAssembler;
 import com.comicatlas.persistence.comic.entity.Category;
 import com.comicatlas.persistence.comic.entity.Comic;
@@ -20,39 +20,30 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import com.comicatlas.api.library.persistence.mapper.ManagementComicListMapper;
+import com.comicatlas.api.library.support.ManagementComicFilterNormalizer;
 
 @Service
 @RequiredArgsConstructor
 public class ManagementComicQueryServiceImpl implements ManagementComicQueryService {
     private final ComicMapper comicMapper;
+    private final ManagementComicListMapper listMapper;
     private final ComicTagMapper comicTagMapper;
     private final CategoryMapper categoryMapper;
     private final ComicDetailAssembler comicDetailAssembler;
     private final FileUrlResolver fileUrlResolver;
 
     @Override
-    public IPage<ManagementComicListVO> list(ComicListQuery query) {
-        if (query == null) {
-            query = new ComicListQuery();
-        }
-        long safePage = query.getPage() == null ? 1L : Math.max(1L, query.getPage());
-        long safeSize = query.getSize() == null ? 20L : Math.min(Math.max(1L, query.getSize()), 100L);
-        query.setPage((int) safePage);
-        query.setSize((int) safeSize);
-        if (query.getTagMode() == null || query.getTagMode().isBlank()) {
-            query.setTagMode("OR");
-        }
-        if (!"asc".equalsIgnoreCase(query.getOrder())) {
-            query.setOrder("desc");
-        } else {
-            query.setOrder("asc");
-        }
-        IPage<Comic> comics = comicMapper.selectPage(new Page<>(safePage, safeSize), query, true);
-        Page<ManagementComicListVO> result = new Page<>(safePage, safeSize, comics.getTotal());
+    public IPage<ManagementComicListVO> list(ManagementComicListQuery query) {
+        ManagementComicListQuery normalizedQuery = query == null ? new ManagementComicListQuery() : query;
+        ManagementComicFilterNormalizer.normalize(normalizedQuery);
+        IPage<Comic> comics = listMapper.selectPage(
+                new Page<>(normalizedQuery.getPage(), normalizedQuery.getSize()), normalizedQuery);
+        Page<ManagementComicListVO> result = new Page<>(
+                normalizedQuery.getPage(), normalizedQuery.getSize(), comics.getTotal());
         result.setRecords(comics.getRecords().stream().map(this::toListVO).toList());
         return result;
     }
-
     @Override
     public ComicDetailVO detail(Long comicId) {
         Comic comic = comicMapper.selectById(comicId);

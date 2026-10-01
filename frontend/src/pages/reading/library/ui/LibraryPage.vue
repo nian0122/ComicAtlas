@@ -5,220 +5,241 @@
       class="library-filter-header"
       :class="{ 'desktop-filter-hidden': isDesktopFilterHidden }"
     >
-      <div class="title-block">
-        <div class="title-row">
-          <h1 class="page-title">
-            <span class="mobile-page-title" aria-label="筛选结果数量">
-              <strong>{{ store.total }}</strong
-              ><small>本</small>
-            </span>
-          </h1>
-          <div class="mobile-recent">
-            <AppButton
-              type="button"
-              class="mobile-sort-order"
-              :class="{ ascending: order === 'asc' }"
-              :aria-label="order === 'asc' ? '当前升序，点击切换为降序' : '当前降序，点击切换为升序'"
-              @click="toggleSortOrder"
-            >
-              <el-icon :size="18"><Sort /></el-icon>
-            </AppButton>
-            <el-popover
-              v-model:visible="isMobileSortOpen"
-              placement="bottom-end"
-              :width="218"
-              trigger="click"
-              popper-class="mobile-sort-menu-popper"
-            >
-              <template #reference>
-                <AppButton type="button" class="mobile-sort-trigger" aria-label="选择排序字段">
-                  <span>{{ currentSortLabel }}</span>
-                  <i aria-hidden="true" />
-                </AppButton>
-              </template>
-
-              <div class="mobile-sort-menu">
-                <div class="mobile-sort-grid" role="group" aria-label="排序字段">
-                  <AppButton
-                    v-for="option in sortOptions"
-                    :key="option.value"
-                    type="button"
-                    :class="{ active: sort === option.value }"
-                    @click="selectMobileSort(option.value)"
-                  >
-                    {{ option.label }}
+      <template v-if="isMobileViewport">
+        <div class="title-block">
+          <div class="title-row">
+            <h1 class="page-title">
+              <span class="mobile-page-title" aria-label="筛选结果数量">
+                <strong>{{ store.total }}</strong
+                ><small>本</small>
+              </span>
+            </h1>
+            <div class="mobile-recent">
+              <AppButton
+                type="button"
+                class="mobile-sort-order"
+                :class="{ ascending: order === 'asc' }"
+                :aria-label="order === 'asc' ? '当前升序，点击切换为降序' : '当前降序，点击切换为升序'"
+                @click="toggleSortOrder"
+              >
+                <el-icon :size="18"><Sort /></el-icon>
+              </AppButton>
+              <el-popover
+                v-model:visible="isMobileSortOpen"
+                placement="bottom-end"
+                :width="218"
+                trigger="click"
+                popper-class="mobile-sort-menu-popper"
+              >
+                <template #reference>
+                  <AppButton type="button" class="mobile-sort-trigger" aria-label="选择排序字段">
+                    <span>{{ currentSortLabel }}</span>
+                    <i aria-hidden="true" />
                   </AppButton>
+                </template>
+
+                <div class="mobile-sort-menu">
+                  <div class="mobile-sort-grid" role="group" aria-label="排序字段">
+                    <AppButton
+                      v-for="option in sortOptions"
+                      :key="option.value"
+                      type="button"
+                      :class="{ active: sort === option.value }"
+                      @click="selectMobileSort(option.value)"
+                    >
+                      {{ option.label }}
+                    </AppButton>
+                  </div>
                 </div>
-              </div>
-            </el-popover>
+              </el-popover>
+            </div>
           </div>
         </div>
-      </div>
-      <div class="toolbar">
-        <!-- 移动端第一行：搜索 + 排序合并为一行；桌面端 display:contents 平铺回单行布局 -->
-        <div class="toolbar-main">
-          <div class="search-input">
-            <el-icon :size="18"><Search /></el-icon>
-            <input
-              v-model="keyword"
-              data-library-search
-              type="text"
-              placeholder="搜索"
-              aria-label="搜索漫画"
-              @input="onKeywordInput"
-              @keyup.enter="onSearch"
-            />
-            <AppButton
-              v-if="keyword"
-              variant="text"
-              size="sm"
-              icon-only
-              class="clear-icon"
-              aria-label="清除搜索"
-              @click="clearKeyword"
-            >
-              <el-icon :size="16"><CircleClose /></el-icon>
-            </AppButton>
+        <div class="toolbar">
+          <!-- 移动端第一行：搜索 + 排序合并为一行；桌面端 display:contents 平铺回单行布局 -->
+          <div class="toolbar-main">
+            <div class="search-input">
+              <el-icon :size="18"><Search /></el-icon>
+              <input
+                v-model="keyword"
+                data-library-search
+                type="text"
+                placeholder="搜索"
+                aria-label="搜索漫画"
+                @input="scheduleKeywordSearch"
+                @keyup.enter="applyFilters"
+              />
+              <AppButton
+                v-if="keyword"
+                variant="text"
+                size="sm"
+                icon-only
+                class="clear-icon"
+                aria-label="清除搜索"
+                @click="clearKeyword"
+              >
+                <el-icon :size="16"><CircleClose /></el-icon>
+              </AppButton>
+            </div>
+
+            <div class="desktop-sort-group">
+              <div class="filter-select sort-select">
+                <el-select
+                  v-model="sort"
+                  aria-label="排序方式"
+                  popper-class="library-filter-popper"
+                  @change="applyFilters"
+                >
+                  <el-option label="最新添加" value="createdAt" />
+                  <el-option label="最近更新" value="updatedAt" />
+                  <el-option label="标题" value="title" />
+                  <el-option label="页数" value="pageCount" />
+                  <el-option label="文件大小" value="fileSize" />
+                  <el-option label="最近阅读" value="lastReadTime" />
+                </el-select>
+              </div>
+
+              <AppButton
+                type="button"
+                class="desktop-sort-order"
+                :class="{ ascending: order === 'asc' }"
+                :aria-label="order === 'asc' ? '当前正序，点击切换为倒序' : '当前倒序，点击切换为正序'"
+                :title="order === 'asc' ? '正序' : '倒序'"
+                @click="toggleSortOrder"
+              >
+                <el-icon :size="18"><Sort /></el-icon>
+              </AppButton>
+            </div>
           </div>
 
-          <div class="desktop-sort-group">
-            <div class="filter-select sort-select">
-              <el-select v-model="sort" aria-label="排序方式" popper-class="library-filter-popper" @change="onSearch">
-                <el-option label="最新添加" value="createdAt" />
-                <el-option label="最近更新" value="updatedAt" />
-                <el-option label="标题" value="title" />
-                <el-option label="页数" value="pageCount" />
-                <el-option label="文件大小" value="fileSize" />
-                <el-option label="最近阅读" value="lastReadTime" />
+          <!-- 移动端第二行：筛选 chips 横向滚动 -->
+          <div class="toolbar-filters">
+            <div class="filter-select category-select">
+              <el-select
+                v-model="categoryFilter"
+                placeholder="全部分类"
+                aria-label="漫画分类"
+                popper-class="library-filter-popper"
+                @change="applyFilters"
+              >
+                <el-option label="全部分类" value="" />
+                <el-option label="未分类" value="_NONE" />
+                <el-option v-for="c in allCategories" :key="c.id" :label="c.name" :value="c.name" />
               </el-select>
             </div>
 
-            <AppButton
-              type="button"
-              class="desktop-sort-order"
-              :class="{ ascending: order === 'asc' }"
-              :aria-label="order === 'asc' ? '当前正序，点击切换为倒序' : '当前倒序，点击切换为正序'"
-              :title="order === 'asc' ? '正序' : '倒序'"
-              @click="toggleSortOrder"
+            <div class="filter-select tag-filter">
+              <el-select
+                v-model="selectedTags"
+                aria-label="阅读标签"
+                multiple
+                collapse-tags
+                collapse-tags-tooltip
+                placeholder="标签：选择"
+                class="tag-select"
+                popper-class="library-filter-popper"
+                @change="applyFilters"
+              >
+                <el-option v-for="tag in allTags" :key="tag.id" :label="tag.name" :value="tag.name" />
+                <el-option label="无标签" value="_NONE" />
+              </el-select>
+            </div>
+
+            <div v-if="selectedTags.length > 1" class="filter-select tag-mode-select">
+              <el-select
+                v-model="tagMode"
+                aria-label="标签匹配方式"
+                popper-class="library-filter-popper tag-mode-popper"
+                @change="applyFilters"
+              >
+                <el-option label="任一" value="OR" />
+                <el-option label="同时" value="AND" />
+              </el-select>
+            </div>
+
+            <AppButton v-if="hasActiveFilters" type="button" class="filter-reset" @click="clearFilters"
+              >清除筛选</AppButton
             >
-              <el-icon :size="18"><Sort /></el-icon>
-            </AppButton>
+          </div>
+
+          <div v-if="hasActiveFilters" class="active-filter-row" aria-label="当前筛选条件">
+            <span class="active-filter-label">当前筛选</span>
+            <span v-for="item in activeFilterSummary" :key="item" class="active-filter-chip">{{ item }}</span>
+            <AppButton type="button" class="active-filter-clear" @click="clearFilters">清除全部</AppButton>
           </div>
         </div>
 
-        <!-- 移动端第二行：筛选 chips 横向滚动 -->
-        <div class="toolbar-filters">
-          <div class="filter-select category-select">
-            <el-select
-              v-model="categoryFilter"
-              placeholder="全部分类"
-              aria-label="漫画分类"
-              popper-class="library-filter-popper"
-              @change="onSearch"
-            >
-              <el-option label="全部分类" value="" />
-              <el-option label="未分类" value="_NONE" />
-              <el-option v-for="c in allCategories" :key="c.id" :label="c.name" :value="c.name" />
-            </el-select>
+        <div class="mobile-filter-stack" aria-label="漫画筛选">
+          <div class="mobile-filter-group-row">
+            <div class="mobile-filter-options" role="group" aria-label="按分类筛选">
+              <AppButton type="button" :class="{ active: !categoryFilter }" @click="selectCategory('')">全部</AppButton>
+              <AppButton
+                v-for="category in allCategories"
+                :key="category.id"
+                type="button"
+                :class="{ active: categoryFilter === category.name }"
+                @click="selectCategory(category.name)"
+              >
+                {{ category.name }}
+              </AppButton>
+              <AppButton type="button" :class="{ active: categoryFilter === '_NONE' }" @click="selectCategory('_NONE')">
+                未分类
+              </AppButton>
+            </div>
           </div>
 
-          <div class="filter-select tag-filter">
-            <el-select
-              v-model="selectedTags"
-              multiple
-              collapse-tags
-              collapse-tags-tooltip
-              placeholder="标签：选择"
-              class="tag-select"
-              popper-class="library-filter-popper"
-              @change="onSearch"
-            >
-              <el-option v-for="tag in allTags" :key="tag.id" :label="tag.name" :value="tag.name" />
-              <el-option label="无标签" value="_NONE" />
-            </el-select>
+          <div class="mobile-filter-group-row">
+            <div class="mobile-filter-options" role="group" aria-label="按标签筛选">
+              <AppButton
+                v-for="tag in allTags"
+                :key="tag.id"
+                type="button"
+                :class="{ active: selectedTags.includes(tag.name) }"
+                @click="toggleTag(tag.name)"
+              >
+                {{ tag.name }}
+              </AppButton>
+              <AppButton type="button" :class="{ active: selectedTags.includes('_NONE') }" @click="toggleTag('_NONE')">
+                无标签
+              </AppButton>
+            </div>
           </div>
 
-          <div v-if="selectedTags.length > 1" class="filter-select tag-mode-select">
-            <el-select
-              v-model="tagMode"
-              aria-label="标签匹配方式"
-              popper-class="library-filter-popper tag-mode-popper"
-              @change="onSearch"
-            >
-              <el-option label="任一" value="OR" />
-              <el-option label="同时" value="AND" />
-            </el-select>
-          </div>
-
-          <AppButton v-if="hasActiveFilters" type="button" class="filter-reset" @click="clearFilters"
-            >清除筛选</AppButton
-          >
-        </div>
-
-        <div v-if="hasActiveFilters" class="active-filter-row" aria-label="当前筛选条件">
-          <span class="active-filter-label">当前筛选</span>
-          <span v-for="item in activeFilterSummary" :key="item" class="active-filter-chip">{{ item }}</span>
-          <AppButton type="button" class="active-filter-clear" @click="clearFilters">清除全部</AppButton>
-        </div>
-      </div>
-
-      <div class="mobile-filter-stack" aria-label="漫画筛选">
-        <div class="mobile-filter-group-row">
-          <div class="mobile-filter-options" role="group" aria-label="按分类筛选">
-            <AppButton type="button" :class="{ active: !categoryFilter }" @click="selectCategory('')">全部</AppButton>
-            <AppButton
-              v-for="category in allCategories"
-              :key="category.id"
-              type="button"
-              :class="{ active: categoryFilter === category.name }"
-              @click="selectCategory(category.name)"
-            >
-              {{ category.name }}
-            </AppButton>
-            <AppButton type="button" :class="{ active: categoryFilter === '_NONE' }" @click="selectCategory('_NONE')">
-              未分类
-            </AppButton>
+          <div v-if="selectedTags.length > 1" class="mobile-filter-group-row mobile-filter-match-row">
+            <div class="mobile-match-control" role="group" aria-label="标签匹配方式">
+              <AppButton
+                type="button"
+                :class="{ active: tagMode === 'OR' }"
+                aria-label="任一标签满足"
+                @click="setTagMode('OR')"
+              >
+                任一
+              </AppButton>
+              <AppButton
+                type="button"
+                :class="{ active: tagMode === 'AND' }"
+                aria-label="所有标签同时满足"
+                @click="setTagMode('AND')"
+              >
+                同时
+              </AppButton>
+            </div>
           </div>
         </div>
-
-        <div class="mobile-filter-group-row">
-          <div class="mobile-filter-options" role="group" aria-label="按标签筛选">
-            <AppButton
-              v-for="tag in allTags"
-              :key="tag.id"
-              type="button"
-              :class="{ active: selectedTags.includes(tag.name) }"
-              @click="toggleTag(tag.name)"
-            >
-              {{ tag.name }}
-            </AppButton>
-            <AppButton type="button" :class="{ active: selectedTags.includes('_NONE') }" @click="toggleTag('_NONE')">
-              无标签
-            </AppButton>
-          </div>
-        </div>
-
-        <div v-if="selectedTags.length > 1" class="mobile-filter-group-row mobile-filter-match-row">
-          <div class="mobile-match-control" role="group" aria-label="标签匹配方式">
-            <AppButton
-              type="button"
-              :class="{ active: tagMode === 'OR' }"
-              aria-label="任一标签满足"
-              @click="setTagMode('OR')"
-            >
-              任一
-            </AppButton>
-            <AppButton
-              type="button"
-              :class="{ active: tagMode === 'AND' }"
-              aria-label="所有标签同时满足"
-              @click="setTagMode('AND')"
-            >
-              同时
-            </AppButton>
-          </div>
-        </div>
-      </div>
+      </template>
+      <ReadingDesktopFilterPanel
+        v-else
+        v-model:filters="filters"
+        :total="store.total"
+        :categories="allCategories"
+        :tags="allTags"
+        :summary="activeFilterSummary"
+        @apply="applyFilters"
+        @keyword="scheduleKeywordSearch"
+        @reset="clearFilters"
+        @clear-keyword="clearKeyword"
+        @order="toggleSortOrder"
+      />
     </header>
 
     <ContentState v-if="store.loading && store.list.length === 0" state="loading" message="加载中..." />
@@ -274,13 +295,16 @@
 <script setup lang="ts">
 import { AppButton } from '@/shared/ui/button'
 import { ContentState } from '@/shared/ui/content-state'
-import { nextTick, ref, watch, onMounted, onBeforeUnmount } from 'vue'
+import { computed, nextTick, ref, watch, onMounted, onBeforeUnmount } from 'vue'
 import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
-import { Search, CircleClose, Sort } from '@element-plus/icons-vue'
+
 import { useComicStore } from '@/pages/reading/library/model/comic-store'
 import { categoryApi } from '@/entities/category'
 import { tagApi } from '@/entities/tag'
-import { useLibraryFilters } from '@/pages/reading/library/model/useLibraryFilters'
+import { READING_SORT_OPTIONS, useReadingComicFilters } from '../model/reading-comic-filters'
+import { Search, CircleClose, Sort } from '@element-plus/icons-vue'
+import ReadingDesktopFilterPanel from './ReadingDesktopFilterPanel.vue'
+
 import { useLibraryPageLayout } from '../model/useLibraryPageLayout'
 import { consumeLibraryScrollPosition, saveLibraryScrollPosition } from '../model/library-navigation'
 import { toPosterStatus } from '@/entities/comic'
@@ -294,75 +318,40 @@ const route = useRoute()
 const store = useComicStore()
 
 const {
+  filters,
   keyword,
   sort,
   order,
   selectedTags,
   tagMode,
   categoryFilter,
-  isMobileSortOpen,
-  sortOptions,
   hasActiveFilters,
+  setTagMode,
   activeFilterSummary,
-  currentSortLabel,
-  clearKeyword: resetKeyword,
-  clearFilters: resetFilters,
-  selectCategory: setCategory,
-  toggleTag: updateTagSelection,
-  setTagMode: updateTagMode,
-  toggleSortOrder: updateSortOrder,
-  selectMobileSort: updateMobileSort,
   buildQuery,
-} = useLibraryFilters()
+  restoreFilters,
+  applyFilters,
+  scheduleKeywordSearch,
+  clearKeyword,
+  clearFilters,
+  selectCategory,
+  toggleTag,
+  toggleSortOrder,
+} = useReadingComicFilters(onSearch)
+const isMobileSortOpen = ref(false)
+const sortOptions = READING_SORT_OPTIONS
+const currentSortLabel = computed(() => sortOptions.find((option) => option.value === sort.value)?.label || '最新添加')
+function selectMobileSort(nextSort: NonNullable<ComicListQuery['sort']>) {
+  filters.sort = nextSort
+  isMobileSortOpen.value = false
+  applyFilters()
+}
 const allTags = ref<TagDTO[]>([])
 const allCategories = ref<CategoryDTO[]>([])
 const pageHeaderRef = ref<HTMLElement | null>(null)
 const { posterSize, isDesktopFilterHidden, isMobileViewport } = useLibraryPageLayout(pageHeaderRef)
 const loadMoreSentinelRef = ref<HTMLElement | null>(null)
 let loadMoreObserver: IntersectionObserver | null = null
-
-let debounceTimer: ReturnType<typeof setTimeout> | null = null
-
-function onKeywordInput() {
-  if (debounceTimer) clearTimeout(debounceTimer)
-  debounceTimer = setTimeout(onSearch, 300)
-}
-
-function clearKeyword() {
-  resetKeyword()
-  onSearch()
-}
-
-function clearFilters() {
-  resetFilters()
-  onSearch()
-}
-
-function selectCategory(category: string) {
-  setCategory(category)
-  onSearch()
-}
-
-function toggleTag(tagName: string) {
-  updateTagSelection(tagName)
-  onSearch()
-}
-
-function setTagMode(mode: 'AND' | 'OR') {
-  updateTagMode(mode)
-  onSearch()
-}
-
-function toggleSortOrder() {
-  updateSortOrder()
-  onSearch()
-}
-
-function selectMobileSort(nextSort: NonNullable<ComicListQuery['sort']>) {
-  updateMobileSort(nextSort)
-  onSearch()
-}
-
 async function loadTags() {
   try {
     const res = await tagApi.list()
@@ -399,46 +388,46 @@ function parseRoutePage(): number | undefined {
 }
 
 function restoreFiltersFromStore(preserveLoadedList: boolean) {
-  const routeTags = route.query.tags
   const hasRouteFilters = ['keyword', 'category', 'tags', 'tagMode', 'sort', 'order'].some(
     (key) => route.query[key] !== undefined,
   )
-  const tagsFromRoute = Array.isArray(routeTags) ? routeTags.map(String) : routeTags ? [String(routeTags)] : undefined
-  keyword.value = hasRouteFilters ? String(route.query.keyword || '') : store.query.keyword || ''
-  categoryFilter.value = hasRouteFilters ? String(route.query.category || '') : store.query.category || ''
-  selectedTags.value = hasRouteFilters ? tagsFromRoute || [] : [...(store.query.tags || [])]
-  tagMode.value = (hasRouteFilters ? route.query.tagMode : store.query.tagMode) === 'AND' ? 'AND' : 'OR'
-  sort.value =
-    ((hasRouteFilters ? route.query.sort : store.query.sort) as NonNullable<ComicListQuery['sort']>) || 'createdAt'
-  order.value = (hasRouteFilters ? route.query.order : store.query.order) === 'asc' ? 'asc' : 'desc'
-  const routePage = parseRoutePage()
+  const routeTags = route.query.tags
+  const source = hasRouteFilters
+    ? {
+        keyword: String(route.query.keyword || ''),
+        category: String(route.query.category || ''),
+        tags: Array.isArray(routeTags)
+          ? routeTags.filter((tag): tag is string => typeof tag === 'string')
+          : routeTags
+            ? [routeTags]
+            : [],
+        tagMode: route.query.tagMode as ComicListQuery['tagMode'],
+        sort: route.query.sort as ComicListQuery['sort'],
+        order: route.query.order as ComicListQuery['order'],
+      }
+    : store.query
+  restoreFilters(source)
   store.updateQuery({
-    keyword: keyword.value || undefined,
-    category: categoryFilter.value || undefined,
-    tags: selectedTags.value.length > 0 ? selectedTags.value : undefined,
-    tagMode: selectedTags.value.length > 1 ? tagMode.value : undefined,
-    sort: sort.value,
-    order: order.value,
-    // 从详情返回时保留移动端已加载页数；正常进入移动端漫画库从第一页加载。
-    page: isMobileViewport.value && !preserveLoadedList ? 1 : (routePage ?? store.query.page ?? 1),
+    ...buildQuery(),
+    // 详情返回保留已加载页数，移动端首次进入从第一页加载。
+    page: isMobileViewport.value && !preserveLoadedList ? 1 : (parseRoutePage() ?? store.query.page ?? 1),
   })
 }
-
 function persistFiltersToRoute() {
+  const query = buildQuery()
   void router.replace({
     query: {
       ...route.query,
-      keyword: keyword.value || undefined,
-      category: categoryFilter.value || undefined,
-      tags: selectedTags.value.length > 0 ? selectedTags.value : undefined,
-      tagMode: selectedTags.value.length > 1 ? tagMode.value : undefined,
-      sort: sort.value || undefined,
-      order: order.value === 'asc' ? 'asc' : undefined,
+      keyword: query.keyword,
+      category: query.category,
+      tags: query.tags,
+      tagMode: query.tags?.length && !query.tags.includes('_NONE') ? query.tagMode : undefined,
+      sort: query.sort,
+      order: query.order === 'asc' ? 'asc' : undefined,
       page: !isMobileViewport.value && (store.query.page || 1) > 1 ? store.query.page : undefined,
     },
   })
 }
-
 function goDetail(id: string | number) {
   router.push(`/comic/${id}`)
 }
@@ -522,10 +511,6 @@ watch(
 onBeforeUnmount(() => {
   loadMoreObserver?.disconnect()
   loadMoreObserver = null
-  if (debounceTimer !== null) {
-    clearTimeout(debounceTimer)
-    debounceTimer = null
-  }
 })
 </script>
 

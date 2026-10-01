@@ -28,7 +28,7 @@ public abstract class BatchSelectionVO {
     @Data
     @EqualsAndHashCode(callSuper = false)
     public static class Filter extends BatchSelectionVO {
-        private com.comicatlas.contract.comic.dto.ComicListQuery query;
+        private com.comicatlas.api.library.dto.ManagementComicListQuery query;
         private java.util.List<Long> excludedIds;
     }
 }

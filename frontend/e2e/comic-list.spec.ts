@@ -46,7 +46,7 @@ test('desktop: renders library with posters, sticky toolbar, hover scale and pag
   await expect(posters).toHaveCount(24)
 
   // 工具栏固定/粘性定位
-  const toolbar = page.locator('.page-header')
+  const toolbar = page.locator('.library-filter-header')
   const position = await toolbar.evaluate((el) => window.getComputedStyle(el).position)
   expect(['sticky', 'fixed']).toContain(position)
 

@@ -1,4 +1,4 @@
-import type { ComicListQuery } from '@/entities/comic/@x/task'
+import type { ManagementComicListQuery } from '@/entities/comic/@x/task'
 
 export type ManagementTaskType =
   | 'IMPORT'
@@ -108,7 +108,7 @@ export interface BatchSelectionIds {
 
 export interface BatchSelectionFilter {
   readonly type: 'FILTER'
-  readonly query?: ComicListQuery
+  readonly query?: ManagementComicListQuery
   readonly excludedIds?: readonly number[]
 }
 

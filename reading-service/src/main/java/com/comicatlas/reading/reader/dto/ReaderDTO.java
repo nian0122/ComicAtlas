@@ -2,7 +2,6 @@ package com.comicatlas.reading.reader.dto;
 
 import lombok.Data;
 
-import java.time.LocalDateTime;
 import java.math.BigDecimal;
 import java.util.List;
 

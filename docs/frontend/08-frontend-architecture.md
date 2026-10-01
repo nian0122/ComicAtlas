@@ -35,6 +35,7 @@ shared 的组件经 `shared/ui` 或具体组件目录的 index 引用。单文�
 ## 状态与业务编排
 
 - 阅读库、管理漫画列表与首页的查询状态属于各自 pages/model，实例独立。
+- 阅读与管理使用独立筛选组件、状态模型与后端查询范围，管理列表及批量快照共用管理谓词；详见[漫画列表筛选](../architecture/comic-list-filtering.md)。
 - 分类、标签、历史 Store 属于 entities/model，用于维护共享实体数据；reader-navigation 保存进度后通过历史实体同步已加载记录。
 - reader-settings 与 reader-navigation 是独立能力。路由导航和快捷键需要协调两者，因此放在 widgets/reader/model；纯手势与交互模式保留在 reader-interaction。
 - 批量编辑依赖 category/tag/comic 实体，不能通过另一个 feature 获取实体状态。
