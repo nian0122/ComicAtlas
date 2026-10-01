@@ -240,6 +240,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useReadingNavigation } from '@/features/reading-navigation'
 import { AppButton } from '@/shared/ui/button'
 import { getApiErrorMessage } from '@/shared/api/http'
 import { readerApi, type ReaderDTO } from '@/entities/chapter'
@@ -255,6 +256,7 @@ import { useReadingProgressPersistence, type ReadingProgressPayload } from './co
 
 const route = useRoute()
 const router = useRouter()
+const readingNavigation = useReadingNavigation()
 const chapter = shallowRef<ReaderDTO | null>(null)
 const catalogTreeCache = new Map<number, CatalogNode[]>()
 const nextChapter = shallowRef<ReaderDTO | null>(null)
@@ -1068,13 +1070,9 @@ function scheduleProgressSave(): void {
 
 function goBack(): void {
   if (chapter.value && currentItem.value) {
-    void router.push({
-      name: 'reader',
-      params: { chapterId: chapter.value.chapterId },
-      query: { ...route.query, page: currentItem.value.pageNumber },
-    })
+    readingNavigation.goToReader(chapter.value.chapterId, { ...route.query, page: currentItem.value.pageNumber })
   } else {
-    router.back()
+    readingNavigation.goToSource()
   }
 }
 

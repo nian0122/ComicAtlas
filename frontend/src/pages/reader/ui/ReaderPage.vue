@@ -98,6 +98,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { PictureFilled } from '@element-plus/icons-vue'
 import { useReaderStore } from '@/features/reader-navigation'
+import { useReadingNavigation } from '@/features/reading-navigation'
 import { useReaderSettingsStore } from '@/features/reader-settings'
 import {
   ReaderViewport,
@@ -127,6 +128,7 @@ const settings = useReaderSettingsStore()
 // ── 移动端交互系统（设计规范 §3/§9）────────────────────────────
 const { mode } = useInteractionMode()
 const nav = useReaderNavigation()
+const readingNavigation = useReadingNavigation()
 // EXIT 哨兵（IMMERSIVE 下 AndroidBack）→ 返回详情页
 const { dispatch, toolbarVisible, isSettings } = useReaderToolbar({ onExit: nav.goBack })
 
@@ -212,11 +214,7 @@ const toolbarTitle = computed(() => {
 
 function openImmersive() {
   if (!store.chapterId) return
-  void router.push({
-    name: 'chapter-videos',
-    params: { chapterId: store.chapterId },
-    query: { ...route.query, page: store.currentPage },
-  })
+  readingNavigation.goToImmersive(store.chapterId, { ...route.query, page: store.currentPage })
 }
 
 async function toggleChapterReaction(next: MediaReaction) {

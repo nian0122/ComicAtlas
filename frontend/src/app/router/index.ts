@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { isMobileReadingDevice } from '@/shared/lib/device/index'
 import { isPublicReading } from '@/shared/config/access'
+import { installReadingNavigation } from '@/features/reading-navigation'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -170,6 +171,8 @@ const router = createRouter({
     },
   ],
 })
+
+installReadingNavigation(router)
 
 // 移动端管理后台拦截守卫：
 // 移动阅读设备访问 /manage/* 时重定向到拦截提示页，其余路由零开销直接放行。

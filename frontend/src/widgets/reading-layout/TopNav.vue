@@ -7,7 +7,7 @@
 
       <div class="mobile-header">
         <template v-if="mobileHeaderKind === 'detail'">
-          <AppButton type="button" class="mobile-header-action" aria-label="返回" @click="router.back()">
+          <AppButton type="button" class="mobile-header-action" aria-label="返回" @click="navigation.goToSource">
             <el-icon :size="22"><ArrowLeft /></el-icon>
           </AppButton>
           <router-link to="/" class="mobile-detail-brand"><ComicAtlasLogo size="sm" /></router-link>
@@ -91,7 +91,8 @@ import { AppButton } from '@/shared/ui/button'
 import { isPublicReading } from '@/shared/config/access'
 // TopNav 是应用级业务组合组件，保留导入状态协作；components 目录不因此整体成为业务层。
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute } from 'vue-router'
+import { useReadingNavigation } from '@/features/reading-navigation'
 import { ElMessage } from 'element-plus'
 import { ArrowLeft, Menu, Share, UploadFilled, User } from '@element-plus/icons-vue'
 import { MaterialSymbolIcon } from '@/shared/ui/icon'
@@ -100,7 +101,7 @@ import { useHistoryStore } from '@/entities/history'
 
 const isScrolled = ref(false)
 const route = useRoute()
-const router = useRouter()
+const navigation = useReadingNavigation()
 const historyStore = useHistoryStore()
 
 const mobileHeaderKind = computed(() => {
