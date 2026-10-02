@@ -1,7 +1,7 @@
 <template>
   <main
     class="short-video-page"
-    :class="{ 'controls-hidden': !controlsVisible }"
+    :class="{ 'controls-hidden': !controlsVisible, 'is-fullscreen': isFullscreen }"
     @touchstart="onTouchStart"
     @touchmove.prevent="onTouchMove"
     @touchend="onTouchEnd"
@@ -13,6 +13,12 @@
       <span v-if="items.length" class="video-count"
         >{{ currentIndex + 1 }} <span>/ {{ items.length }}</span></span
       >
+      <FullscreenButton
+        class="video-fullscreen"
+        :active="isFullscreen"
+        :pending="fullscreenPending"
+        @toggle="toggleFullscreen"
+      />
     </header>
 
     <div v-if="loading" class="video-state">正在加载阅读内容…</div>
@@ -241,7 +247,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useReadingNavigation } from '@/features/reading-navigation'
-import { AppButton } from '@/shared/ui/button'
+import { AppButton, FullscreenButton } from '@/shared/ui/button'
 import { getApiErrorMessage } from '@/shared/api/http'
 import { readerApi, type ReaderDTO } from '@/entities/chapter'
 import { catalogApi, type CatalogNode } from '@/entities/comic'
@@ -252,10 +258,12 @@ import { useScreenWakeLock } from '@/shared/lib/device/useScreenWakeLock'
 import { VideoProgressControl, VideoSpeedSheet } from './components'
 import { useAutoHideControls } from './composables/useAutoHideControls'
 import { useImmersiveSwipe } from './composables/useImmersiveSwipe'
+import { useReaderFullscreen } from './composables/useReaderFullscreen'
 import { useReadingProgressPersistence, type ReadingProgressPayload } from './composables/useReadingProgressPersistence'
 
 const route = useRoute()
 const router = useRouter()
+const { isFullscreen, isPending: fullscreenPending, toggleFullscreen } = useReaderFullscreen()
 const readingNavigation = useReadingNavigation()
 const chapter = shallowRef<ReaderDTO | null>(null)
 const catalogTreeCache = new Map<number, CatalogNode[]>()
@@ -1149,6 +1157,15 @@ onBeforeUnmount(() => {
   font-size: 25px;
 }
 
+.video-fullscreen {
+  justify-self: end;
+  width: 44px;
+  height: 44px;
+  color: #fff;
+  border: 0;
+  background: transparent;
+}
+
 .video-count {
   font-size: 13px;
   font-variant-numeric: tabular-nums;
@@ -1166,6 +1183,10 @@ onBeforeUnmount(() => {
   margin: 0 auto;
   overflow: hidden;
   background: #000;
+}
+
+.short-video-page.is-fullscreen .video-stage {
+  width: 100%;
 }
 
 .video-media-frame {

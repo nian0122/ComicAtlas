@@ -1,5 +1,5 @@
 <template>
-  <div class="reader-page">
+  <div class="reader-page" :class="{ 'is-fullscreen': isFullscreen }" @pointerdown="scheduleFullscreenControlsHide">
     <div v-if="store.progressSaveError && !store.loading && !store.error" class="progress-save-error" role="alert">
       <span>阅读进度暂未保存：{{ store.progressSaveError }}</span>
       <AppButton variant="ghost" @click="retryProgressSave">重试保存</AppButton>
@@ -15,6 +15,10 @@
       :next-chapter-id="store.nextChapterId"
       :chapter-id="store.chapterId"
       :reaction="store.reaction"
+      :is-fullscreen="isFullscreen"
+      :fullscreen-pending="fullscreenPending"
+      :visibility-override="isFullscreen ? fullscreenToolbarVisible : undefined"
+      @toggle-fullscreen="toggleFullscreen"
       @back="nav.goBack"
       @prev-chapter="nav.goPrevChapter()"
       @next-chapter="nav.goNextChapter()"
@@ -69,6 +73,9 @@
         :title="toolbarTitle"
         :chapter-id="store.chapterId"
         :reaction="store.reaction"
+        :is-fullscreen="isFullscreen"
+        :fullscreen-pending="fullscreenPending"
+        @toggle-fullscreen="toggleFullscreen"
         @back="nav.goBack"
         @open-settings="dispatch(ReaderAction.OpenSettings)"
         @open-immersive="openImmersive"
@@ -119,11 +126,27 @@ import { preloadEngine } from '@/widgets/reader'
 import { isVideoMedia } from '@/entities/media'
 import type { MediaReaction } from '@/entities/media'
 import { useReaderProgress } from './composables/useReaderProgress'
+import { useReaderFullscreen } from './composables/useReaderFullscreen'
 
 const route = useRoute()
 const router = useRouter()
 const store = useReaderStore()
 const settings = useReaderSettingsStore()
+const { isFullscreen, isPending: fullscreenPending, toggleFullscreen } = useReaderFullscreen()
+const fullscreenToolbarVisible = ref(true)
+let fullscreenControlsTimer: ReturnType<typeof setTimeout> | null = null
+
+function scheduleFullscreenControlsHide(): void {
+  if (fullscreenControlsTimer != null) clearTimeout(fullscreenControlsTimer)
+  fullscreenControlsTimer = null
+  if (!isFullscreen.value) return
+  fullscreenControlsTimer = setTimeout(() => {
+    fullscreenControlsTimer = null
+    if (!isFullscreen.value || isSettings.value) return
+    if (mode.value === 'mobile') dispatch(ReaderAction.SwipeUp)
+    else fullscreenToolbarVisible.value = false
+  }, 2600)
+}
 
 // ── 移动端交互系统（设计规范 §3/§9）────────────────────────────
 const { mode } = useInteractionMode()
@@ -180,7 +203,10 @@ gesture.onTap((point) => {
   }
   if (mode.value === 'mobile') {
     dispatch(ReaderAction.TapCenter)
+  } else if (isFullscreen.value) {
+    fullscreenToolbarVisible.value = !fullscreenToolbarVisible.value
   }
+  scheduleFullscreenControlsHide()
 })
 
 // swipe 仅翻页模式响应：内容随手指方向前进（左划=下一页）
@@ -397,6 +423,11 @@ function onVideoStarted(page: number) {
 
 /** 以真实滚动方向控制阅读端工具栏，避免依赖会被浏览器取消的 pointer swipe。 */
 function onViewportScrollDirection(direction: 'up' | 'down') {
+  if (isFullscreen.value && mode.value === 'desktop') {
+    fullscreenToolbarVisible.value = direction === 'down'
+    scheduleFullscreenControlsHide()
+    return
+  }
   if (mode.value === 'mobile') {
     dispatch(direction === 'up' ? ReaderAction.SwipeUp : ReaderAction.SwipeDown)
     return
@@ -438,6 +469,7 @@ watch(
 )
 
 onBeforeUnmount(() => {
+  if (fullscreenControlsTimer != null) clearTimeout(fullscreenControlsTimer)
   document.documentElement.classList.remove('reader-document')
   // 移动端未注册这些监听器，remove 为无害 no-op
   document.removeEventListener('keydown', onKeydown)
@@ -445,6 +477,18 @@ onBeforeUnmount(() => {
   document.removeEventListener('dblclick', onDblClick)
   preloadEngine.destroy()
 })
+
+watch(
+  isFullscreen,
+  (active) => {
+    fullscreenToolbarVisible.value = true
+    if (!active) {
+      if (mode.value === 'mobile') dispatch(ReaderAction.SwipeDown)
+    }
+    scheduleFullscreenControlsHide()
+  },
+  { immediate: true },
+)
 </script>
 
 <style scoped>
@@ -456,6 +500,13 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   background: var(--bg);
+}
+
+.reader-page.is-fullscreen :deep(.reader-toolbar) {
+  position: fixed;
+  top: 0;
+  right: 0;
+  left: 0;
 }
 
 .progress-save-error {

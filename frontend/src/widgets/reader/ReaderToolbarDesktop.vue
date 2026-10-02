@@ -1,5 +1,5 @@
 <template>
-  <header class="reader-toolbar" :class="{ 'toolbar-hidden': !settings.showToolbar }">
+  <header class="reader-toolbar" :class="{ 'toolbar-hidden': !(visibilityOverride ?? settings.showToolbar) }">
     <div class="toolbar-left">
       <AppButton class="tool-btn" icon-only aria-label="返回上一页" @click="emit('back')">
         <el-icon :size="20"><ArrowLeft /></el-icon>
@@ -42,6 +42,12 @@
         >下一章</AppButton
       >
       <AppButton v-if="chapterId" class="tool-btn immersive-btn" @click="emit('openImmersive')">短视频</AppButton>
+      <FullscreenButton
+        class="tool-btn"
+        :active="isFullscreen"
+        :pending="fullscreenPending"
+        @toggle="emit('toggleFullscreen')"
+      />
 
       <el-popover
         v-model:visible="settingsVisible"
@@ -103,7 +109,7 @@
 </template>
 
 <script setup lang="ts">
-import { AppButton } from '@/shared/ui/button'
+import { AppButton, FullscreenButton } from '@/shared/ui/button'
 import { ref, watch } from 'vue'
 import { ArrowLeft, Setting } from '@element-plus/icons-vue'
 import { ElSelect, ElOption, ElPopover, ElInputNumber } from 'element-plus'
@@ -118,15 +124,19 @@ interface Props {
   nextChapterId: number | null
   chapterId?: number | null
   reaction: 'NONE' | 'LIKE' | 'DISLIKE'
+  isFullscreen?: boolean
+  fullscreenPending?: boolean
+  visibilityOverride?: boolean
 }
 
-const props = defineProps<Props>()
+const props = withDefaults(defineProps<Props>(), { chapterId: null, visibilityOverride: undefined })
 const emit = defineEmits<{
   (e: 'back'): void
   (e: 'prevChapter'): void
   (e: 'nextChapter'): void
   (e: 'jumpToPage', page: number): void
   (e: 'openImmersive'): void
+  (e: 'toggleFullscreen'): void
   (e: 'toggleReaction', reaction: 'NONE' | 'LIKE' | 'DISLIKE'): void
 }>()
 

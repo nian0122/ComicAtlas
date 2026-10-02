@@ -21,6 +21,12 @@
     <!-- 漫画标题（超长省略） -->
     <span class="toolbar-title">{{ title }}</span>
     <MediaReactionButtons :reaction="reaction" compact @toggle="emit('toggleReaction', $event)" />
+    <FullscreenButton
+      class="toolbar-btn"
+      :active="isFullscreen"
+      :pending="fullscreenPending"
+      @toggle="emit('toggleFullscreen')"
+    />
 
     <!-- 更多入口 ⋯（打开设置抽屉） -->
     <AppButton class="toolbar-btn" type="button" aria-label="阅读设置" @click="emit('openSettings')">
@@ -37,7 +43,7 @@
 </template>
 
 <script setup lang="ts">
-import { AppButton } from '@/shared/ui/button'
+import { AppButton, FullscreenButton } from '@/shared/ui/button'
 import { MediaReactionButtons } from '@/entities/media'
 // 哑组件：props 进、emits 出，不接触任何 store / composable。
 // 显示与隐藏由父级（ReaderPage）通过 v-if 控制。
@@ -45,6 +51,8 @@ interface Props {
   /** 漫画名（移动端不展示长章节标题） */
   title: string
   reaction: 'NONE' | 'LIKE' | 'DISLIKE'
+  isFullscreen?: boolean
+  fullscreenPending?: boolean
 }
 
 defineProps<Props>()
@@ -53,6 +61,7 @@ const emit = defineEmits<{
   (e: 'back'): void
   (e: 'openSettings'): void
   (e: 'openImmersive'): void
+  (e: 'toggleFullscreen'): void
   (e: 'toggleReaction', reaction: 'NONE' | 'LIKE' | 'DISLIKE'): void
 }>()
 </script>
