@@ -132,13 +132,9 @@
               >
             </div>
             <div v-if="(scanResult.warnings ?? []).length > 0" class="scan-warnings" aria-label="扫描警告">
-              <span
-                v-for="w in scanResult.warnings"
-                :key="`${w.code}-${w.relativePath}`"
-                class="warn-chip severity-warning"
-              >
+              <ScanWarningChip v-for="w in scanResult.warnings" :key="`${w.code}-${w.relativePath}`" severity="WARNING">
                 {{ w.message }}
-              </span>
+              </ScanWarningChip>
             </div>
           </div>
 
@@ -166,14 +162,13 @@
                   <span class="scan-item-count">{{ itemStats(row.item, row.preview) }}</span>
                 </div>
                 <div v-if="nonBlockingWarnings(row.item).length > 0" class="scan-item-warnings">
-                  <span
+                  <ScanWarningChip
                     v-for="w in nonBlockingWarnings(row.item)"
                     :key="`${w.code}-${w.relativePath}`"
-                    class="warn-chip"
-                    :class="`severity-${w.severity.toLowerCase()}`"
+                    :severity="w.severity"
                   >
                     {{ w.message }}
-                  </span>
+                  </ScanWarningChip>
                 </div>
                 <div v-if="blockingReason(row.item)" class="blocked-reason">
                   不可导入：{{ blockingReason(row.item) }}
@@ -239,7 +234,7 @@ import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { getApiErrorMessage } from '@/shared/api/http'
-import { useImportStore, useImportScan, useImportPageForm, PreviewNode } from '@/features/import'
+import { useImportStore, useImportScan, useImportPageForm, PreviewNode, ScanWarningChip } from '@/features/import'
 
 const router = useRouter()
 const store = useImportStore()

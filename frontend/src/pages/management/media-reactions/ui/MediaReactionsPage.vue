@@ -109,10 +109,7 @@
                   <span class="type-badge">{{ item.mediaType === 'VIDEO' ? '视频' : '图片' }}</span>
                 </td>
                 <td>
-                  <span class="reaction-badge" :class="item.reaction.toLowerCase()">
-                    <span class="reaction-dot" aria-hidden="true" />
-                    {{ reactionLabel(item.reaction) }}
-                  </span>
+                  <ReactionBadge :reaction="item.reaction" emphasized />
                 </td>
                 <td class="date-cell">{{ formatDate(item.reactionAt) }}</td>
                 <td>
@@ -128,13 +125,14 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, onScopeDispose, ref, watch } from 'vue'
 import { AppButton } from '@/shared/ui/button'
 import { ContentState } from '@/shared/ui/content-state'
 import { ManagementPanel } from '@/shared/ui/management-panel'
 import { PageHeader } from '@/shared/ui/page-header'
 import { getApiErrorMessage } from '@/shared/api/http'
-import { ContentReactionsPanel, mediaReactionApi, type MediaReaction, type MediaReactionVO } from '@/entities/media'
+import { ReactionBadge, mediaReactionApi, type MediaReaction, type MediaReactionVO } from '@/entities/media'
+import { ContentReactionsPanel } from '@/features/content-reactions'
 
 type ReactionScope = 'MEDIA' | 'COMIC' | 'CHAPTER'
 const scope = ref<ReactionScope>('MEDIA')
@@ -153,6 +151,14 @@ const selectedIds = ref<number[]>([])
 const loading = ref(false)
 const batchLoading = ref(false)
 const errorMessage = ref('')
+let requestVersion = 0
+let disposed = false
+let refreshTimer: ReturnType<typeof setTimeout> | undefined
+onScopeDispose(() => {
+  disposed = true
+  requestVersion += 1
+  clearTimeout(refreshTimer)
+})
 
 const reactionOptions = [
   { value: '', label: '全部标记' },
@@ -173,6 +179,8 @@ const allSelected = computed({
 })
 
 async function loadItems(): Promise<void> {
+  if (disposed || scope.value !== 'MEDIA') return
+  const version = ++requestVersion
   loading.value = true
   errorMessage.value = ''
   try {
@@ -181,12 +189,14 @@ async function loadItems(): Promise<void> {
       mediaType: mediaTypeFilter.value || undefined,
       includeTrashed: includeTrashed.value,
     })
+    if (disposed || version !== requestVersion || scope.value !== 'MEDIA') return
     items.value = response.data
     selectedIds.value = selectedIds.value.filter((id) => items.value.some((item) => item.id === id))
   } catch (error: unknown) {
+    if (disposed || version !== requestVersion || scope.value !== 'MEDIA') return
     errorMessage.value = getApiErrorMessage(error, '加载媒体标记失败')
   } finally {
-    loading.value = false
+    if (!disposed && version === requestVersion) loading.value = false
   }
 }
 
@@ -214,13 +224,15 @@ async function trashSelected(): Promise<void> {
   try {
     selectedIds.value = []
     await mediaReactionApi.trashBatch([...trashedIds])
+    if (disposed) return
     // 回收任务经 MQ 异步落库，先从当前视图移除，稍后再用服务端状态校正。
     if (!includeTrashed.value) {
       items.value = items.value.filter((item) => !trashedIds.has(item.id))
     } else {
       items.value = items.value.map((item) => (trashedIds.has(item.id) ? { ...item, status: 'TRASHED' } : item))
     }
-    window.setTimeout(() => {
+    clearTimeout(refreshTimer)
+    refreshTimer = setTimeout(() => {
       void loadItems()
     }, 900)
   } catch (error: unknown) {
@@ -228,10 +240,6 @@ async function trashSelected(): Promise<void> {
   } finally {
     batchLoading.value = false
   }
-}
-
-function reactionLabel(reaction: MediaReaction): string {
-  return reaction === 'LIKE' ? '喜欢' : reaction === 'DISLIKE' ? '不喜欢' : '未标记'
 }
 
 function statusLabel(status: string | null): string {
@@ -244,6 +252,12 @@ function formatDate(value: string | null): string {
 }
 
 watch([reactionFilter, mediaTypeFilter, includeTrashed], loadItems)
+watch(scope, () => {
+  requestVersion += 1
+  loading.value = false
+  clearTimeout(refreshTimer)
+  if (scope.value === 'MEDIA') void loadItems()
+})
 onMounted(loadItems)
 </script>
 
@@ -368,32 +382,6 @@ onMounted(loadItems)
 .type-badge,
 .status-text {
   color: var(--text-muted);
-}
-.reaction-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  font-weight: 700;
-}
-.reaction-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--text-muted);
-}
-.reaction-badge.like {
-  color: var(--color-brand);
-}
-.reaction-badge.like .reaction-dot {
-  background: var(--color-brand);
-  box-shadow: 0 0 0 4px var(--color-brand-soft);
-}
-.reaction-badge.dislike {
-  color: var(--text-secondary);
-}
-.reaction-badge.dislike .reaction-dot {
-  background: var(--text-muted);
-  box-shadow: 0 0 0 4px var(--color-border-faint);
 }
 .date-cell {
   color: var(--text-secondary);

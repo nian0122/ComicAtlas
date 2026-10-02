@@ -23,6 +23,32 @@ const taskFixture = (status: AiAnalysisTask['status'], resultJson: string | null
 })
 
 describe('分析任务共用状态', () => {
+  it('创建成功但首次查询失败时继续追踪同一任务，不能再次提交', async () => {
+    vi.useFakeTimers()
+    vi.mocked(aiAnalysisApi.create).mockResolvedValue({ taskId: 7, status: 'QUEUED' })
+    vi.mocked(aiAnalysisApi.get)
+      .mockRejectedValueOnce(new Error('网络中断'))
+      .mockResolvedValue(taskFixture('SUCCEEDED', '{"tags":["冒险"]}'))
+    const scope = effectScope()
+    const analysis = scope.run(useAiAnalysisTask)!
+    expect(await analysis.startTask(1)).toBe(7)
+    expect(await analysis.startTask(1)).toBeNull()
+    await vi.advanceTimersByTimeAsync(1500)
+    expect(analysis.result.value?.tags).toEqual(['冒险'])
+    expect(aiAnalysisApi.create).toHaveBeenCalledTimes(1)
+    expect(vi.getTimerCount()).toBe(0)
+    scope.stop()
+  })
+  it('字段类型错误的完成结果不会交给组件渲染', async () => {
+    vi.mocked(aiAnalysisApi.create).mockResolvedValue({ taskId: 7, status: 'QUEUED' })
+    vi.mocked(aiAnalysisApi.get).mockResolvedValue(taskFixture('SUCCEEDED', '{"warnings":"错误的数组类型"}'))
+    const scope = effectScope()
+    const analysis = scope.run(useAiAnalysisTask)!
+    await analysis.startTask(1)
+    expect(analysis.result.value).toBeNull()
+    expect(analysis.resultError.value).toContain('格式无效')
+    scope.stop()
+  })
   it('首次读取就完成时立即展示结果，不继续轮询', async () => {
     vi.useFakeTimers()
     vi.mocked(aiAnalysisApi.create).mockResolvedValue({ taskId: 7, status: 'QUEUED' })

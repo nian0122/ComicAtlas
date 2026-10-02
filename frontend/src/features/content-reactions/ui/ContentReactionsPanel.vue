@@ -20,10 +20,16 @@
       <strong>{{ items.length }} 个{{ targetType === 'COMIC' ? '漫画' : '章节' }}</strong>
       <span v-if="selectedIds.length" class="selected-count">已选 {{ selectedIds.length }} 个</span>
       <div class="batch-actions">
-        <AppButton :disabled="!selectedIds.length || loading" @click="updateSelected('LIKE')">设为喜欢</AppButton>
-        <AppButton :disabled="!selectedIds.length || loading" @click="updateSelected('DISLIKE')">设为不喜欢</AppButton>
-        <AppButton :disabled="!selectedIds.length || loading" @click="updateSelected('NONE')">取消标记</AppButton>
-        <AppButton variant="danger" :disabled="!selectedIds.length || loading" @click="trashSelected"
+        <AppButton :disabled="!selectedIds.length || loading || batchLoading" @click="updateSelected('LIKE')"
+          >设为喜欢</AppButton
+        >
+        <AppButton :disabled="!selectedIds.length || loading || batchLoading" @click="updateSelected('DISLIKE')"
+          >设为不喜欢</AppButton
+        >
+        <AppButton :disabled="!selectedIds.length || loading || batchLoading" @click="updateSelected('NONE')"
+          >取消标记</AppButton
+        >
+        <AppButton variant="danger" :disabled="!selectedIds.length || loading || batchLoading" @click="trashSelected"
           >送入回收站</AppButton
         >
       </div>
@@ -49,9 +55,7 @@
               }}<span v-if="targetType === 'CHAPTER'" class="secondary"> · 漫画 {{ item.comicId }}</span>
             </td>
             <td>
-              <span class="reaction-badge" :class="item.reaction.toLowerCase()"
-                ><span class="reaction-dot" />{{ reactionLabel(item.reaction) }}</span
-              >
+              <ReactionBadge :reaction="item.reaction" />
             </td>
             <td class="date-cell">{{ formatDate(item.reactionAt) }}</td>
             <td>
@@ -65,13 +69,18 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, onScopeDispose, ref, watch } from 'vue'
 import { AppButton } from '@/shared/ui/button'
 import { ContentState } from '@/shared/ui/content-state'
 import { ManagementPanel } from '@/shared/ui/management-panel'
 import { getApiErrorMessage } from '@/shared/api/http'
-import { contentReactionApi, type ContentReactionTarget, type ContentReactionVO } from '../api/content-reaction-api'
-import type { MediaReaction } from '../types'
+import {
+  contentReactionApi,
+  ReactionBadge,
+  type ContentReactionTarget,
+  type ContentReactionVO,
+  type MediaReaction,
+} from '@/entities/media'
 
 const props = defineProps<{ targetType: ContentReactionTarget }>()
 const reactionFilter = ref<'' | 'LIKE' | 'DISLIKE'>('')
@@ -79,7 +88,14 @@ const includeTrashed = ref(false)
 const items = ref<ContentReactionVO[]>([])
 const selectedIds = ref<number[]>([])
 const loading = ref(false)
+const batchLoading = ref(false)
 const errorMessage = ref('')
+let requestVersion = 0
+let disposed = false
+onScopeDispose(() => {
+  disposed = true
+  requestVersion += 1
+})
 const reactionOptions = [
   { value: '', label: '全部标记' },
   { value: 'LIKE' as const, label: '喜欢' },
@@ -93,6 +109,8 @@ const allSelected = computed({
 })
 
 async function loadItems(): Promise<void> {
+  if (disposed) return
+  const version = ++requestVersion
   loading.value = true
   errorMessage.value = ''
   try {
@@ -100,24 +118,29 @@ async function loadItems(): Promise<void> {
       reaction: reactionFilter.value || undefined,
       includeTrashed: includeTrashed.value,
     })
+    if (disposed || version !== requestVersion) return
     items.value = response.data
     selectedIds.value = []
   } catch (error: unknown) {
+    if (disposed || version !== requestVersion) return
     errorMessage.value = getApiErrorMessage(error, '加载标记失败')
   } finally {
-    loading.value = false
+    if (!disposed && version === requestVersion) loading.value = false
   }
 }
 async function updateSelected(reaction: MediaReaction): Promise<void> {
   if (!selectedIds.value.length) return
-  loading.value = true
+  const version = requestVersion
+  batchLoading.value = true
   try {
     await contentReactionApi.updateBatch(props.targetType, selectedIds.value, reaction)
+    if (disposed || version !== requestVersion) return
     await loadItems()
   } catch (error: unknown) {
+    if (disposed || version !== requestVersion) return
     errorMessage.value = getApiErrorMessage(error, '批量更新标记失败')
   } finally {
-    loading.value = false
+    batchLoading.value = false
   }
 }
 async function trashSelected(): Promise<void> {
@@ -129,19 +152,19 @@ async function trashSelected(): Promise<void> {
   )
     return
   const ids = [...selectedIds.value]
-  loading.value = true
+  const version = requestVersion
+  batchLoading.value = true
   try {
     await contentReactionApi.trashBatch(props.targetType, ids)
+    if (disposed || version !== requestVersion) return
     items.value = items.value.filter((item) => !ids.includes(item.id))
     selectedIds.value = []
   } catch (error: unknown) {
+    if (disposed || version !== requestVersion) return
     errorMessage.value = getApiErrorMessage(error, '批量回收失败')
   } finally {
-    loading.value = false
+    batchLoading.value = false
   }
-}
-function reactionLabel(reaction: MediaReaction): string {
-  return reaction === 'LIKE' ? '喜欢' : '不喜欢'
 }
 function statusLabel(status: string | null): string {
   return status === 'TRASHED' ? '回收站' : status === 'DELETED' ? '已删除' : '正常'
@@ -209,24 +232,6 @@ onMounted(loadItems)
 .secondary {
   color: var(--text-muted);
   font-size: 12px;
-}
-.reaction-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 13px;
-}
-.reaction-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--text-muted);
-}
-.reaction-badge.like .reaction-dot {
-  background: var(--accent);
-}
-.reaction-badge.dislike .reaction-dot {
-  background: var(--danger);
 }
 .date-cell {
   color: var(--text-muted);

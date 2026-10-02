@@ -21,6 +21,22 @@ const STATUS_LABELS: Record<AiTaskStatus, string> = {
 }
 const ACTIVE_STATUSES: readonly AiTaskStatus[] = ['QUEUED', 'RUNNING', 'CANCEL_REQUESTED']
 
+function isAnalysisResult(value: unknown): value is AnalysisResult {
+  if (value == null || typeof value !== 'object' || Array.isArray(value)) return false
+  const fields = value as Record<string, unknown>
+  return (
+    ['titleCandidate', 'authorCandidate', 'categoryCandidate'].every(
+      (name) => fields[name] == null || typeof fields[name] === 'string',
+    ) &&
+    (fields.description === undefined || typeof fields.description === 'string') &&
+    ['tags', 'warnings'].every(
+      (name) =>
+        fields[name] === undefined ||
+        (Array.isArray(fields[name]) && fields[name].every((item: unknown) => typeof item === 'string')),
+    )
+  )
+}
+
 /** 两个分析入口共用任务状态与轮询生命周期，页面只负责提交对象和结果展示。 */
 export function useAiAnalysisTask() {
   const task = ref<AiAnalysisTask | null>(null)
@@ -28,9 +44,12 @@ export function useAiAnalysisTask() {
   const resultError = ref('')
   const submitting = ref(false)
   const cancelling = ref(false)
+  const pendingTaskId = ref<number | null>(null)
   let requestVersion = 0
   let disposed = false
-  const isActive = computed(() => task.value != null && ACTIVE_STATUSES.includes(task.value.status))
+  const isActive = computed(
+    () => pendingTaskId.value != null || (task.value != null && ACTIVE_STATUSES.includes(task.value.status)),
+  )
   const canCancel = computed(() => task.value != null && ['QUEUED', 'RUNNING'].includes(task.value.status))
   const statusLabel = computed(() => STATUS_LABELS[task.value?.status ?? 'QUEUED'])
   const progressStatus = computed(() =>
@@ -39,11 +58,12 @@ export function useAiAnalysisTask() {
 
   function acceptTask(updatedTask: AiAnalysisTask): void {
     task.value = updatedTask
+    pendingTaskId.value = null
     if (updatedTask.status !== 'SUCCEEDED') return
     try {
       const parsed: unknown = updatedTask.resultJson ? JSON.parse(updatedTask.resultJson) : null
-      if (parsed != null && (typeof parsed !== 'object' || Array.isArray(parsed))) throw new Error('分析结果格式无效')
-      result.value = parsed as AnalysisResult | null
+      if (parsed != null && !isAnalysisResult(parsed)) throw new Error('分析结果格式无效')
+      result.value = parsed == null ? null : parsed
       resultError.value = ''
     } catch {
       result.value = null
@@ -52,7 +72,7 @@ export function useAiAnalysisTask() {
   }
 
   async function refreshTask(): Promise<boolean> {
-    const taskId = task.value?.id
+    const taskId = pendingTaskId.value ?? task.value?.id
     const version = requestVersion
     if (disposed || taskId == null) return false
     try {
@@ -75,10 +95,11 @@ export function useAiAnalysisTask() {
     resultError.value = ''
     try {
       const created = await aiAnalysisApi.create(comicId)
-      const updatedTask = await aiAnalysisApi.get(created.taskId)
       if (disposed || version !== requestVersion) return null
-      acceptTask(updatedTask)
-      if (isActive.value) polling.start()
+      // 创建成功后立即保留 ID，首次状态请求失败也继续追踪同一任务，避免重复提交。
+      task.value = null
+      pendingTaskId.value = created.taskId
+      if (await refreshTask()) polling.start()
       return created.taskId
     } finally {
       if (version === requestVersion) submitting.value = false
@@ -86,10 +107,12 @@ export function useAiAnalysisTask() {
   }
 
   async function cancelTask(): Promise<void> {
-    if (!task.value || cancelling.value) return
+    if (!task.value || cancelling.value || !canCancel.value) return
+    const version = requestVersion
     cancelling.value = true
     try {
       await aiAnalysisApi.cancel(task.value.id)
+      if (disposed || version !== requestVersion) return
       if (await refreshTask()) polling.start()
       else polling.stop()
     } finally {

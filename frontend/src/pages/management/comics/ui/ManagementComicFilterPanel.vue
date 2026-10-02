@@ -191,8 +191,7 @@ const emit = defineEmits<{ apply: []; keyword: []; reset: [] }>()
   color: var(--text-primary);
   font-size: var(--text-md);
 }
-.filter-panel-heading span,
-.filter-field > span {
+.filter-panel-heading span {
   color: var(--text-muted);
   font-size: var(--text-xs);
 }
@@ -206,15 +205,6 @@ const emit = defineEmits<{ apply: []; keyword: []; reset: [] }>()
 .filter-secondary {
   grid-template-columns: repeat(2, minmax(170px, 1fr)) minmax(180px, 1.5fr) repeat(3, minmax(100px, 1fr));
   margin-top: var(--space-md);
-}
-.filter-field {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-xs);
-  min-width: 0;
-}
-.filter-field :deep(.el-select) {
-  width: 100%;
 }
 .filter-help {
   color: var(--text-muted);

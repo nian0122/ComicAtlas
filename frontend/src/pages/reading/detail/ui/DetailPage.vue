@@ -501,22 +501,6 @@ onMounted(loadData)
   margin-left: auto;
 }
 
-.clear-search-button {
-  border: 0;
-  padding: 7px 12px;
-  border-radius: var(--radius-sm);
-  background: var(--accent-bg);
-  color: var(--accent);
-  cursor: pointer;
-  font: inherit;
-  font-size: 12px;
-}
-
-.clear-search-button:hover {
-  background: var(--accent);
-  color: var(--text-primary);
-}
-
 .catalog-header__action {
   margin-left: auto;
 }

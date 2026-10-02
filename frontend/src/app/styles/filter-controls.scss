@@ -1,5 +1,20 @@
 /* 筛选面板共用控件契约。页面只声明 filter-controls，保留各自的布局与业务交互。 */
 .filter-controls {
+  .filter-field {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+    min-width: 0;
+  }
+
+  .filter-field > span {
+    color: var(--text-muted);
+    font-size: var(--text-xs);
+  }
+
+  .filter-field .el-select {
+    width: 100%;
+  }
   .el-input__wrapper,
   .el-select__wrapper {
     height: var(--control-height);

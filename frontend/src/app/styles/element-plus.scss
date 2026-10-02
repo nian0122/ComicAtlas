@@ -574,7 +574,7 @@
   box-shadow: inset 0 0 0 1px var(--control-focus-border) !important;
 }
 
-/* 表单错误是信息提示而非第二层容器：只改变控件描边，避免焦点和校验态叠成粗红框。 */
+/* Select 的尺寸类带有固定高度，需要按相同公共尺寸契约覆盖。 */
 .el-select.el-select--small .el-select__wrapper {
   min-height: var(--button-height-sm);
   padding: 0 var(--space-3);
@@ -584,6 +584,7 @@
   padding: 0 var(--space-4);
 }
 
+/* 表单错误只改变控件描边，避免焦点和校验态叠成粗红框。 */
 .el-form-item.is-error .el-input__wrapper,
 .el-form-item.is-error .el-select__wrapper,
 .el-form-item.is-error .el-textarea__inner {

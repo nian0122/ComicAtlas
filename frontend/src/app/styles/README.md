@@ -7,6 +7,7 @@
 | `tokens.css`                  | 颜色、间距、字号、圆角等设计令牌的唯一来源 |
 | `base.css`                    | 原生元素、页面基础、可访问性和滚动条       |
 | `element-plus.scss`           | Element Plus 变量映射与全站统一外观        |
+| `filter-controls.scss`        | 桌面筛选控件与筛选字段的公共契约           |
 | `animation.css`               | 公共动画与过渡                             |
 | `src/pages/<分组>/<页面>/ui/` | 页面私有样式，不属于全局样式目录           |
 

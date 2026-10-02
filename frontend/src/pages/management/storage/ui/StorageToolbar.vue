@@ -259,19 +259,6 @@ onMounted(() => {
 .filter-grid--storage {
   grid-template-columns: repeat(3, minmax(0, 1fr)) minmax(0, 0.65fr);
 }
-.filter-field {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  gap: var(--space-xs);
-}
-.filter-field > span {
-  color: var(--text-muted);
-  font-size: var(--text-xs);
-}
-.filter-field :deep(.el-select) {
-  width: 100%;
-}
 .filter-feedback {
   margin-top: var(--space-lg);
   padding-top: var(--space-base);

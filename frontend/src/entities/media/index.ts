@@ -6,6 +6,6 @@ export * from './guards'
 export * from './api/media-reaction-api'
 export * from './api/content-reaction-api'
 export { default as MediaReactionButtons } from './ui/MediaReactionButtons.vue'
-export { default as ContentReactionsPanel } from './ui/ContentReactionsPanel.vue'
+export { default as ReactionBadge } from './ui/ReactionBadge.vue'
 
 export { ProgressiveImage, VideoPlayer } from './ui'

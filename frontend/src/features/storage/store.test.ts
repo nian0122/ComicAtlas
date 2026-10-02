@@ -55,6 +55,7 @@ describe('存储行刷新与轮询', () => {
     await vi.advanceTimersByTimeAsync(15000)
     expect(refresh).toHaveBeenCalledTimes(1)
     scope.stop()
+    polling.start(42, StorageOperationType.GenerateLQ)
     completeRefresh()
     await Promise.resolve()
     expect(vi.getTimerCount()).toBe(0)

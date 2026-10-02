@@ -14,6 +14,7 @@ const MAX_RETRIES = 12
 
 export function useStoragePolling(store: ReturnType<typeof useStorageStore>) {
   const activePolls = new Map<number, PollEntry>()
+  let disposed = false
 
   function stop(comicId: number) {
     const entry = activePolls.get(comicId)
@@ -27,6 +28,7 @@ export function useStoragePolling(store: ReturnType<typeof useStorageStore>) {
   }
 
   function start(comicId: number, type: StorageOperationTypeValue) {
+    if (disposed) return
     stop(comicId)
     store.setBusy(comicId, true)
 
@@ -79,6 +81,9 @@ export function useStoragePolling(store: ReturnType<typeof useStorageStore>) {
     }
   }
 
-  onScopeDispose(stopAll)
+  onScopeDispose(() => {
+    disposed = true
+    stopAll()
+  })
   return { start, stop, stopAll }
 }

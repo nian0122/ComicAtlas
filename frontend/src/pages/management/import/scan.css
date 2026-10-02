@@ -159,29 +159,6 @@
   gap: 4px;
 }
 
-.warn-chip {
-  flex-shrink: 0;
-  padding: 1px 6px;
-  border-radius: var(--radius-pill);
-  font-size: 11px;
-  line-height: 1.5;
-}
-
-.warn-chip.severity-error {
-  color: var(--danger);
-  background: rgb(240 107 112 / 12%);
-}
-
-.warn-chip.severity-warning {
-  color: var(--warning);
-  background: rgb(216 165 79 / 12%);
-}
-
-.warn-chip.severity-info {
-  color: var(--info);
-  background: var(--surface-highlight);
-}
-
 .blocked-reason {
   font-size: 12px;
   font-weight: 600;
