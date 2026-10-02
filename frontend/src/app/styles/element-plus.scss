@@ -597,9 +597,8 @@
 }
 
 /*
- * Element Plus 的可过滤选择器把原生 input 放进控件容器中。基础层的原生
- * input 规则具有更高选择器优先级；这里须显式清空所有盒模型视觉属性，
- * 否则会在选择框内部再次画出一只输入框。
+ * Element Plus 的内部 input 由外层控件负责背景与焦点态；基础层已排除
+ * 这些元素，这里统一清空内部盒模型，避免在控件中再次绘制输入框。
  */
 input.el-select__input,
 input.el-input__inner {
@@ -613,6 +612,8 @@ input.el-input__inner {
 }
 
 input.el-select__input {
+  height: 24px;
+  line-height: 24px;
   color: var(--text-primary);
 }
 

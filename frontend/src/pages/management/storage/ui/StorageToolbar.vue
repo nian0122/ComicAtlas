@@ -83,7 +83,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <section class="storage-filter-panel" aria-label="存储记录筛选">
+  <section class="storage-filter-panel filter-controls" aria-label="存储记录筛选">
     <div class="filter-heading">
       <div class="filter-heading-copy">
         <h2>筛选存储记录</h2>
@@ -271,35 +271,6 @@ onMounted(() => {
 }
 .filter-field :deep(.el-select) {
   width: 100%;
-}
-.storage-filter-panel :deep(.el-input__wrapper),
-.storage-filter-panel :deep(.el-select__wrapper) {
-  min-height: var(--control-height);
-  padding: 0 var(--space-3);
-  border-radius: var(--control-radius);
-  font-size: var(--text-sm);
-}
-.storage-filter-panel :deep(.el-input__inner),
-.storage-filter-panel :deep(.el-select__placeholder) {
-  font-size: var(--text-sm);
-}
-/* 标签和分类可搜索，内部输入框只承载文字，不叠加原生表单控件外观。 */
-.storage-filter-panel :deep(input.el-select__input) {
-  height: 24px;
-  min-height: 0;
-  padding: 0;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  box-shadow: none;
-  font-size: var(--text-sm);
-  line-height: 24px;
-}
-.storage-filter-panel :deep(input.el-select__input:hover),
-.storage-filter-panel :deep(input.el-select__input:focus) {
-  border: 0;
-  background: transparent;
-  box-shadow: none;
 }
 .filter-feedback {
   margin-top: var(--space-lg);

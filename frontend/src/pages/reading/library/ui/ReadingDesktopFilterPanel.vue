@@ -16,7 +16,7 @@ const emit = defineEmits<{ apply: []; keyword: []; reset: []; clearKeyword: []; 
 </script>
 
 <template>
-  <section class="reading-desktop-filters" aria-label="阅读漫画筛选">
+  <section class="reading-desktop-filters filter-controls" aria-label="阅读漫画筛选">
     <div class="reading-filter-heading">
       <h1>
         漫画库 <small aria-label="筛选结果数量">{{ total }} 本</small>
@@ -38,7 +38,7 @@ const emit = defineEmits<{ apply: []; keyword: []; reset: []; clearKeyword: []; 
         <el-option v-for="option in READING_SORT_OPTIONS" :key="option.value" v-bind="option" />
       </el-select>
       <AppButton
-        class="desktop-sort-order"
+        class="reading-order-button"
         :aria-label="filters.order === 'asc' ? '当前正序，点击切换为倒序' : '当前倒序，点击切换为正序'"
         @click="emit('order')"
         >{{ filters.order === 'asc' ? '正序 ↑' : '倒序 ↓' }}</AppButton
@@ -119,17 +119,25 @@ const emit = defineEmits<{ apply: []; keyword: []; reset: []; clearKeyword: []; 
 }
 .reading-search-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 150px auto;
-  gap: var(--space-sm);
+  grid-template-columns: minmax(0, 1fr) 168px 112px;
+  gap: var(--space-3);
+  align-items: center;
 }
 .reading-filter-row {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-sm);
-  margin-top: var(--space-sm);
+  align-items: center;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+}
+.reading-order-button {
+  font-weight: 500;
 }
 .category-select {
   width: 160px;
+}
+.category-select :deep(.el-select) {
+  width: 100%;
 }
 .tag-select {
   width: 240px;
@@ -146,8 +154,9 @@ const emit = defineEmits<{ apply: []; keyword: []; reset: []; clearKeyword: []; 
 }
 .reading-filter-summary span {
   color: var(--text-secondary);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
+  border: 1px solid var(--control-border);
+  border-radius: var(--control-radius);
+  background: var(--control-bg-hover);
   padding: var(--space-xs) var(--space-sm);
   overflow-wrap: anywhere;
 }

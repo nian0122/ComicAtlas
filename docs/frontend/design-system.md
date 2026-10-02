@@ -131,6 +131,7 @@ ComicAtlas 是一座“私人放映馆”：打开应用先看到作品，而不
 - **Structure**：搜索与排序为第一层；分类、标签、模式为第二层。
 - **Layout**：桌面 sticky；移动第二层为显式横向 reel。
 - **States**：default、focus-within、filtered、disabled。
+- **公共控件契约**：PC 漫画库、管理漫画列表和存储筛选面板声明 `filter-controls` 类，共用 `frontend/src/app/styles/filter-controls.scss`。高度、圆角、内边距、字体与折叠标签外观由 token 统一；页面只负责字段宽度、排列和业务交互，不重复覆盖 Element Plus 内部控件。移动阅读筛选保留独立样式。
 
 ### Ledger row
 

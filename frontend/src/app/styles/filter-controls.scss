@@ -1,0 +1,31 @@
+/* 筛选面板共用控件契约。页面只声明 filter-controls，保留各自的布局与业务交互。 */
+.filter-controls {
+  .el-input__wrapper,
+  .el-select__wrapper {
+    height: var(--control-height);
+    min-height: var(--control-height);
+    padding: 0 var(--space-3);
+    border-radius: var(--control-radius);
+    font-size: var(--text-sm);
+  }
+
+  .el-input__inner,
+  .el-select__selected-item,
+  .el-select__placeholder,
+  input.el-select__input {
+    font-size: var(--text-sm);
+  }
+
+  // 筛选多选使用 collapse-tags，搜索文字与折叠标签始终在同一行。
+  .el-select__selection {
+    flex-wrap: nowrap;
+    min-width: 0;
+  }
+
+  .el-select .el-tag {
+    border-radius: var(--control-radius);
+    border-color: var(--control-border);
+    background: var(--control-bg-hover);
+    color: var(--text-primary);
+  }
+}

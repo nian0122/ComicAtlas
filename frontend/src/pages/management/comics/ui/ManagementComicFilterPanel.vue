@@ -15,7 +15,7 @@ const emit = defineEmits<{ apply: []; keyword: []; reset: [] }>()
 </script>
 
 <template>
-  <section class="comic-filter-panel" aria-label="管理漫画筛选">
+  <section class="comic-filter-panel filter-controls" aria-label="管理漫画筛选">
     <div class="filter-panel-heading">
       <div><strong>筛选漫画</strong><span>定位需要管理的内容</span></div>
       <AppButton variant="text" size="sm" @click="emit('reset')">重置筛选</AppButton>
@@ -215,41 +215,6 @@ const emit = defineEmits<{ apply: []; keyword: []; reset: [] }>()
 }
 .filter-field :deep(.el-select) {
   width: 100%;
-}
-.comic-filter-panel :deep(.el-input__wrapper),
-.comic-filter-panel :deep(.el-select__wrapper) {
-  min-height: var(--control-height);
-  padding: 0 var(--space-3);
-  border-radius: var(--control-radius);
-  font-size: var(--text-sm);
-}
-.comic-filter-panel :deep(.el-input__inner),
-.comic-filter-panel :deep(.el-select__placeholder) {
-  font-size: var(--text-sm);
-}
-/* 多选内的搜索框不是独立表单控件，不能再次撑出完整控件的高度与边框。 */
-.comic-filter-panel :deep(input.el-select__input) {
-  height: 24px;
-  min-height: 0;
-  padding: 0;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  box-shadow: none;
-  font-size: var(--text-sm);
-  line-height: 24px;
-}
-.comic-filter-panel :deep(input.el-select__input:hover),
-.comic-filter-panel :deep(input.el-select__input:focus) {
-  border: 0;
-  background: transparent;
-  box-shadow: none;
-}
-.filter-field :deep(.el-tag) {
-  border-radius: var(--control-radius);
-  border-color: var(--control-border);
-  background: var(--control-bg-hover);
-  color: var(--text-primary);
 }
 .filter-help {
   color: var(--text-muted);
