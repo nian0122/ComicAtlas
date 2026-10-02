@@ -210,7 +210,7 @@
   padding: 6px;
   border: 1px solid var(--border);
   border-radius: 7px;
-  background: color-mix(in srgb, var(--bg-elevated) 62%, var(--bg-surface));
+  background: color-mix(in srgb, var(--surface-highlight) 62%, var(--bg-surface));
   color: var(--text-muted);
   cursor: pointer;
 }
@@ -242,7 +242,7 @@
 }
 .chapter-workspace-tabs button:hover {
   border-color: var(--border-strong);
-  background: var(--bg-elevated);
+  background: var(--surface-highlight);
   color: var(--text-primary);
 }
 .chapter-workspace-tabs button.is-active {
@@ -317,7 +317,7 @@
   padding: 5px 4px;
   border: 1px solid var(--border);
   border-radius: 6px;
-  background: color-mix(in srgb, var(--bg-elevated) 55%, var(--bg-surface));
+  background: color-mix(in srgb, var(--surface-highlight) 55%, var(--bg-surface));
   color: var(--text-secondary);
   text-align: center;
   cursor: pointer;
@@ -352,7 +352,7 @@
 }
 .chapter-choice-grid button:hover {
   border-color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 6%, var(--bg-elevated));
+  background: color-mix(in srgb, var(--accent) 6%, var(--surface-highlight));
   color: var(--text-primary);
 }
 .chapter-choice-grid button.is-active {
@@ -378,7 +378,7 @@
   margin-top: 1px;
   padding: 5px 8px;
   border-left: 2px solid var(--accent);
-  background: color-mix(in srgb, var(--bg-elevated) 65%, transparent);
+  background: color-mix(in srgb, var(--surface-highlight) 65%, transparent);
   color: var(--text-muted);
 }
 .chapter-choice-help small {
@@ -556,7 +556,7 @@
 }
 .media-order-item:hover {
   border-color: var(--border-strong);
-  background: var(--bg-elevated);
+  background: var(--surface-highlight);
 }
 .media-order-item:active {
   cursor: grabbing;

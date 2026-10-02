@@ -85,9 +85,7 @@ test('mobile: 2-column grid with sm posters', async ({ page }) => {
   await expect(firstPoster).toHaveClass(/size--sm/)
 
   const grid = page.locator('.comic-grid')
-  const gridTemplateColumns = await grid.evaluate(
-    (el) => window.getComputedStyle(el).gridTemplateColumns
-  )
+  const gridTemplateColumns = await grid.evaluate((el) => window.getComputedStyle(el).gridTemplateColumns)
   const columnCount = gridTemplateColumns.split(' ').length
   expect(columnCount).toBe(2)
 })

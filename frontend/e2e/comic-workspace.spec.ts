@@ -8,35 +8,35 @@ function resultBody(data: unknown, code = 200, message = 'success'): string {
 
 async function mockWorkspace(page: Page, detail: unknown): Promise<void> {
   await page.route(`**/api/manage/comics/${COMIC_ID}`, (route) =>
-    route.fulfill({ status: 200, contentType: 'application/json', body: resultBody(detail) })
+    route.fulfill({ status: 200, contentType: 'application/json', body: resultBody(detail) }),
   )
   await page.route(`**/api/manage/operations/comics/${COMIC_ID}`, (route) =>
     route.fulfill({
       status: 200,
       contentType: 'application/json',
       body: resultBody({ allowed: ['METADATA_REFRESH'], blockedReasons: {} }),
-    })
+    }),
   )
   await page.route('**/api/manage/tasks?*', (route) =>
     route.fulfill({
       status: 200,
       contentType: 'application/json',
       body: resultBody({ records: [], total: 0 }),
-    })
+    }),
   )
   await page.route('**/api/manage/outbox/stats', (route) =>
     route.fulfill({
       status: 200,
       contentType: 'application/json',
       body: resultBody({ pending: 0, failed: 0, total: 0 }),
-    })
+    }),
   )
   await page.route('**/api/manage/mq/stats', (route) =>
     route.fulfill({
       status: 200,
       contentType: 'application/json',
       body: resultBody({ available: true, dlqTotal: 0, dlqQueues: 0, queuedTotal: 0, queues: [] }),
-    })
+    }),
   )
 }
 
@@ -78,7 +78,7 @@ test('工作区展示后端业务错误且不抛出页面异常', async ({ page 
       status: 200,
       contentType: 'application/json',
       body: resultBody(null, 404, '漫画不存在或不可阅读'),
-    })
+    }),
   )
   await page.goto(`/manage/comics/${COMIC_ID}?tab=operations`)
 

@@ -1,6 +1,10 @@
 <template>
   <div class="media-reactions-page">
-    <PageHeader :title="scope === 'MEDIA' ? '媒体标记' : scope === 'COMIC' ? '漫画标记' : '章节标记'" description="集中查看喜欢与不喜欢标记，并支持批量维护。" eyebrow="MEDIA / REACTIONS">
+    <PageHeader
+      :title="scope === 'MEDIA' ? '媒体标记' : scope === 'COMIC' ? '漫画标记' : '章节标记'"
+      description="集中查看喜欢与不喜欢标记，并支持批量维护。"
+      eyebrow="MEDIA / REACTIONS"
+    >
       <AppButton :loading="loading" @click="loadItems">刷新列表</AppButton>
     </PageHeader>
 
@@ -14,110 +18,111 @@
         :variant="scope === option.value ? 'primary' : 'ghost'"
         :aria-selected="scope === option.value"
         @click="scope = option.value"
-      >{{ option.label }}</AppButton>
+        >{{ option.label }}</AppButton
+      >
     </div>
 
     <ContentReactionsPanel v-if="scope !== 'MEDIA'" :target-type="contentTargetType" />
 
     <template v-else>
-    <ManagementPanel class="filter-panel">
-      <div class="filter-row">
-        <div class="filter-group">
-          <span class="filter-label">标记</span>
-          <AppButton
-            v-for="option in reactionOptions"
-            :key="option.value || 'all'"
-            size="sm"
-            :variant="reactionFilter === option.value ? 'primary' : 'ghost'"
-            :aria-pressed="reactionFilter === option.value"
-            @click="reactionFilter = option.value"
-          >
-            {{ option.label }}
-          </AppButton>
+      <ManagementPanel class="filter-panel">
+        <div class="filter-row">
+          <div class="filter-group">
+            <span class="filter-label">标记</span>
+            <AppButton
+              v-for="option in reactionOptions"
+              :key="option.value || 'all'"
+              size="sm"
+              :variant="reactionFilter === option.value ? 'primary' : 'ghost'"
+              :aria-pressed="reactionFilter === option.value"
+              @click="reactionFilter = option.value"
+            >
+              {{ option.label }}
+            </AppButton>
+          </div>
+          <div class="filter-group">
+            <span class="filter-label">类型</span>
+            <AppButton
+              v-for="option in mediaTypeOptions"
+              :key="option.value || 'all'"
+              size="sm"
+              :variant="mediaTypeFilter === option.value ? 'primary' : 'ghost'"
+              :aria-pressed="mediaTypeFilter === option.value"
+              @click="mediaTypeFilter = option.value"
+            >
+              {{ option.label }}
+            </AppButton>
+          </div>
+          <label class="trash-toggle">
+            <input v-model="includeTrashed" type="checkbox" />
+            <span>包含回收站媒体</span>
+          </label>
         </div>
-        <div class="filter-group">
-          <span class="filter-label">类型</span>
-          <AppButton
-            v-for="option in mediaTypeOptions"
-            :key="option.value || 'all'"
-            size="sm"
-            :variant="mediaTypeFilter === option.value ? 'primary' : 'ghost'"
-            :aria-pressed="mediaTypeFilter === option.value"
-            @click="mediaTypeFilter = option.value"
-          >
-            {{ option.label }}
-          </AppButton>
-        </div>
-        <label class="trash-toggle">
-          <input v-model="includeTrashed" type="checkbox" />
-          <span>包含回收站媒体</span>
-        </label>
-      </div>
-    </ManagementPanel>
+      </ManagementPanel>
 
-    <ManagementPanel class="list-panel">
-      <div class="list-toolbar">
-        <div>
-          <strong>{{ items.length }} 个媒体</strong>
-          <span v-if="selectedIds.length" class="selected-count">已选 {{ selectedIds.length }} 个</span>
+      <ManagementPanel class="list-panel">
+        <div class="list-toolbar">
+          <div>
+            <strong>{{ items.length }} 个媒体</strong>
+            <span v-if="selectedIds.length" class="selected-count">已选 {{ selectedIds.length }} 个</span>
+          </div>
+          <div class="batch-actions">
+            <AppButton :disabled="!selectedIds.length || batchLoading" @click="updateSelected('LIKE')"
+              >设为喜欢</AppButton
+            >
+            <AppButton :disabled="!selectedIds.length || batchLoading" @click="updateSelected('DISLIKE')"
+              >设为不喜欢</AppButton
+            >
+            <AppButton :disabled="!selectedIds.length || batchLoading" @click="updateSelected('NONE')"
+              >取消标记</AppButton
+            >
+            <AppButton variant="danger" :disabled="!selectedIds.length || batchLoading" @click="trashSelected">
+              送入回收站
+            </AppButton>
+          </div>
         </div>
-        <div class="batch-actions">
-          <AppButton :disabled="!selectedIds.length || batchLoading" @click="updateSelected('LIKE')"
-            >设为喜欢</AppButton
-          >
-          <AppButton :disabled="!selectedIds.length || batchLoading" @click="updateSelected('DISLIKE')"
-            >设为不喜欢</AppButton
-          >
-          <AppButton :disabled="!selectedIds.length || batchLoading" @click="updateSelected('NONE')"
-            >取消标记</AppButton
-          >
-          <AppButton variant="danger" :disabled="!selectedIds.length || batchLoading" @click="trashSelected">
-            送入回收站
-          </AppButton>
-        </div>
-      </div>
 
-      <div v-if="errorMessage" class="error-banner" role="alert">{{ errorMessage }}</div>
-      <ContentState v-if="!loading && !items.length" state="empty" message="暂无符合条件的媒体标记" />
-      <div v-else class="reaction-table-wrap">
-        <table class="reaction-table">
-          <thead>
-            <tr>
-              <th class="check-cell"><input v-model="allSelected" type="checkbox" aria-label="全选" /></th>
-              <th>媒体</th>
-              <th>类型</th>
-              <th>标记</th>
-              <th>最近标记</th>
-              <th>状态</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="item in items" :key="item.id">
-              <td class="check-cell"><input v-model="selectedIds" type="checkbox" :value="item.id" /></td>
-              <td>
-                <div class="media-cell">
-                  <span class="media-id">#{{ item.id }}</span>
-                  <span>章节 {{ item.chapterId }} · 第 {{ item.pageNumber }} 页</span>
-                </div>
-              </td>
-              <td>
-                <span class="type-badge">{{ item.mediaType === 'VIDEO' ? '视频' : '图片' }}</span>
-              </td>
-              <td>
-                <span class="reaction-badge" :class="item.reaction.toLowerCase()">
-                  <span class="reaction-dot" aria-hidden="true" />
-                  {{ reactionLabel(item.reaction) }}
-                </span>
-              </td>
-              <td class="date-cell">{{ formatDate(item.reactionAt) }}</td>
-              <td>
-                <span class="status-text">{{ statusLabel(item.status) }}</span>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </ManagementPanel>
+        <div v-if="errorMessage" class="error-banner" role="alert">{{ errorMessage }}</div>
+        <ContentState v-if="!loading && !items.length" state="empty" message="暂无符合条件的媒体标记" />
+        <div v-else class="reaction-table-wrap">
+          <table class="reaction-table">
+            <thead>
+              <tr>
+                <th class="check-cell"><input v-model="allSelected" type="checkbox" aria-label="全选" /></th>
+                <th>媒体</th>
+                <th>类型</th>
+                <th>标记</th>
+                <th>最近标记</th>
+                <th>状态</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="item in items" :key="item.id">
+                <td class="check-cell"><input v-model="selectedIds" type="checkbox" :value="item.id" /></td>
+                <td>
+                  <div class="media-cell">
+                    <span class="media-id">#{{ item.id }}</span>
+                    <span>章节 {{ item.chapterId }} · 第 {{ item.pageNumber }} 页</span>
+                  </div>
+                </td>
+                <td>
+                  <span class="type-badge">{{ item.mediaType === 'VIDEO' ? '视频' : '图片' }}</span>
+                </td>
+                <td>
+                  <span class="reaction-badge" :class="item.reaction.toLowerCase()">
+                    <span class="reaction-dot" aria-hidden="true" />
+                    {{ reactionLabel(item.reaction) }}
+                  </span>
+                </td>
+                <td class="date-cell">{{ formatDate(item.reactionAt) }}</td>
+                <td>
+                  <span class="status-text">{{ statusLabel(item.status) }}</span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </ManagementPanel>
     </template>
   </div>
 </template>
@@ -254,7 +259,7 @@ onMounted(loadItems)
   padding: 4px;
   border: 1px solid var(--border);
   border-radius: 999px;
-  background: var(--surface-muted);
+  background: var(--bg-secondary);
 }
 .scope-switch button {
   padding: 7px 16px;

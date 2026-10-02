@@ -3,6 +3,11 @@
  */
 
 :root {
+  /* 按需 CSS 会在页面加载后注入，通过组件变量保证所有表单的公共尺寸契约。 */
+  --el-component-size: var(--control-height) !important;
+  --el-component-size-small: var(--button-height-sm) !important;
+  --el-component-size-large: var(--button-height-lg) !important;
+  --el-border-radius-base: var(--control-radius) !important;
   /* Primary brand palette */
   --el-color-primary-rgb: 229, 9, 20 !important;
   --el-color-primary: var(--accent) !important;
@@ -544,6 +549,10 @@
 /* 按需组件样式可能在页面组件之后注入，显式锁定全局控件契约，避免回退到 Element Plus 蓝/白默认主题。 */
 .el-input .el-input__wrapper,
 .el-select .el-select__wrapper {
+  min-height: var(--el-component-size);
+  padding: 0 var(--space-3);
+  border-radius: var(--control-radius);
+  font-size: var(--text-sm);
   border: 0 !important;
   background: var(--control-bg) !important;
   box-shadow:
@@ -566,6 +575,15 @@
 }
 
 /* 表单错误是信息提示而非第二层容器：只改变控件描边，避免焦点和校验态叠成粗红框。 */
+.el-select.el-select--small .el-select__wrapper {
+  min-height: var(--button-height-sm);
+  padding: 0 var(--space-3);
+}
+.el-select.el-select--large .el-select__wrapper {
+  min-height: var(--button-height-lg);
+  padding: 0 var(--space-4);
+}
+
 .el-form-item.is-error .el-input__wrapper,
 .el-form-item.is-error .el-select__wrapper,
 .el-form-item.is-error .el-textarea__inner {

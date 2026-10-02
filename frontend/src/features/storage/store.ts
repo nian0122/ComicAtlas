@@ -85,11 +85,7 @@ export const useStorageStore = defineStore('storage', () => {
 
   async function refreshRow(comicId: number) {
     try {
-      const data = await storageService.fetchComics({ keyword: String(comicId), size: 1 })
-      const item = data.records?.find((c) => c.comicId === comicId)
-      if (item) {
-        replaceRow(item)
-      }
+      replaceRow(await storageService.fetchComic(comicId))
     } catch {
       // row refresh failure is non-critical
     }

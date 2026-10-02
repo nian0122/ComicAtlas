@@ -14,8 +14,10 @@ export interface ContentReactionVO {
 }
 
 export const contentReactionApi = {
-  list: (targetType: ContentReactionTarget, params?: { reaction?: Exclude<MediaReaction, 'NONE'>; includeTrashed?: boolean }) =>
-    api.get<ContentReactionVO[]>('/manage/content/reactions', { params: { targetType, ...params } }),
+  list: (
+    targetType: ContentReactionTarget,
+    params?: { reaction?: Exclude<MediaReaction, 'NONE'>; includeTrashed?: boolean },
+  ) => api.get<ContentReactionVO[]>('/manage/content/reactions', { params: { targetType, ...params } }),
   updateBatch: (targetType: ContentReactionTarget, ids: number[], reaction: MediaReaction) =>
     api.put<number>('/manage/content/reactions/batch', { ids, reaction }, { params: { targetType } }),
   trashBatch: (targetType: ContentReactionTarget, ids: number[]) =>

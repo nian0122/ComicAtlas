@@ -49,6 +49,9 @@
   --success: var(--color-success);
   --warning: var(--color-warning);
   --danger: var(--color-danger);
+  --danger-bg: color-mix(in srgb, var(--danger) 14%, var(--bg-surface));
+  --danger-hover: color-mix(in srgb, var(--danger) 85%, var(--color-on-brand));
+  --warning-bg: color-mix(in srgb, var(--warning) 14%, var(--bg-surface));
   --info: var(--color-info);
 
   /* 旧组件兼容映射 */

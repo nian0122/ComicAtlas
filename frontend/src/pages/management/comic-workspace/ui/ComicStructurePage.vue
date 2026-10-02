@@ -898,9 +898,10 @@ function flattenStructureRows(row: StructureRow): readonly StructureRow[] {
   return [row, ...(row.children ?? []).flatMap(flattenStructureRows)]
 }
 function selectStructureRow(row: StructureRow): void {
-  const selectedNode = structureRows.value
-    .flatMap(flattenStructureRows)
-    .find((candidate) => candidate.kind === row.kind && candidate.id === row.id) ?? row
+  const selectedNode =
+    structureRows.value
+      .flatMap(flattenStructureRows)
+      .find((candidate) => candidate.kind === row.kind && candidate.id === row.id) ?? row
   selectedMedia.value = null
   selectedRow.value = selectedNode
   if (selectedNode.kind === 'CHAPTER') chapterWorkspaceTab.value = 'chapter'

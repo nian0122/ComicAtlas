@@ -1,6 +1,12 @@
 import { exportApi, hqApi, lqApi, storageAdminApi } from '@/entities/storage'
 import { getApiErrorMessage } from '@/shared/api/http'
-import type { ComicStorageQuery, ExportArtifactVO, ExportTaskVO, StorageOperation } from '@/entities/storage'
+import type {
+  ComicStorageItem,
+  ComicStorageQuery,
+  ExportArtifactVO,
+  ExportTaskVO,
+  StorageOperation,
+} from '@/entities/storage'
 import type { OperationSubmitResult } from '@/shared/api/types'
 import { StorageOperationType } from '@/entities/storage'
 
@@ -20,7 +26,7 @@ export const storageService = {
     return response.data
   },
 
-  async fetchComic(comicId: number) {
+  async fetchComic(comicId: number): Promise<ComicStorageItem> {
     const res = await storageAdminApi.comic(comicId)
     return res.data
   },

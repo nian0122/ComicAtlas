@@ -100,7 +100,7 @@ function percent(bytes: number | undefined): number {
   min-height: 190px;
   padding: var(--space-xl);
   border: 1px solid var(--border-strong);
-  background: linear-gradient(145deg, var(--bg-elevated), var(--bg-surface));
+  background: linear-gradient(145deg, var(--surface-highlight), var(--bg-surface));
 }
 .overview-kicker {
   color: var(--accent);

@@ -376,11 +376,6 @@ function formatBytes(bytes: number | undefined): string {
   width: 190px;
 }
 
-.batch-toolbar :deep(.el-select__wrapper) {
-  min-height: 36px;
-  border-radius: var(--radius-sm);
-}
-
 .comic-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(205px, 1fr));

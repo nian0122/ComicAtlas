@@ -608,6 +608,6 @@ watch(
 }
 
 .video-retry-btn:hover {
-  background: var(--surface-hover);
+  background: var(--surface-highlight);
 }
 </style>

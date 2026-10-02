@@ -1,9 +1,10 @@
 import { StorageOperationType } from '@/entities/storage'
 import type { StorageOperationType as StorageOperationTypeValue } from '@/entities/storage'
 import { useStorageStore } from '@/features/storage/store'
+import { onScopeDispose } from 'vue'
 
 interface PollEntry {
-  timer: ReturnType<typeof setInterval> | null
+  timer: ReturnType<typeof setTimeout> | null
   type: StorageOperationTypeValue
   retries: number
 }
@@ -19,20 +20,22 @@ export function useStoragePolling(store: ReturnType<typeof useStorageStore>) {
     if (!entry) return
 
     if (entry.timer !== null) {
-      clearInterval(entry.timer)
+      clearTimeout(entry.timer)
     }
     store.setBusy(comicId, false)
     activePolls.delete(comicId)
   }
 
   function start(comicId: number, type: StorageOperationTypeValue) {
+    stop(comicId)
     store.setBusy(comicId, true)
 
     const entry: PollEntry = { timer: null, type, retries: 0 }
     activePolls.set(comicId, entry)
 
-    entry.timer = setInterval(async () => {
+    const poll = async () => {
       await store.refreshRow(comicId)
+      if (activePolls.get(comicId) !== entry) return
       entry.retries++
 
       const comic = store.comicList.find((c) => c.comicId === comicId)
@@ -63,8 +66,11 @@ export function useStoragePolling(store: ReturnType<typeof useStorageStore>) {
 
       if (shouldStop) {
         stop(comicId)
+      } else {
+        entry.timer = setTimeout(poll, POLL_INTERVAL)
       }
-    }, POLL_INTERVAL)
+    }
+    entry.timer = setTimeout(poll, POLL_INTERVAL)
   }
 
   function stopAll() {
@@ -73,5 +79,6 @@ export function useStoragePolling(store: ReturnType<typeof useStorageStore>) {
     }
   }
 
+  onScopeDispose(stopAll)
   return { start, stop, stopAll }
 }

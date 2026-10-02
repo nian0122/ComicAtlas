@@ -1,2 +1,6 @@
 export { aiAnalysisApi } from './api'
 export type { AiTaskStatus, AiAnalysisTask } from './api'
+export { useAiAnalysisTask } from './model/useAiAnalysisTask'
+export type { AnalysisResult } from './model/useAiAnalysisTask'
+export { default as AiAnalysisResult } from './ui/AiAnalysisResult.vue'
+export { default as AiAnalysisHero } from './ui/AiAnalysisHero.vue'

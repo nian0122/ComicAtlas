@@ -14,11 +14,12 @@
     "lint": "pnpm check:fsd && eslint .",
     "check:ui": "node scripts/check-ui-consolidation.mjs",
     "check:fsd": "node scripts/check-fsd-imports.mjs",
-    "test:architecture": "node --test scripts/check-fsd-imports.test.mjs",
+    "test:architecture": "node --test scripts/check-fsd-imports.test.mjs scripts/check-style-contracts.test.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check . --end-of-line auto",
-    "check": "pnpm check:ui && pnpm test:architecture && pnpm typecheck && pnpm lint && pnpm format:check && pnpm test:unit && pnpm test:e2e && pnpm build",
-    "preview": "vite preview"
+    "check": "pnpm check:ui && pnpm check:styles && pnpm test:architecture && pnpm typecheck && pnpm lint && pnpm format:check && pnpm test:unit && pnpm test:e2e && pnpm build",
+    "preview": "vite preview",
+    "check:styles": "node scripts/check-style-contracts.mjs"
   },
   "dependencies": {
     "@element-plus/icons-vue": "^2.3.2",

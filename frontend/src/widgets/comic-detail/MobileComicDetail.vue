@@ -87,6 +87,7 @@
 <script setup lang="ts">
 import { AppButton } from '@/shared/ui/button'
 import { computed } from 'vue'
+import { formatBytes } from '@/shared/lib/format/bytes'
 import { VideoPlay } from '@element-plus/icons-vue'
 import { CatalogTree } from '@/entities/comic'
 import { ChapterSearchBox } from '@/features/chapter-search'
@@ -124,14 +125,7 @@ const year = computed(() => props.comic.createdAt?.slice(0, 4) || '未知年份'
 
 const hqSize = computed(() => {
   if (!props.comic.hqSize) return '-'
-  const units = ['B', 'KB', 'MB', 'GB', 'TB']
-  let value = props.comic.hqSize
-  let unitIndex = 0
-  while (value >= 1024 && unitIndex < units.length - 1) {
-    value /= 1024
-    unitIndex += 1
-  }
-  return `${value.toFixed(unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`
+  return formatBytes(props.comic.hqSize)
 })
 </script>
 

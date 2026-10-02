@@ -1,7 +1,7 @@
 <template>
   <div
     class="chapter-row"
-    :class="{ active: active }"
+    :class="{ active: active, 'chapter-row--catalog': appearance === 'catalog' }"
     :style="{
       paddingLeft: (indent ?? 0) + 12 + 'px',
     }"
@@ -38,6 +38,7 @@ const props = defineProps<{
   active?: boolean
   indent?: number
   highlightKeyword?: string
+  appearance?: 'plain' | 'catalog'
 }>()
 
 const emit = defineEmits<{
@@ -62,9 +63,7 @@ function splitText(text: string): TextSegment[] {
   return segments
 }
 
-const chapterNumberSegments = computed(() =>
-  splitText(`#${props.chapter.globalOrder}`),
-)
+const chapterNumberSegments = computed(() => splitText(`#${props.chapter.globalOrder}`))
 const titleSegments = computed(() => splitText(props.chapter.title || ''))
 </script>
 
@@ -92,6 +91,20 @@ const titleSegments = computed(() => splitText(props.chapter.title || ''))
 
 .chapter-row.active .chapter-title {
   color: var(--text-primary);
+}
+
+.chapter-row--catalog {
+  position: relative;
+  height: 40px;
+  box-sizing: border-box;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
+}
+.chapter-row--catalog:hover {
+  background: color-mix(in srgb, var(--bg-surface) 72%, transparent);
+}
+.chapter-row--catalog.active {
+  border-left: 0;
+  box-shadow: inset 3px 0 var(--accent);
 }
 
 .chapter-no {
@@ -130,6 +143,20 @@ mark {
   padding: 2px 8px;
   background: var(--accent-bg);
   border-radius: var(--radius-sm);
+}
+
+@media (max-width: 480px) {
+  .chapter-row--catalog {
+    gap: 4px;
+    padding-right: 6px;
+  }
+  .chapter-row--catalog .chapter-no {
+    flex: 0 0 48px;
+    min-width: 48px;
+  }
+  .chapter-row--catalog .chapter-pages {
+    flex-basis: 30px;
+  }
 }
 
 @media (max-width: 1024px) {

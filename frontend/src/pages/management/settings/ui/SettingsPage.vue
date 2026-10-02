@@ -131,7 +131,7 @@ onMounted(loadSettings)
 
 .setting-hint {
   font-size: 12px;
-  color: var(--text-tertiary);
+  color: var(--text-muted);
 }
 
 .setting-select {

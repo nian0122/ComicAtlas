@@ -269,20 +269,6 @@ async function onUpdateTag() {
   background-color: var(--border);
 }
 
-.metadata-page :deep(.el-input__wrapper) {
-  box-shadow: 0 0 0 1px var(--border) inset;
-}
-
-.metadata-page :deep(.el-input__wrapper:hover) {
-  box-shadow: 0 0 0 1px var(--border-strong) inset;
-}
-
-.metadata-page :deep(.el-input__wrapper.is-focus) {
-  box-shadow:
-    inset 0 0 0 1px var(--accent),
-    var(--shadow-sm) !important;
-}
-
 .tag-list {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 230px), 1fr));
@@ -295,7 +281,7 @@ async function onUpdateTag() {
   border-radius: 16px;
   background:
     radial-gradient(ellipse at 8% 0%, color-mix(in srgb, var(--accent) 8%, transparent), transparent 36%),
-    var(--surface-raised, var(--bg-secondary));
+    var(--bg-surface, var(--bg-secondary));
 }
 
 .tag-toolbar,

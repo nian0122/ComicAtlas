@@ -51,7 +51,7 @@
   padding: 6px 8px;
   border: 1px solid var(--border);
   border-radius: var(--radius-xs);
-  background: var(--bg-elevated);
+  background: var(--surface-highlight);
   color: var(--text-primary);
   text-align: left;
   cursor: pointer;
@@ -110,7 +110,7 @@
   gap: var(--space-3);
   padding: var(--space-3);
   border: 1px solid var(--border);
-  background: var(--bg-elevated);
+  background: var(--surface-highlight);
 }
 .mode-mark {
   display: grid;
@@ -198,7 +198,7 @@
 .upload-session-note {
   padding: 10px 12px;
   color: var(--text-muted);
-  background: var(--bg-elevated);
+  background: var(--surface-highlight);
   font-size: var(--text-xs);
 }
 .media-order-dialog-body {

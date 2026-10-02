@@ -109,9 +109,7 @@ test('激活后使用 metadata 预加载并提供原生进度控制', async ({ p
   await video.evaluate((element: HTMLVideoElement) => {
     element.currentTime = 0.25
   })
-  await expect
-    .poll(() => video.evaluate((element: HTMLVideoElement) => element.currentTime))
-    .toBeCloseTo(0.25, 2)
+  await expect.poll(() => video.evaluate((element: HTMLVideoElement) => element.currentTime)).toBeCloseTo(0.25, 2)
 })
 
 test('占位预览经静音微播放解码首帧后立即暂停', async ({ page }) => {

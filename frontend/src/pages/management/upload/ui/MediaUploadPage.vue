@@ -474,7 +474,7 @@ onMounted(async () => {
 }
 .session-note {
   padding: 10px 12px;
-  background: var(--bg-elevated);
+  background: var(--surface-highlight);
 }
 .upload-guide {
   grid-template-columns: minmax(180px, 0.5fr) 1fr;
