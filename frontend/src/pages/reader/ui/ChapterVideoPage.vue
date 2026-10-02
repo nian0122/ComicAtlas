@@ -121,6 +121,7 @@
           class="video-play-button"
           type="button"
           aria-label="播放视频"
+          title="播放 / 暂停（空格或 K）"
           @click="togglePlayback"
           >▶</AppButton
         >
@@ -133,6 +134,7 @@
           class="video-sound"
           type="button"
           :aria-label="muted ? '开启声音' : '静音'"
+          title="静音 / 开启声音（M）"
           @click="toggleMute"
         >
           <svg
@@ -221,8 +223,12 @@
         />
       </section>
       <div class="video-nav">
-        <AppButton type="button" aria-label="上一项" :disabled="!hasPrevious" @click="move(-1)">↑</AppButton>
-        <AppButton type="button" aria-label="下一项" :disabled="!hasNext" @click="move(1)">↓</AppButton>
+        <AppButton type="button" aria-label="上一项" title="上一项（↑）" :disabled="!hasPrevious" @click="move(-1)"
+          >↑</AppButton
+        >
+        <AppButton type="button" aria-label="下一项" title="下一项（↓）" :disabled="!hasNext" @click="move(1)"
+          >↓</AppButton
+        >
       </div>
       <video
         v-if="nextItem && isVideoMedia(nextItem)"
@@ -259,6 +265,7 @@ import { VideoProgressControl, VideoSpeedSheet } from './components'
 import { useAutoHideControls } from './composables/useAutoHideControls'
 import { useImmersiveSwipe } from './composables/useImmersiveSwipe'
 import { useReaderFullscreen } from './composables/useReaderFullscreen'
+import { useShortVideoKeyboard } from './composables/useShortVideoKeyboard'
 import { useReadingProgressPersistence, type ReadingProgressPayload } from './composables/useReadingProgressPersistence'
 
 const route = useRoute()
@@ -754,11 +761,11 @@ function resetMediaState(): void {
   imageReloadKey.value = 0
 }
 
-function togglePlayback(): void {
+function togglePlayback(event?: Event): void {
   if (!currentIsVideo.value) return
   if (suppressVideoClick) {
     suppressVideoClick = false
-    return
+    if (event) return
   }
   showControls(false)
   const video = videoRef.value
@@ -949,10 +956,13 @@ function onProgressTouchEnd(event: TouchEvent): void {
 }
 
 function onProgressKeydown(event: KeyboardEvent): void {
+  if (isSpeedSheetOpen.value) return
+  if (event.ctrlKey || event.metaKey || event.altKey || event.isComposing) return
   if (duration.value <= 0) return
   const step = event.shiftKey ? 10 : 5
   if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
     event.preventDefault()
+    event.stopPropagation()
     const direction = event.key === 'ArrowLeft' ? -1 : 1
     const video = videoRef.value
     if (!video) return
@@ -1036,20 +1046,26 @@ function onWheel(event: WheelEvent): void {
   void move(event.deltaY > 0 ? 1 : -1)
 }
 
-function onKeydown(event: KeyboardEvent): void {
-  if (event.key === 'ArrowDown') {
-    event.preventDefault()
-    void move(1)
-  }
-  if (event.key === 'ArrowUp') {
-    event.preventDefault()
-    void move(-1)
-  }
-  if (event.code === 'Space' && currentIsVideo.value) {
-    event.preventDefault()
-    togglePlayback()
-  }
-}
+useShortVideoKeyboard({
+  isVideo: () => currentIsVideo.value,
+  isDialogOpen: () => isSpeedSheetOpen.value,
+  move: (direction) => {
+    void move(direction)
+  },
+  togglePlayback: () => togglePlayback(),
+  seek: (seconds) => {
+    const video = videoRef.value
+    if (!video || duration.value <= 0 || isSeeking.value) return
+    video.currentTime = Math.min(duration.value, Math.max(0, video.currentTime + seconds))
+    onTimeUpdate()
+  },
+  toggleMute,
+  toggleFullscreen: () => {
+    void toggleFullscreen()
+  },
+  closeDialog: closeSpeedSheet,
+  showControls,
+})
 
 function currentProgress(): ReadingProgressPayload | null {
   if (!chapter.value || !currentItem.value) return null
@@ -1097,7 +1113,6 @@ watch(
 onMounted(() => {
   previousOverflow = document.body.style.overflow
   document.body.style.overflow = 'hidden'
-  document.addEventListener('keydown', onKeydown)
   void loadChapter()
 })
 
@@ -1115,7 +1130,6 @@ onBeforeUnmount(() => {
   disposeControls()
   stopCurrent()
   document.body.style.overflow = previousOverflow
-  document.removeEventListener('keydown', onKeydown)
 })
 </script>
 
@@ -1430,6 +1444,10 @@ onBeforeUnmount(() => {
   transition: opacity 180ms ease;
 }
 
+.short-video-page.is-fullscreen .video-nav {
+  right: max(20px, env(safe-area-inset-right));
+}
+
 .video-nav :deep(button) {
   width: 40px;
   height: 40px;
@@ -1528,6 +1546,9 @@ onBeforeUnmount(() => {
   .video-stage {
     width: 100%;
   }
+}
+
+@media (max-width: 680px), (pointer: coarse) {
   .video-nav {
     display: none;
   }
