@@ -85,6 +85,11 @@ storage:
       readOnly: false
     EXPORT:
       path: ${MANGA_ROOT:F:/manga}/export
+  statistics:
+    # 后台核对缩略图目录，查询接口不等待扫描。
+    refresh-interval: 15m
+    scan-timeout: 2m
+    poll-interval-ms: 5000
   upload:
     chunk-size: ${UPLOAD_CHUNK_SIZE:16777216}
     max-file-size: ${UPLOAD_MAX_FILE_SIZE:21474836480}

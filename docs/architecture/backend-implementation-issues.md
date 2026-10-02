@@ -62,12 +62,12 @@
 
 ### IMPL-04：磁盘统计异常被静默转为零容量（已修复）
 
-位置：[StorageQueryServiceImpl.directorySize](../../api-service/src/main/java/com/comicatlas/api/storage/service/impl/StorageQueryServiceImpl.java)。
+现行位置：[ThumbnailCapacityScanner.java](../../api-service/src/main/java/com/comicatlas/api/storage/adapter/ThumbnailCapacityScanner.java) 与 [ThumbnailSnapshotService.java](../../api-service/src/main/java/com/comicatlas/api/storage/service/ThumbnailSnapshotService.java)。
 
 - 修复前证据：单文件 `Files.size` 和外层遍历的 IOException 分支均直接返回 0，没有记录异常；上层 `getStorageStats` 使用缓存。
 - 触发：文件不可读、目录访问失败，或扫描期间文件被移动/删除。
 - 影响：统计结果少算或归零，用户无法区分“确实没有文件”与“未能读取”，错误结果还可能被缓存。
-- 处理方向：明确失败与部分成功的统计语义，保留异常上下文，可按约定降级到上次成功统计；日志避免高频逐文件输出。与 DECOUPLE-11 一起处理。
+- 当前处理：扫描失败保留上次成功快照并发布 FAILED；无成功快照时总量为 null，明确显示待统计。失败日志保留 cause，GET 不扫描也不缓存失败容量。见 [管理端存储统计](storage-statistics.md)。
 - 回归：空目录、部分文件读取失败、根目录不可读、缓存已有成功结果后的失败。
 
 ### IMPL-06：摘要计算失败时丢失原始异常链（已修复）

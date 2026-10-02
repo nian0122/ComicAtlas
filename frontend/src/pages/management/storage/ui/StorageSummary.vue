@@ -7,58 +7,79 @@ import type { StorageStats } from '@/entities/storage'
 
 const props = defineProps<{
   stats: StorageStats | null
+  loading: boolean
+  error: string
 }>()
 
-const total = computed(() => {
-  const stats = props.stats
-  if (!stats) return 0
-  return stats.totalBytes || stats.hqBytes + stats.lqBytes + stats.thumbBytes
-})
+const total = computed(() => props.stats?.totalBytes ?? null)
+const isComplete = computed(() => props.stats?.snapshotAvailable === true && total.value !== null)
 const hqPercent = computed(() => percent(props.stats?.hqBytes))
 const lqPercent = computed(() => percent(props.stats?.lqBytes))
 const thumbPercent = computed(() => percent(props.stats?.thumbBytes))
-const unknownPercent = computed(() => Math.max(0, 100 - hqPercent.value - lqPercent.value - thumbPercent.value))
+const refreshMessage = computed(() => {
+  if (props.error) return props.error
+  if (!props.stats) return props.loading ? '正在读取统计…' : '统计尚不可用'
+  if (props.stats.refreshStatus === 'FAILED')
+    return props.stats.snapshotAvailable ? '容量核对失败，保留上次成功结果' : '容量核对失败，尚无可用快照'
+  if (props.stats.refreshStatus === 'RUNNING' || props.stats.refreshStatus === 'PENDING')
+    return props.stats.snapshotAvailable ? '正在后台核对缩略图容量，暂显示上次结果' : '首次容量统计中…'
+  return '缩略图容量已核对'
+})
+const updatedTime = computed(() => {
+  const value = props.stats?.thumbUpdatedAt
+  if (!value) return ''
+  // 后端快照时间为 UTC，无偏移的数据库时间需要明确按 UTC 解释。
+  const date = new Date(/Z$|[+-]\d{2}:\d{2}$/.test(value) ? value : `${value}Z`)
+  return Number.isNaN(date.getTime()) ? '' : date.toLocaleString('zh-CN', { hour12: false })
+})
 
 function percent(bytes: number | undefined): number {
-  if (!bytes || total.value <= 0) return 0
+  if (!bytes || total.value === null || total.value <= 0) return 0
   return Math.round((bytes / total.value) * 100)
 }
 </script>
 
 <template>
-  <section class="storage-overview">
+  <section class="storage-overview" aria-label="全库容量统计">
     <div class="total-card">
-      <span class="overview-kicker">TOTAL STORAGE</span>
-      <strong>{{ formatSize(total) }}</strong>
-      <span>当前已统计的漫画文件与缩略图</span>
-      <div class="capacity-bar" aria-label="存储占用分布">
+      <span class="overview-kicker">LIBRARY CAPACITY</span>
+      <strong>{{ isComplete ? formatSize(total ?? 0) : '待完成统计' }}</strong>
+      <span>活动媒体登记容量 + 缩略图目录容量</span>
+      <div v-if="isComplete" class="capacity-bar" aria-label="存储占用分布">
         <i class="bar-hq" :style="{ width: `${hqPercent}%` }" />
         <i class="bar-lq" :style="{ width: `${lqPercent}%` }" />
         <i class="bar-thumb" :style="{ width: `${thumbPercent}%` }" />
-        <i class="bar-unknown" :style="{ width: `${unknownPercent}%` }" />
       </div>
-      <div class="distribution-legend">
+      <div v-if="isComplete" class="distribution-legend">
         <span><i class="dot dot-hq" />HQ {{ hqPercent }}%</span><span><i class="dot dot-lq" />LQ {{ lqPercent }}%</span
         ><span><i class="dot dot-thumb" />缩略图 {{ thumbPercent }}%</span>
       </div>
+      <p
+        class="snapshot-status"
+        :class="{ 'snapshot-status--error': error || stats?.refreshStatus === 'FAILED' }"
+        role="status"
+      >
+        {{ refreshMessage }}
+      </p>
+      <span v-if="updatedTime">缩略图更新于 {{ updatedTime }}</span>
     </div>
     <StatGrid class="stat-grid" :columns="3">
       <StatCard
-        label="HQ 主文件"
-        :value="formatSize(stats?.hqBytes)"
-        :description="'原始质量 · ' + hqPercent + '%'"
+        label="HQ 就绪文件"
+        :value="stats ? formatSize(stats.hqBytes) : '—'"
+        :description="isComplete ? '原始质量 · ' + hqPercent + '%' : '数据库登记的就绪文件'"
         tone="primary"
       />
       <StatCard
-        label="LQ 衍生文件"
-        :value="formatSize(stats?.lqBytes)"
-        :description="'阅读优化 · ' + lqPercent + '%'"
+        label="LQ 就绪图片"
+        :value="stats ? formatSize(stats.lqBytes) : '—'"
+        :description="isComplete ? '阅读优化 · ' + lqPercent + '%' : '数据库登记的就绪图片'"
         tone="success"
       />
       <StatCard
         label="缩略图"
-        :value="formatSize(stats?.thumbBytes)"
-        :description="'列表预览 · ' + thumbPercent + '%'"
+        :value="stats?.snapshotAvailable ? formatSize(stats.thumbBytes) : '尚未统计'"
+        :description="stats?.snapshotAvailable ? stats.thumbFileCount + ' 个文件 · 最近成功快照' : '后台核对目录容量'"
         tone="warning"
       />
     </StatGrid>
@@ -119,9 +140,6 @@ function percent(bytes: number | undefined): number {
 .dot-thumb {
   background: var(--warning);
 }
-.bar-unknown {
-  background: var(--border-strong);
-}
 .distribution-legend {
   display: flex;
   flex-wrap: wrap;
@@ -138,6 +156,16 @@ function percent(bytes: number | undefined): number {
   width: 7px;
   height: 7px;
   border-radius: 50%;
+}
+
+.snapshot-status {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+  line-height: 1.5;
+}
+.snapshot-status--error {
+  color: var(--warning);
 }
 
 @media (max-width: 900px) {

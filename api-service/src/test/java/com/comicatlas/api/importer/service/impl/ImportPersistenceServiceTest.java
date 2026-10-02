@@ -48,6 +48,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import com.comicatlas.api.storage.service.ThumbnailSnapshotService;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import com.comicatlas.api.importer.service.impl.ImportFinalizationServiceImpl;
@@ -91,6 +92,8 @@ import static org.mockito.Mockito.when;
  */
 @ExtendWith(MockitoExtension.class)
 class ImportPersistenceServiceTest {
+    @Mock private ThumbnailSnapshotService thumbnailSnapshotService;
+
 
     @Mock private TransactionTemplate transactionTemplate;
     @Mock private ComicMapper comicMapper;

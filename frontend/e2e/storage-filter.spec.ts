@@ -16,6 +16,11 @@ async function mockStorage(page: Page) {
       lqBytes: 0,
       thumbBytes: 0,
       comicCount: 1,
+      totalBytes: 1024,
+      snapshotAvailable: true,
+      thumbFileCount: 0,
+      thumbUpdatedAt: '2026-10-02T00:00:00',
+      refreshStatus: 'READY',
     }),
   )
   await page.route('**/api/manage/admin/storage/comics**', (route) => {

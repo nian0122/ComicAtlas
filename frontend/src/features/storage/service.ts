@@ -15,6 +15,11 @@ export const storageService = {
     return res.data
   },
 
+  async refreshStatistics() {
+    const response = await storageAdminApi.refreshStats()
+    return response.data
+  },
+
   async fetchComic(comicId: number) {
     const res = await storageAdminApi.comic(comicId)
     return res.data

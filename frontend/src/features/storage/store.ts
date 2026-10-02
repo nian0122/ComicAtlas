@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
+import { getApiErrorMessage } from '@/shared/api/http'
 import { storageService } from '@/features/storage/service'
 import type {
   ComicStorageItem,
@@ -13,6 +14,9 @@ export const useStorageStore = defineStore('storage', () => {
   const comicList = ref<ComicStorageItem[]>([])
   const chapters = ref<Record<number, readonly ChapterStorageItem[]>>({})
   const summary = ref<StorageStats | null>(null)
+  const summaryLoading = ref(false)
+  const summaryError = ref('')
+  let summaryRequestVersion = 0
   const busyState = ref<Record<number, boolean>>({})
   const loading = ref(false)
   const serverTotal = ref(0)
@@ -36,10 +40,26 @@ export const useStorageStore = defineStore('storage', () => {
   }
 
   async function loadSummary() {
+    const requestVersion = ++summaryRequestVersion
+    summaryLoading.value = true
+    summaryError.value = ''
     try {
-      summary.value = await storageService.fetchSummary()
-    } catch {
-      // keep existing summary
+      const statistics = await storageService.fetchSummary()
+      if (requestVersion === summaryRequestVersion) summary.value = statistics
+    } catch (error) {
+      if (requestVersion === summaryRequestVersion) summaryError.value = getApiErrorMessage(error, '统计读取失败')
+    } finally {
+      if (requestVersion === summaryRequestVersion) summaryLoading.value = false
+    }
+  }
+
+  async function refreshStatistics() {
+    summaryError.value = ''
+    try {
+      await storageService.refreshStatistics()
+      await loadSummary()
+    } catch (error) {
+      summaryError.value = getApiErrorMessage(error, '统计刷新提交失败')
     }
   }
 
@@ -87,11 +107,14 @@ export const useStorageStore = defineStore('storage', () => {
     comicList,
     chapters,
     summary,
+    summaryLoading,
+    summaryError,
     busyState,
     loading,
     serverTotal,
     loadComics,
     loadSummary,
+    refreshStatistics,
     loadChapters,
     executeOperation,
     replaceRow,

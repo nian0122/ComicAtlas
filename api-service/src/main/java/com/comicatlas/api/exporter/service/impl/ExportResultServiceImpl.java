@@ -1,6 +1,7 @@
 package com.comicatlas.api.exporter.service.impl;
 
 import com.comicatlas.api.catalog.cache.CatalogCacheInvalidator;
+import com.comicatlas.api.storage.service.ThumbnailSnapshotService;
 import com.comicatlas.api.exporter.enums.ExportTaskStatus;
 import com.comicatlas.api.exporter.persistence.entity.ExportTask;
 import com.comicatlas.api.exporter.persistence.mapper.ExportTaskMapper;
@@ -43,6 +44,7 @@ public class ExportResultServiceImpl implements com.comicatlas.api.exporter.serv
     private final CatalogMapper catalogMapper;
     private final TrashDataMapper trashDataMapper;
     private final CatalogCacheInvalidator catalogCacheInvalidator;
+    private final ThumbnailSnapshotService thumbnailSnapshotService;
 
     @Transactional
     public void applyStarted(ExportTaskStartedEvent event) {
@@ -135,6 +137,7 @@ public class ExportResultServiceImpl implements com.comicatlas.api.exporter.serv
         comic.setReactionAt(null);
         comicMapper.updateById(comic);
         catalogCacheInvalidator.evict(comicId);
+        thumbnailSnapshotService.filesChangedAfterCommit();
     }
 
     private void updateItem(Long comicId, ManagementTaskStatus status, String errorMessage, Long exportTaskId) {

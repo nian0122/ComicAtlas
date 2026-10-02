@@ -8,6 +8,7 @@
 | [前端设计系统](frontend/design-system.md) | 视觉规范；实现令牌位于 `frontend/src/app/styles/tokens.css` |
 | [`architecture/README.md`](architecture/README.md) | 当前架构总览；专题设计与 ADR 位于 `architecture/` |
 | [共享模块边界](architecture/shared-module-boundaries.md) | 跨服务契约与持久化模块边界 |
+| [管理端存储统计](architecture/storage-statistics.md) | 统计口径、后台容量快照与升级方式 |
 | [后端代码分类](architecture/backend-package-organization.md) | 业务域、框架职责与文件归属 |
 | [后端待解耦清单](architecture/backend-decoupling.md) | 源码标记、拆分约束与回归要求 |
 | [后端三层架构检查](architecture/backend-layer-audit.md) | 接口层越界、持久化框架类型泄漏和处理约束 |

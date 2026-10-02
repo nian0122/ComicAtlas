@@ -2,10 +2,10 @@ package com.comicatlas.api.storage.service.impl;
 
 import com.comicatlas.api.catalog.cache.CatalogCacheInvalidator;
 import com.comicatlas.contract.common.enums.HqStatus;
+import com.comicatlas.contract.common.enums.ChapterLifecycleStatus;
 import com.comicatlas.contract.common.enums.LqStatus;
 import com.comicatlas.contract.common.enums.MediaLifecycleStatus;
 import com.comicatlas.persistence.comic.entity.Chapter;
-import com.comicatlas.persistence.comic.entity.Comic;
 import com.comicatlas.persistence.comic.entity.Media;
 import com.comicatlas.persistence.comic.mapper.ChapterMapper;
 import com.comicatlas.persistence.comic.mapper.ComicMapper;
@@ -25,9 +25,8 @@ import java.util.stream.Collectors;
  * <p>
  * 任何存储操作（LQ 生成 / HQ 删除 / 转码 / 回收 / 恢复 / 清理 / 上传）完成后
  * 统一经此类从实际 media/chapter 行重算整本统计（hqSize + lqSize + totalPages +
- * 各章 pageCount），避免业务落库逻辑各自实现聚合。存储管理页面的动态 SUM 聚合
- * （StorageMapper.xml）仍作为读取侧独立口径，本服务的缓存口径与其语义保持一致
- * （hqSize 统计 HQ 非 DELETED 的行，lqSize 统计 IMAGE 且 LQ READY 的行）。
+ * 各章 pageCount），避免业务落库逻辑各自实现聚合。与存储列表/全库汇总使用同一口径：
+ * 活动章节仅含 DRAFT/READY，媒体仅含 STAGING/READY；HQ 仅 READY，LQ 仅 IMAGE 且 READY。
  */
 @Slf4j
 @Service
@@ -53,15 +52,7 @@ public class ComicStatsServiceImpl implements ComicStatsService {
         if (chapter == null) {
             return;
         }
-        long pageCount = mediaMapper.countActiveByChapterId(chapterId);
-        chapterMapper.updatePageCount(chapterId, (int) pageCount);
-        Comic comic = comicMapper.selectById(chapter.getComicId());
-        if (comic == null) {
-            return;
-        }
-        recomputeComicStats(comic.getId());
-        refreshTotalPages(comic.getId());
-        catalogCacheInvalidator.evict(comic.getId());
+        refreshByComic(chapter.getComicId());
     }
 
     /** 整本一次性刷新：一次预取媒体，批量更新各章节页数与整本统计。 */
@@ -69,7 +60,9 @@ public class ComicStatsServiceImpl implements ComicStatsService {
         if (comicId == null) {
             return;
         }
-        List<Chapter> chapters = chapterMapper.selectByComicIdOrderByGlobalOrder(comicId);
+        List<Chapter> chapters = chapterMapper.selectByComicIdOrderByGlobalOrder(comicId).stream()
+                .filter(chapter -> chapter.getStatus() == ChapterLifecycleStatus.DRAFT
+                        || chapter.getStatus() == ChapterLifecycleStatus.READY).toList();
         if (chapters.isEmpty()) {
             updateComicStats(comicId, 0, 0L, 0L);
             catalogCacheInvalidator.evict(comicId);
@@ -78,8 +71,7 @@ public class ComicStatsServiceImpl implements ComicStatsService {
         List<Long> chapterIds = chapters.stream().map(Chapter::getId).toList();
         List<Media> mediaItems = mediaMapper.selectByChapterIds(chapterIds);
         Map<Long, Long> pageCountByChapter = mediaItems.stream()
-                .filter(media -> media.getStatus() != MediaLifecycleStatus.DELETED
-                        && media.getStatus() != MediaLifecycleStatus.TRASHED)
+                .filter(ComicStatsServiceImpl::isActiveMedia)
                 .collect(Collectors.groupingBy(Media::getChapterId, Collectors.counting()));
         for (Chapter chapter : chapters) {
             chapter.setPageCount(Math.toIntExact(pageCountByChapter.getOrDefault(chapter.getId(), 0L)));
@@ -116,43 +108,24 @@ public class ComicStatsServiceImpl implements ComicStatsService {
                 .toList();
     }
 
-    /** 整本媒体行重算：hqSize（HQ 非 DELETED 的 fileSize 之和）+ lqSize（IMAGE 且 LQ READY 的 lqSize 之和）。 */
-    private void recomputeComicStats(Long comicId) {
-        List<Chapter> chapters = chapterMapper.selectByComicIdOrderByGlobalOrder(comicId);
-        if (chapters.isEmpty()) {
-            return;
-        }
-        List<Long> chapterIds = chapters.stream().map(Chapter::getId).toList();
-        List<Media> mediaItems = mediaMapper.selectByChapterIds(chapterIds);
-        long hqSize = calculateHqSize(mediaItems);
-        long lqSize = calculateLqSize(mediaItems);
-        comicMapper.updateStorageStats(comicId, hqSize, lqSize);
-        log.debug("重算 comic 统计: comicId={}, hqSize={}, lqSize={}", comicId, hqSize, lqSize);
-    }
-
-    /** 整本总页数（非 DELETED/TRASHED 的媒体行数）。 */
-    private void refreshTotalPages(Long comicId) {
-        List<Long> chapterIds = chapterIdsOf(comicId);
-        if (chapterIds.isEmpty()) {
-            return;
-        }
-        long totalPages = mediaMapper.countActiveByChapterIds(chapterIds);
-        comicMapper.updateTotalPages(comicId, (int) totalPages);
-    }
-
     private long calculateHqSize(List<Media> mediaItems) {
         return mediaItems.stream()
-                .filter(media -> media.getHqStatus() != HqStatus.DELETED)
+                .filter(media -> isActiveMedia(media) && media.getHqStatus() == HqStatus.READY)
                 .mapToLong(media -> media.getHqSize() != null ? media.getHqSize() : 0L)
                 .sum();
     }
 
     private long calculateLqSize(List<Media> mediaItems) {
         return mediaItems.stream()
-                .filter(media -> MEDIA_TYPE_IMAGE.equals(media.getMediaType())
+                .filter(media -> isActiveMedia(media) && MEDIA_TYPE_IMAGE.equals(media.getMediaType())
                         && media.getLqStatus() == LqStatus.READY)
                 .mapToLong(media -> media.getLqSize() != null ? media.getLqSize() : 0L)
                 .sum();
+    }
+
+    private static boolean isActiveMedia(Media media) {
+        return (media.getStatus() == MediaLifecycleStatus.STAGING || media.getStatus() == MediaLifecycleStatus.READY)
+                && (MEDIA_TYPE_IMAGE.equals(media.getMediaType()) || MEDIA_TYPE_VIDEO.equals(media.getMediaType()));
     }
 
     private void updateComicStats(Long comicId, int totalPages, long hqSize, long lqSize) {

@@ -25,6 +25,7 @@ export const hqApi = {
 
 export const storageAdminApi = {
   stats: () => api.get<StorageStats>('/manage/storage/stats'),
+  refreshStats: () => api.post<{ refreshStatus: StorageStats['refreshStatus'] }>('/manage/storage/stats/refresh'),
   comics: (params: ComicStorageQuery) =>
     api.get<PageResult<ComicStorageItem>>('/manage/admin/storage/comics', { params }),
   comic: (comicId: number) => api.get<ComicStorageItem>(`/manage/admin/storage/comics/${comicId}`),
