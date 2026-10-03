@@ -8,8 +8,8 @@
   }
 
   .filter-field > span {
-    color: var(--text-muted);
-    font-size: var(--text-xs);
+    color: var(--filter-label-color, var(--text-muted));
+    font-size: var(--filter-label-size, var(--text-xs));
   }
 
   .filter-field .el-select {

@@ -79,7 +79,11 @@ test('刷新按钮异步触发扫描并刷新汇总与列表，扫描失败保�
   await expect(overview.getByText('2 个文件 · 最近成功快照')).toBeVisible()
   await expect(page.getByRole('button', { name: '刷新统计' })).toBeEnabled()
   await overview.screenshot({ path: testInfo.outputPath('statistics-failed-with-snapshot.png') })
+  const readsBeforeLeaving = statisticsRequests
   await page.goto('/manage/comics')
+  await expect(page.getByRole('heading', { name: '漫画管理', exact: true })).toBeVisible()
+  // 漫画管理页自身会读取一次全库容量；等待这次合法读取后，再验证存储页轮询已停止。
+  await expect.poll(() => statisticsRequests).toBe(readsBeforeLeaving + 1)
   const previousReads = statisticsRequests
   await page.waitForTimeout(2200)
   expect(statisticsRequests).toBe(previousReads)

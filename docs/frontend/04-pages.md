@@ -26,7 +26,7 @@
 | `/manage/upload` | `pages/management/upload` | 媒体上传和替换 |
 | `/manage/tasks` | `pages/management/tasks` | 管理任务进度、取消与重试 |
 | `/manage/trash` | `pages/management/trash` | 回收、恢复与永久清理 |
-| `/manage/storage` | `pages/management/storage` | 存储统计、筛选和批量操作 |
+| `/manage/storage` | `pages/management/storage` | 存储统计、筛选和漫画存储明细入口 |
 | `/manage/metadata` | `pages/management/metadata` | 分类和标签维护 |
 | `/manage/media-reactions` | `pages/management/media-reactions` | 媒体反馈管理 |
 | `/manage/ai-analysis` | `pages/management/ai-analysis` | AI 分析 |
@@ -35,3 +35,5 @@
 | `/manage/intercept` | `pages/management/intercept` | 移动设备管理端提示 |
 
 管理页面使用 `widgets/management-layout`。`/manage/comics/:id/edit` 和 `/manage/storage/:id` 重定向到漫画工作台的相应标签；旧的 `/manage/import/tasks` 重定向到统一任务中心。`/manage/workbench`、`/manage/operations` 和 `/manage/status` 保留为列表页兼容跳转。移动阅读设备访问管理路由时由路由守卫转到 `/manage/intercept`。
+
+存储统计页使用完整管理内容区：全库、HQ、LQ 与缩略图为四张对齐的紧凑统计卡，窄屏保留两列。状态和更新时间独立显示，统计刷新仍异步核对容量。筛选在桌面排列为两行，字段、条件清除与排序保留原有行为，条件只影响漫画列表。表格将容量与媒体数量分列展示，点击记录进入漫画存储工作台。

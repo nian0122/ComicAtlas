@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { AppButton } from '@/shared/ui/button'
+import { ManagementPanel } from '@/shared/ui/management-panel'
 import { computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElSelect, ElOption, ElInput } from 'element-plus'
@@ -83,192 +84,138 @@ onMounted(() => {
 </script>
 
 <template>
-  <section class="storage-filter-panel filter-controls" aria-label="存储记录筛选">
+  <ManagementPanel class="storage-filter-panel filter-controls" aria-label="存储记录筛选">
     <div class="filter-heading">
       <div class="filter-heading-copy">
-        <h2>筛选存储记录</h2>
-        <p>按漫画范围与文件状态，定位需要处理的内容</p>
+        <h2>漫画存储记录</h2>
+        <span class="filter-result" aria-live="polite">
+          <span v-if="loading">正在筛选…</span>
+          <span v-else
+            >匹配 <strong>{{ total }}</strong> 本漫画</span
+          >
+        </span>
       </div>
-      <AppButton variant="ghost" size="sm" @click="router.push('/manage/tasks')">前往任务中心</AppButton>
+      <AppButton variant="text" size="sm" @click="router.push('/manage/tasks')">前往任务中心</AppButton>
     </div>
-
-    <div class="filter-group">
-      <h3>漫画范围</h3>
-      <div class="filter-grid filter-grid--scope">
-        <label class="filter-field filter-field--keyword">
-          <span>标题关键词</span>
-          <el-input
-            :model-value="filter.keyword"
-            placeholder="搜索标题"
-            aria-label="存储标题关键词"
-            clearable
-            @update:model-value="setFilter({ keyword: $event })"
+    <div class="filter-grid">
+      <label class="filter-field filter-field--keyword">
+        <span>标题关键词</span>
+        <el-input
+          :model-value="filter.keyword"
+          placeholder="搜索标题"
+          aria-label="存储标题关键词"
+          clearable
+          @update:model-value="setFilter({ keyword: $event })"
+        />
+      </label>
+      <label class="filter-field">
+        <span>分类</span>
+        <el-select
+          :model-value="filter.category"
+          placeholder="全部分类"
+          aria-label="存储分类"
+          clearable
+          filterable
+          @update:model-value="setFilter({ category: $event })"
+        >
+          <el-option label="未分类" value="_NONE" />
+          <el-option
+            v-for="category in categoryStore.list"
+            :key="category.id"
+            :label="category.name"
+            :value="category.name"
           />
-        </label>
-        <label class="filter-field">
-          <span>分类</span>
-          <el-select
-            :model-value="filter.category"
-            placeholder="全部分类"
-            aria-label="存储分类"
-            clearable
-            filterable
-            @update:model-value="setFilter({ category: $event })"
-          >
-            <el-option label="未分类" value="_NONE" />
-            <el-option
-              v-for="category in categoryStore.list"
-              :key="category.id"
-              :label="category.name"
-              :value="category.name"
-            />
-          </el-select>
-        </label>
-        <label class="filter-field">
-          <span>标签</span>
-          <el-select
-            :model-value="filter.tag"
-            placeholder="全部标签"
-            aria-label="存储标签"
-            clearable
-            filterable
-            @update:model-value="setFilter({ tag: $event })"
-          >
-            <el-option label="无标签" value="_NONE" />
-            <el-option v-for="tag in tagStore.list" :key="tag.id" :label="tag.name" :value="tag.name" />
-          </el-select>
-        </label>
-      </div>
-    </div>
-
-    <div class="filter-group filter-group--storage">
-      <h3>文件状态与排序</h3>
-      <div class="filter-grid filter-grid--storage">
-        <label class="filter-field">
-          <span>HQ 原文件</span>
-          <el-select
-            :model-value="filter.hqStatus"
-            aria-label="存储 HQ 状态"
-            @update:model-value="setFilter({ hqStatus: $event })"
-          >
-            <el-option v-for="option in hqOptions" :key="option.value" v-bind="option" />
-          </el-select>
-        </label>
-        <label class="filter-field">
-          <span>LQ 衍生文件</span>
-          <el-select
-            :model-value="filter.lqStatus"
-            aria-label="存储 LQ 状态"
-            @update:model-value="setFilter({ lqStatus: $event })"
-          >
-            <el-option v-for="option in lqOptions" :key="option.value" v-bind="option" />
-          </el-select>
-        </label>
-        <label class="filter-field filter-field--sort">
-          <span>排序依据</span>
-          <el-select
-            :model-value="sort.field"
-            aria-label="存储排序依据"
-            @update:model-value="setSort({ field: $event })"
-          >
-            <el-option v-for="option in sortOptions" :key="option.value" v-bind="option" />
-          </el-select>
-        </label>
-        <label class="filter-field">
-          <span>排列顺序</span>
-          <el-select
-            :model-value="sort.order"
-            aria-label="存储排列顺序"
-            @update:model-value="setSort({ order: $event })"
-          >
-            <el-option label="降序" value="desc" /><el-option label="升序" value="asc" />
-          </el-select>
-        </label>
-      </div>
-    </div>
-
-    <div class="filter-feedback">
-      <div class="filter-result" aria-live="polite">
-        <span v-if="loading">正在筛选…</span>
-        <span v-else
-          >匹配 <strong>{{ total }}</strong> 本漫画</span
+        </el-select>
+      </label>
+      <label class="filter-field">
+        <span>标签</span>
+        <el-select
+          :model-value="filter.tag"
+          placeholder="全部标签"
+          aria-label="存储标签"
+          clearable
+          filterable
+          @update:model-value="setFilter({ tag: $event })"
         >
-        <span class="filter-summary-hint">{{ activeConditions.length ? '条件同时匹配' : '当前显示全部记录' }}</span>
-      </div>
-      <div v-if="activeConditions.length" class="filter-conditions" aria-label="当前存储筛选条件">
-        <AppButton
-          v-for="condition in activeConditions"
-          :key="condition.key"
-          size="sm"
-          class="filter-condition"
-          :aria-label="`清除${condition.label}`"
-          @click="clearCondition(condition.key)"
+          <el-option label="无标签" value="_NONE" />
+          <el-option v-for="tag in tagStore.list" :key="tag.id" :label="tag.name" :value="tag.name" />
+        </el-select>
+      </label>
+
+      <label class="filter-field">
+        <span>HQ 原文件</span>
+        <el-select
+          :model-value="filter.hqStatus"
+          aria-label="存储 HQ 状态"
+          @update:model-value="setFilter({ hqStatus: $event })"
         >
-          <span class="filter-condition-label">{{ condition.label }}</span
-          ><span class="filter-condition-close" aria-hidden="true">×</span>
-        </AppButton>
-        <AppButton variant="text" size="sm" @click="clearFilters">清空筛选</AppButton>
-      </div>
-      <p class="filter-note">筛选仅影响下方漫画列表，上方占用统计保持全库汇总。</p>
+          <el-option v-for="option in hqOptions" :key="option.value" v-bind="option" />
+        </el-select>
+      </label>
+      <label class="filter-field">
+        <span>LQ 衍生文件</span>
+        <el-select
+          :model-value="filter.lqStatus"
+          aria-label="存储 LQ 状态"
+          @update:model-value="setFilter({ lqStatus: $event })"
+        >
+          <el-option v-for="option in lqOptions" :key="option.value" v-bind="option" />
+        </el-select>
+      </label>
+      <label class="filter-field filter-field--sort">
+        <span>排序依据</span>
+        <el-select :model-value="sort.field" aria-label="存储排序依据" @update:model-value="setSort({ field: $event })">
+          <el-option v-for="option in sortOptions" :key="option.value" v-bind="option" />
+        </el-select>
+      </label>
+      <label class="filter-field">
+        <span>排列顺序</span>
+        <el-select :model-value="sort.order" aria-label="存储排列顺序" @update:model-value="setSort({ order: $event })">
+          <el-option label="降序" value="desc" /><el-option label="升序" value="asc" />
+        </el-select>
+      </label>
     </div>
-  </section>
+    <div v-if="activeConditions.length" class="filter-conditions" aria-label="当前存储筛选条件">
+      <AppButton
+        v-for="condition in activeConditions"
+        :key="condition.key"
+        size="sm"
+        class="filter-condition"
+        :aria-label="`清除${condition.label}`"
+        @click="clearCondition(condition.key)"
+      >
+        <span class="filter-condition-label">{{ condition.label }}</span
+        ><span class="filter-condition-close" aria-hidden="true">×</span>
+      </AppButton>
+      <AppButton variant="text" size="sm" @click="clearFilters">清空筛选</AppButton>
+    </div>
+  </ManagementPanel>
 </template>
-
 <style scoped>
 .storage-filter-panel {
-  margin-bottom: var(--space-lg);
-  padding: var(--space-lg);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--bg-surface);
+  --filter-label-size: var(--text-sm);
+  --filter-label-color: var(--text-secondary);
 }
 .filter-heading {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-base);
-  margin-bottom: var(--space-lg);
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+.filter-heading-copy {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-3);
+  min-width: 0;
 }
 .filter-heading h2 {
   margin: 0;
   color: var(--text-primary);
   font-size: var(--text-md);
 }
-.filter-heading p {
-  margin: var(--space-xs) 0 0;
-  color: var(--text-muted);
-  font-size: var(--text-xs);
-  line-height: 1.5;
-}
-.filter-group h3 {
-  margin: 0 0 var(--space-sm);
-  color: var(--text-secondary);
-  font-size: var(--text-xs);
-  font-weight: 600;
-}
-.filter-group--storage {
-  margin-top: var(--space-lg);
-}
-.filter-grid {
-  display: grid;
-  gap: var(--space-base);
-}
-.filter-grid--scope {
-  grid-template-columns: minmax(0, 2fr) repeat(2, minmax(0, 1fr));
-}
-.filter-grid--storage {
-  grid-template-columns: repeat(3, minmax(0, 1fr)) minmax(0, 0.65fr);
-}
-.filter-feedback {
-  margin-top: var(--space-lg);
-  padding-top: var(--space-base);
-  border-top: 1px solid var(--border);
-}
 .filter-result {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: var(--space-sm);
   color: var(--text-secondary);
   font-size: var(--text-sm);
 }
@@ -276,31 +223,28 @@ onMounted(() => {
   color: var(--text-primary);
   font-variant-numeric: tabular-nums;
 }
-.filter-summary-hint,
-.filter-note {
-  color: var(--text-muted);
-  font-size: var(--text-xs);
+.filter-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-3) var(--space-4);
+}
+.filter-field--keyword {
+  grid-column: span 2;
 }
 .filter-conditions {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: var(--space-sm);
-  margin-top: var(--space-sm);
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border);
 }
 .filter-condition {
   max-width: 100%;
-  min-height: var(--button-height-sm);
-  background: var(--control-bg);
-  border-color: var(--control-border);
-  border-radius: var(--control-radius);
-  color: var(--text-secondary);
 }
-.filter-condition :deep(> span) {
-  display: flex;
-  align-items: center;
+.filter-condition :deep(.app-button__content) {
   min-width: 0;
-  gap: var(--space-sm);
 }
 .filter-condition-label {
   overflow: hidden;
@@ -312,13 +256,8 @@ onMounted(() => {
   color: var(--text-muted);
   font-size: var(--text-md);
 }
-.filter-note {
-  margin: var(--space-sm) 0 0;
-  line-height: 1.5;
-}
-@media (max-width: 900px) {
-  .filter-grid--scope,
-  .filter-grid--storage {
+@media (max-width: 1100px) {
+  .filter-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .filter-field--keyword {
@@ -326,15 +265,15 @@ onMounted(() => {
   }
 }
 @media (max-width: 540px) {
-  .storage-filter-panel {
-    padding: var(--space-base);
-  }
   .filter-heading {
     align-items: flex-start;
+  }
+  .filter-heading-copy {
     flex-direction: column;
+    gap: var(--space-1);
   }
   .filter-grid {
-    gap: var(--space-sm);
+    gap: var(--space-3);
   }
 }
 </style>

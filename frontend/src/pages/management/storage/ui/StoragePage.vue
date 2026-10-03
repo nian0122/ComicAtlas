@@ -1,11 +1,6 @@
 <template>
   <div class="storage-page">
-    <PageHeader
-      spaced
-      title="存储统计"
-      description="查看 HQ、LQ 与缩略图的占用分布，并定位需要处理的漫画。"
-      eyebrow="COMIC / STORAGE"
-    >
+    <PageHeader title="存储统计" description="全库容量概览；筛选仅影响下方漫画存储记录。">
       <div class="page-actions">
         <span class="comic-count">{{ store.summary?.comicCount ?? '—' }} 本库内漫画</span>
         <AppButton :loading="isRequestingRefresh" :disabled="isScanning" @click="refreshStatistics">{{
@@ -225,7 +220,10 @@ onMounted(async () => {
 
 <style scoped>
 .storage-page {
-  max-width: 1440px;
+  display: grid;
+  gap: var(--space-4);
+  width: 100%;
+  min-width: 0;
 }
 .page-actions {
   display: flex;
@@ -234,7 +232,7 @@ onMounted(async () => {
 }
 .comic-count {
   color: var(--text-secondary);
-  font: 700 11px var(--mono);
+  font-size: var(--text-sm);
   white-space: nowrap;
 }
 

@@ -31,6 +31,7 @@ async function mockStorage(page: Page) {
           comicId: 1,
           title: '目标漫画',
           coverUrl: '',
+          mediaType: 'IMAGE',
           totalSize: 1024,
           hqSize: 1024,
           lqSize: 0,
@@ -124,4 +125,56 @@ test('存储筛选控件在桌面与窄屏统一尺寸且不溢出', async ({ pa
     .evaluateAll((elements) => elements.map((element) => element.getBoundingClientRect().right))
   expect(controls.every((right) => right <= 390)).toBe(true)
   await panel.screenshot({ path: testInfo.outputPath('storage-filter-narrow.png') })
+})
+
+test('存储统计宽屏充分利用内容区，概览与筛选紧凑且列表可见', async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 2560, height: 1392 })
+  await mockStorage(page)
+  await page.route('**/api/manage/storage/stats', (route) =>
+    json(route, {
+      hqBytes: 1229779136384,
+      lqBytes: 18455646546,
+      thumbBytes: 168880338,
+      totalBytes: 1248403663268,
+      comicCount: 920,
+      snapshotAvailable: true,
+      thumbFileCount: 940,
+      thumbUpdatedAt: '2026-10-03T08:30:00',
+      refreshStatus: 'READY',
+    }),
+  )
+  await page.goto('/manage/storage')
+  await expect(page.getByRole('region', { name: '全库容量统计' })).toContainText('1.1 TB')
+  const layout = await page.locator('.storage-page').evaluate((element) => {
+    const bounds = element.getBoundingClientRect()
+    const parent = element.parentElement!
+    const parentStyle = getComputedStyle(parent)
+    const availableWidth =
+      parent.clientWidth - parseFloat(parentStyle.paddingLeft) - parseFloat(parentStyle.paddingRight)
+    const cards = [...element.querySelectorAll('.stat-card')].map((card) => card.getBoundingClientRect())
+    const filter = element.querySelector('.storage-filter-panel')!.getBoundingClientRect()
+    const table = element.querySelector('.el-table')!.getBoundingClientRect()
+    return {
+      width: bounds.width,
+      availableWidth,
+      cardTops: cards.map((card) => card.top),
+      cardHeights: cards.map((card) => card.height),
+      filterHeight: filter.height,
+      tableTop: table.top,
+    }
+  })
+  expect(layout.width).toBeGreaterThan(layout.availableWidth * 0.98)
+  expect(new Set(layout.cardTops).size).toBe(1)
+  expect(new Set(layout.cardHeights).size).toBe(1)
+  expect(layout.cardHeights[0]).toBeLessThan(150)
+  expect(layout.filterHeight).toBeLessThan(250)
+  expect(layout.tableTop).toBeLessThan(650)
+  await expect(page.locator('.storage-bar')).toHaveCount(0)
+  await page.screenshot({ path: testInfo.outputPath('storage-page-wide.png'), fullPage: true })
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.screenshot({ path: testInfo.outputPath('storage-page-desktop.png'), fullPage: true })
+  await page.setViewportSize({ width: 390, height: 844 })
+  const overflow = await page.locator('.storage-page').evaluate((element) => element.scrollWidth > element.clientWidth)
+  expect(overflow).toBe(false)
+  await page.screenshot({ path: testInfo.outputPath('storage-page-mobile.png'), fullPage: true })
 })
