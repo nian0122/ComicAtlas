@@ -1,11 +1,6 @@
 <template>
   <section class="favorites-page">
-    <header class="page-heading">
-      <div>
-        <h1>喜欢</h1>
-        <p>留住想再看的漫画与片段</p>
-      </div>
-    </header>
+    <PageHeader title="喜欢" description="留住想再看的漫画与片段" />
     <div class="filters">
       <div class="tabs" role="group" aria-label="喜欢的内容类型">
         <AppButton
@@ -53,6 +48,7 @@
   </section>
 </template>
 <script setup lang="ts">
+import { PageHeader } from '@/shared/ui/page-header'
 import { computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import type { FavoriteTarget } from '@/features/favorites'

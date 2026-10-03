@@ -48,3 +48,21 @@ test('移动阅读筛选的独立外观不被统一成管理控件', () => {
     [],
   )
 })
+
+test('界面字体和管理壳层不得绕过公共设计组件', () => {
+  assert.match(
+    validateStyleContracts([
+      { path: 'src/pages/example/ui/page.css', source: 'h2 { font-family: Georgia, serif; }' },
+    ])[0],
+    /公共字体 token/,
+  )
+  assert.match(
+    validateStyleContracts([
+      {
+        path: 'src/widgets/management-layout/ManagementLayout.vue',
+        source: '.management-content :deep(.settings-card) { border-radius: 6px; }',
+      },
+    ])[0],
+    /只负责布局/,
+  )
+})

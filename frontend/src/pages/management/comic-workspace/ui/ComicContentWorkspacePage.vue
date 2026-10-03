@@ -1,12 +1,6 @@
 <template>
   <div class="content-workspace">
-    <header class="content-header">
-      <div>
-        <span class="eyebrow">COMIC / CONTENT + STORAGE</span>
-        <h2>目录与存储</h2>
-        <p>在同一工作区管理目录、媒体文件和 HQ / LQ 存储状态。</p>
-      </div>
-    </header>
+    <PanelHeader title="目录与存储" description="在同一工作区管理目录、媒体文件和 HQ / LQ 存储状态。" />
     <section class="content-stage">
       <ComicStructurePage />
     </section>
@@ -14,6 +8,7 @@
 </template>
 
 <script setup lang="ts">
+import { PanelHeader } from '@/shared/ui/management-panel'
 import ComicStructurePage from './ComicStructurePage.vue'
 </script>
 
@@ -23,30 +18,6 @@ import ComicStructurePage from './ComicStructurePage.vue'
   gap: var(--space-5);
   width: 100%;
   min-width: 0;
-}
-.content-header {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: var(--space-5);
-  padding-bottom: var(--space-5);
-  border-bottom: 1px solid var(--border);
-}
-.eyebrow {
-  color: var(--accent);
-  font: 800 10px var(--mono);
-  letter-spacing: 0.16em;
-}
-.content-header h2 {
-  margin: var(--space-2) 0;
-  color: var(--text-primary);
-  font-family: Georgia, 'Times New Roman', serif;
-  font-size: clamp(1.8rem, 3vw, 2.5rem);
-  letter-spacing: -0.04em;
-}
-.content-header p {
-  color: var(--text-muted);
-  font-size: var(--text-sm);
 }
 .content-stage {
   min-width: 0;

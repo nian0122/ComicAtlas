@@ -272,18 +272,18 @@ onMounted(loadItems)
   gap: 4px;
   padding: 4px;
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--bg-secondary);
 }
 .scope-switch button {
   padding: 7px 16px;
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: transparent;
   color: var(--text-muted);
   cursor: pointer;
   font: inherit;
-  font-size: 13px;
+  font-size: var(--text-sm);
 }
 .scope-switch button.active {
   background: var(--surface);
@@ -312,7 +312,7 @@ onMounted(loadItems)
 }
 .filter-label {
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: var(--text-xs);
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -322,7 +322,7 @@ onMounted(loadItems)
   align-items: center;
   gap: 8px;
   color: var(--text-secondary);
-  font-size: 13px;
+  font-size: var(--text-sm);
   cursor: pointer;
 }
 .trash-toggle input,
@@ -342,7 +342,7 @@ onMounted(loadItems)
 .selected-count {
   margin-left: 10px;
   color: var(--accent);
-  font-size: 13px;
+  font-size: var(--text-sm);
 }
 .reaction-table-wrap {
   overflow-x: auto;
@@ -357,11 +357,11 @@ onMounted(loadItems)
   padding: 14px 10px;
   border-bottom: 1px solid var(--color-border-faint);
   text-align: left;
-  font-size: 13px;
+  font-size: var(--text-sm);
 }
 .reaction-table th {
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: var(--text-xs);
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -390,10 +390,10 @@ onMounted(loadItems)
 .error-banner {
   margin: 14px 0;
   padding: 10px 12px;
-  border-radius: 10px;
+  border-radius: var(--card-radius);
   background: color-mix(in srgb, var(--danger) 12%, var(--bg-surface));
   color: var(--danger);
-  font-size: 13px;
+  font-size: var(--text-sm);
 }
 @media (max-width: 760px) {
   .filter-panel,

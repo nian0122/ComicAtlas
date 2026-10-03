@@ -258,7 +258,7 @@ function hideToolbar() {
   min-width: 44px;
   text-align: center;
   font-size: 13px;
-  color: rgb(255 255 255 / 88%);
+  color: var(--text-primary);
   font-variant-numeric: tabular-nums;
 }
 
@@ -271,16 +271,16 @@ function hideToolbar() {
   display: grid;
   gap: var(--space-4);
   padding: var(--space-4);
-  color: rgb(255 255 255 / 94%);
+  color: var(--text-primary);
 }
 
 .settings-panel-title {
   padding-bottom: var(--space-3);
-  border-bottom: 1px solid rgb(255 255 255 / 12%);
+  border-bottom: 1px solid var(--border);
   font-size: 14px;
   font-weight: 700;
   letter-spacing: 0.02em;
-  color: rgb(255 255 255 / 94%);
+  color: var(--text-primary);
 }
 
 .settings-field {
@@ -288,7 +288,7 @@ function hideToolbar() {
   grid-template-columns: 72px minmax(0, 1fr);
   align-items: center;
   gap: var(--space-3);
-  color: rgb(255 255 255 / 62%);
+  color: var(--text-muted);
   font-size: 12px;
 }
 
@@ -305,24 +305,24 @@ function hideToolbar() {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--space-2);
   padding-top: var(--space-3);
-  border-top: 1px solid rgb(255 255 255 / 12%);
+  border-top: 1px solid var(--border);
 }
 
 .panel-action {
   flex: 1;
   min-height: 34px;
   padding: 0 var(--space-2);
-  border: 1px solid rgb(255 255 255 / 14%);
-  border-radius: 6px;
-  background: rgb(255 255 255 / 5%);
-  color: rgb(255 255 255 / 78%);
+  border: 1px solid var(--color-overlay-soft);
+  border-radius: var(--radius-sm);
+  background: var(--color-overlay-faint);
+  color: var(--text-secondary);
   font: inherit;
   font-size: 12px;
   cursor: pointer;
 }
 
 .panel-action:hover {
-  border-color: rgb(255 255 255 / 32%);
+  border-color: var(--border-strong);
   background: rgb(255 255 255 / 10%);
   color: var(--text-primary);
 }
@@ -330,17 +330,17 @@ function hideToolbar() {
 /* Popover 会 Teleport 到 body，必须用全局选择器修正默认白色外壳。 */
 :global(.reader-settings-popover.el-popper),
 :global(.reader-jump-popover.el-popper) {
-  --el-text-color-primary: rgb(255 255 255 / 94%);
+  --el-text-color-primary: var(--text-primary);
   --el-text-color-regular: rgb(255 255 255 / 86%);
   --el-text-color-placeholder: rgb(255 255 255 / 48%);
   --el-fill-color-blank: rgb(18 18 18 / 96%);
   --el-bg-color-overlay: rgb(18 18 18 / 96%);
   padding: 0;
   overflow: visible;
-  color: rgb(255 255 255 / 94%);
+  color: var(--text-primary);
   background: rgb(18 18 18 / 96%);
   border: 1px solid rgb(255 255 255 / 16%);
-  border-radius: 10px;
+  border-radius: var(--card-radius);
   box-shadow: 0 16px 40px rgb(0 0 0 / 42%);
   backdrop-filter: blur(18px);
 }
@@ -372,7 +372,7 @@ function hideToolbar() {
   width: 34px;
   color: rgb(255 255 255 / 72%);
   background: transparent;
-  border-color: rgb(255 255 255 / 14%);
+  border-color: var(--color-overlay-soft);
 }
 
 :global(.reader-jump-popover .jump-confirm) {

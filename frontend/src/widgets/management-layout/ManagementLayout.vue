@@ -356,7 +356,7 @@ onMounted(() => {
   gap: var(--space-2);
   min-height: 44px;
   padding-inline: var(--space-5);
-  border-radius: var(--radius-xs);
+  border-radius: var(--control-radius);
   background: var(--color-brand);
   color: var(--color-on-brand);
   font-size: var(--text-sm);
@@ -406,7 +406,7 @@ onMounted(() => {
   min-height: 48px;
   margin-bottom: var(--space-6);
   border: 1px solid var(--border-strong);
-  border-radius: var(--radius-xs);
+  border-radius: var(--control-radius);
   color: var(--text-primary);
   font-size: var(--text-sm);
   font-weight: 700;
@@ -473,43 +473,6 @@ onMounted(() => {
   min-width: 0;
   max-width: 100%;
   box-sizing: border-box;
-}
-
-/*
- * 管理壳需要跨 router-view 统一页面标题、卡片和主操作的视觉契约；
- * 这些节点由不同管理页渲染，无法通过本组件的 scoped 普通选择器命中，
- * 因此仅对已约定的根类保留 :deep，Element Plus 按钮则改由上方变量控制。
- */
-.management-content :deep(.management-page-header) {
-  padding-bottom: var(--space-8);
-  margin-bottom: var(--space-8);
-  border-bottom: 1px solid var(--border);
-}
-
-.management-content :deep(.management-page-header .panel-header__title) {
-  color: var(--text-primary);
-  font-size: clamp(2rem, 3.3vw, 3rem);
-  letter-spacing: -0.04em;
-}
-
-.management-content :deep(.management-page-header .panel-header__description),
-.management-content :deep(.section-desc) {
-  color: var(--text-muted);
-  font-size: var(--text-lg);
-}
-
-/* 各管理页通过这些业务根类声明卡片边界，壳层负责保持跨页面一致。 */
-.management-content :deep(.settings-card),
-.management-content :deep(.import-form-card),
-.management-content :deep(.batch-panel),
-.management-content :deep(.recent-section),
-.management-content :deep(.comic-table-section),
-.management-content :deep(.task-card),
-.management-content :deep(.storage-summary),
-.management-content :deep(.metadata-card) {
-  border-color: var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--bg-surface);
 }
 
 @media (max-width: 900px) {

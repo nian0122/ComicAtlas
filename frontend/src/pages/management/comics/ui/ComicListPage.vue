@@ -471,7 +471,7 @@ function formatBytes(bytes: number | undefined): string {
   border-radius: var(--radius-pill);
   background: rgb(10 10 10 / 72%);
   color: #f3f3f3;
-  font-size: 10px;
+  font-size: var(--text-micro);
   line-height: 1.2;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -514,7 +514,7 @@ function formatBytes(bytes: number | undefined): string {
   min-height: 2.7em;
   overflow: hidden;
   color: var(--text-primary);
-  font-size: 14px;
+  font-size: var(--text-sm);
   font-weight: 600;
   line-height: 1.35;
   overflow-wrap: anywhere;
@@ -528,7 +528,7 @@ function formatBytes(bytes: number | undefined): string {
   gap: var(--space-sm);
   min-width: 0;
   overflow: hidden;
-  font-size: 12px;
+  font-size: var(--text-xs);
   color: var(--text-secondary);
 }
 

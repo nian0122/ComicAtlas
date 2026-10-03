@@ -378,8 +378,8 @@ onMounted(async () => {
 .upload-guide h2 {
   margin: 0;
   color: var(--text-primary);
-  font-family: Georgia, 'Times New Roman', serif;
-  font-size: 26px;
+  font-family: var(--heading);
+  font-size: var(--text-lg);
   letter-spacing: -0.035em;
 }
 .section-heading p {

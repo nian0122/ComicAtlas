@@ -248,6 +248,37 @@ test('详情页进入普通阅读器，再从工具栏切换混排短视频模�
   await expect(page.getByRole('button', { name: '第 3 / 3 页' })).toBeVisible()
 })
 
+test('移动阅读工具栏分组清晰且页码导航不越界', async ({ page }, testInfo) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await page.goto('/reader/1')
+  await showReaderToolbar(page)
+  for (const width of [320, 502]) {
+    await page.setViewportSize({ width, height: 1078 })
+    const toolbar = page.locator('.reader-toolbar-mobile')
+    const navigation = page.getByRole('navigation', { name: '章节导航' })
+    await expect(toolbar).toBeVisible()
+    for (const container of [toolbar, navigation]) {
+      const bounds = await container.boundingBox()
+      expect(bounds!.x).toBeGreaterThan(0)
+      expect(bounds!.x + bounds!.width).toBeLessThan(width)
+      for (const button of await container.getByRole('button').all()) {
+        const buttonBounds = await button.boundingBox()
+        expect(buttonBounds!.x).toBeGreaterThanOrEqual(bounds!.x)
+        expect(buttonBounds!.x + buttonBounds!.width).toBeLessThanOrEqual(bounds!.x + bounds!.width)
+        expect(buttonBounds!.y + buttonBounds!.height).toBeLessThanOrEqual(bounds!.y + bounds!.height)
+      }
+    }
+    await page.screenshot({ path: testInfo.outputPath(`reader-toolbar-${width}.png`) })
+  }
+  await page.locator('#mobile-reader-page-progress').click()
+  await expect(page.getByRole('dialog', { name: '跳转页码' })).toBeVisible()
+  await page.getByLabel('目标页码', { exact: true }).fill('2')
+  await page.getByRole('button', { name: '跳转到第 2 页' }).click()
+  await expect(page.locator('#mobile-reader-page-progress')).toHaveText('第 2 / 3 页')
+  await page.getByRole('button', { name: '阅读设置', exact: true }).click()
+  await expect(page.locator('.reader-settings-drawer')).toBeVisible()
+})
+
 test('漫画阅读入口进入连续阅读器', async ({ page }) => {
   await page.goto('/comic/7')
   await page.getByRole('button', { name: /开始阅读|继续阅读/ }).click()

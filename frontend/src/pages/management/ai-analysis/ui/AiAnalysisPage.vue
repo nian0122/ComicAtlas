@@ -168,9 +168,9 @@ async function cancelTask(): Promise<void> {
 
 <style scoped>
 .ai-analysis-page {
-  max-width: 1180px;
-  margin: 0 auto;
-  padding-bottom: 64px;
+  width: 100%;
+  margin: 0;
+  padding-bottom: var(--space-8);
 }
 .analysis-grid {
   display: grid;
@@ -192,7 +192,7 @@ async function cancelTask(): Promise<void> {
 }
 .task-identity span {
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: var(--text-xs);
 }
 .task-identity strong {
   overflow: hidden;
@@ -205,13 +205,13 @@ async function cancelTask(): Promise<void> {
   justify-content: space-between;
   margin: 12px 0 22px;
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: var(--text-xs);
 }
 .task-error {
   padding: 12px;
   color: var(--danger);
   background: var(--danger-bg);
-  font-size: 13px;
+  font-size: var(--text-sm);
 }
 .comic-select {
   width: 100%;
@@ -224,7 +224,7 @@ async function cancelTask(): Promise<void> {
 }
 .comic-option span {
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: var(--text-xs);
 }
 .result-panel {
   margin-top: 20px;

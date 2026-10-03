@@ -11,6 +11,15 @@ export function validateStyleContracts(files) {
     for (const match of source.matchAll(/['"]?(--[\w-]+)['"]?\s*:/g)) definitions.add(match[1])
     for (const match of source.matchAll(/setProperty\(\s*['"](--[\w-]+)['"]/g)) definitions.add(match[1])
     for (const match of source.matchAll(/var\(\s*(--[\w-]+)/g)) references.push({ path, name: match[1] })
+    if (/font-family\s*:[^;}]*(?:Georgia|Times New Roman)/i.test(source)) {
+      violations.push(`${path}: 界面标题必须使用公共字体 token，不得另设衬线字体`)
+    }
+    if (
+      path === 'src/widgets/management-layout/ManagementLayout.vue' &&
+      /\.management-content\s+:deep\(/.test(source)
+    ) {
+      violations.push(`${path}: 管理壳层只负责布局，不得跨页面覆盖组件外观`)
+    }
     if (!path.startsWith('src/pages/') || path === 'src/pages/reading/library/ui/library.css') continue
     for (const match of source.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
       if (!/\.el-(?:input__wrapper|select__wrapper|textarea__inner)\b/.test(match[1])) continue

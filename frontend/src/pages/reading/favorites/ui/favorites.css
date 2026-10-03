@@ -1,17 +1,7 @@
 .favorites-page {
-  max-width: 1440px;
+  max-width: var(--content-max);
   margin: 0 auto;
   padding-top: var(--space-8);
-}
-.page-heading h1 {
-  margin: 0;
-  color: var(--text-primary);
-  font-size: var(--text-page);
-}
-.page-heading p {
-  margin: var(--space-2) 0 0;
-  color: var(--text-muted);
-  font-size: var(--text-sm);
 }
 .filters {
   display: flex;
@@ -86,7 +76,7 @@
   background: var(--bg-surface);
   color: var(--text-primary);
   white-space: nowrap;
-  box-shadow: var(--brand-shadow);
+  box-shadow: var(--shadow);
 }
 @media (max-width: 680px) {
   .favorites-page {

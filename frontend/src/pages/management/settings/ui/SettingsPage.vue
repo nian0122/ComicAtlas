@@ -98,7 +98,10 @@ onMounted(loadSettings)
 <style scoped>
 .settings-page {
   width: 100%;
-  max-width: 1120px;
+}
+
+.settings-card {
+  max-width: var(--form-content-max);
 }
 
 .settings-card + .settings-card {
@@ -124,13 +127,13 @@ onMounted(loadSettings)
 }
 
 .setting-label {
-  font-size: 14px;
+  font-size: var(--text-sm);
   color: var(--text-secondary);
   font-weight: 600;
 }
 
 .setting-hint {
-  font-size: 12px;
+  font-size: var(--text-xs);
   color: var(--text-muted);
 }
 

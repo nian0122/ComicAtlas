@@ -92,7 +92,7 @@ watch(
 @media (max-width: 640px) {
   .workspace-tabs > :deep(.el-tabs__header > .el-tabs__nav-wrap .el-tabs__item) {
     padding: 0 var(--space-2);
-    font-size: 12px;
+    font-size: var(--text-xs);
   }
 }
 </style>

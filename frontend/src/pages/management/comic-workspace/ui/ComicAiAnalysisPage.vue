@@ -120,13 +120,13 @@ onMounted(async () => {
 .empty-copy {
   padding: 28px 0;
   color: var(--text-muted);
-  font-size: 13px;
+  font-size: var(--text-sm);
 }
 .task-meta {
   display: flex;
   justify-content: space-between;
   color: var(--text-muted);
-  font-size: 13px;
+  font-size: var(--text-sm);
 }
 .task-meta strong {
   color: var(--text-primary);
@@ -140,7 +140,7 @@ onMounted(async () => {
   padding: 12px;
   color: var(--danger);
   background: var(--danger-bg);
-  font-size: 13px;
+  font-size: var(--text-sm);
 }
 @media (max-width: 800px) {
   .ai-grid {
