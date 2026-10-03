@@ -248,6 +248,44 @@ test('详情页进入普通阅读器，再从工具栏切换混排短视频模�
   await expect(page.getByRole('button', { name: '第 3 / 3 页' })).toBeVisible()
 })
 
+test.describe('桌面阅读工具栏覆盖层', () => {
+  test.use({ viewport: { width: 1440, height: 1000 }, hasTouch: false, isMobile: false })
+
+  for (const readingDirection of ['vertical', 'horizontal']) {
+    test(`${readingDirection} 阅读隐藏工具栏不留黑条且不改变图片与进度`, async ({ page }, testInfo) => {
+      await page.addInitScript((direction) => {
+        localStorage.setItem(
+          'comicatlas.reader.settings',
+          JSON.stringify({ readingDirection: direction, fitMode: 'HEIGHT', showToolbar: true }),
+        )
+      }, readingDirection)
+      await page.goto('/reader/1')
+      const viewport = page.locator(readingDirection === 'vertical' ? '.reader-viewport' : '.paged-viewport')
+      const image = viewport.locator('img').first()
+      await expect(image).toBeVisible()
+      const viewportBefore = (await viewport.boundingBox())!
+      expect(viewportBefore.y).toBe(0)
+      expect(viewportBefore.height).toBe(1000)
+      const imageBefore = await image.boundingBox()
+      const scrollContainer = readingDirection === 'vertical' ? viewport.locator('.scroller') : viewport
+      const scrollBefore = await scrollContainer.evaluate((element) => element.scrollTop)
+      const pageBefore = await page.locator('.page-indicator').textContent()
+      await page.getByRole('button', { name: '阅读设置', exact: true }).click()
+      await page.getByRole('button', { name: '隐藏工具栏', exact: true }).click()
+      const toolbar = page.locator('.reader-toolbar')
+      await expect(toolbar).toHaveCSS('opacity', '0')
+      await expect(toolbar).toHaveAttribute('inert', '')
+      expect(await viewport.boundingBox()).toEqual(viewportBefore)
+      expect(await image.boundingBox()).toEqual(imageBefore)
+      expect(await scrollContainer.evaluate((element) => element.scrollTop)).toBe(scrollBefore)
+      expect(await page.locator('.page-indicator').textContent()).toBe(pageBefore)
+      const toolbarAfter = (await toolbar.boundingBox())!
+      expect(toolbarAfter.y + toolbarAfter.height).toBeLessThanOrEqual(0)
+      await page.screenshot({ path: testInfo.outputPath(`desktop-toolbar-hidden-${readingDirection}.png`) })
+    })
+  }
+})
+
 test('移动阅读工具栏分组清晰且页码导航不越界', async ({ page }, testInfo) => {
   await page.emulateMedia({ reducedMotion: 'reduce' })
   await page.goto('/reader/1')

@@ -4,7 +4,7 @@
       <span>阅读进度暂未保存：{{ store.progressSaveError }}</span>
       <AppButton variant="ghost" @click="retryProgressSave">重试保存</AppButton>
     </div>
-    <!-- 桌面工具栏：迁移前行为 100% 保留（常驻渲染，隐藏由 settings.showToolbar 的 CSS 类控制，不进移动端状态机） -->
+    <!-- 桌面工具栏始终作为覆盖层，显隐不参与阅读视口布局。 -->
     <ReaderToolbar
       v-if="mode === 'desktop'"
       :mode="mode"
@@ -500,13 +500,6 @@ watch(
   display: flex;
   flex-direction: column;
   background: var(--bg);
-}
-
-.reader-page.is-fullscreen :deep(.reader-toolbar) {
-  position: fixed;
-  top: 0;
-  right: 0;
-  left: 0;
 }
 
 .progress-save-error {

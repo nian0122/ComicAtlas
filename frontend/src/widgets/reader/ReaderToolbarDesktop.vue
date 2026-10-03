@@ -1,5 +1,10 @@
 <template>
-  <header class="reader-toolbar" :class="{ 'toolbar-hidden': !(visibilityOverride ?? settings.showToolbar) }">
+  <header
+    class="reader-toolbar"
+    :class="{ 'toolbar-hidden': !toolbarVisible }"
+    :inert="!toolbarVisible"
+    :aria-hidden="!toolbarVisible"
+  >
     <div class="toolbar-left">
       <AppButton class="tool-btn" icon-only aria-label="返回上一页" @click="emit('back')">
         <el-icon :size="20"><ArrowLeft /></el-icon>
@@ -110,7 +115,7 @@
 
 <script setup lang="ts">
 import { AppButton, FullscreenButton } from '@/shared/ui/button'
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { ArrowLeft, Setting } from '@element-plus/icons-vue'
 import { ElSelect, ElOption, ElPopover, ElInputNumber } from 'element-plus'
 import { useReaderSettingsStore } from '@/features/reader-settings'
@@ -141,6 +146,7 @@ const emit = defineEmits<{
 }>()
 
 const settings = useReaderSettingsStore()
+const toolbarVisible = computed(() => props.visibilityOverride ?? settings.showToolbar)
 
 const jumpVisible = ref(false)
 const jumpPage = ref(1)
@@ -163,6 +169,11 @@ function hideToolbar() {
 
 <style scoped>
 .reader-toolbar {
+  /* 覆盖阅读区域，显隐时不改变视口高度、图片尺寸与滚动位置。 */
+  position: fixed;
+  top: 0;
+  right: 0;
+  left: 0;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
@@ -171,7 +182,6 @@ function hideToolbar() {
   padding: 0 clamp(16px, 2vw, 32px);
   background: var(--bg-primary);
   border-bottom: 1px solid var(--border);
-  flex-shrink: 0;
   z-index: 10;
   transition:
     transform 200ms ease,
