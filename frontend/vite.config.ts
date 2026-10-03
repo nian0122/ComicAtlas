@@ -8,7 +8,8 @@ export default defineConfig({
   plugins: [
     vue(),
     Components({
-      resolvers: [ElementPlusResolver()],
+      // 全量基础样式已由 app/styles/index.scss 装配，避免懒加载组件再次覆盖公共主题。
+      resolvers: [ElementPlusResolver({ importStyle: false })],
     }),
   ],
   resolve: {

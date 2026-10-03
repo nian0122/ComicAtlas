@@ -52,6 +52,8 @@ shared 的组件经 `shared/ui` 或具体组件目录的 index 引用。单文�
 
 全局样式只从 `app/styles/index.scss` 装配。页面 CSS 放在所属切片 ui 下，通过 `<style scoped src="…">` 引入，不允许在 pages 分组下散落共用样式。组件私有样式就近维护，设计值使用全局令牌。
 
+Element Plus 基础样式已在全局入口加载，组件自动导入配置使用 `ElementPlusResolver({ importStyle: false })`，避免懒加载页面再次注入默认样式、覆盖深色主题。漫画工作区使用公共 `PageHeader`、`PanelHeader`、`ManagementPanel`、`AppButton` 和标签组件，不另设标题字体或控件尺寸。
+
 ## 自动门禁
 
 - `pnpm check:fsd`：检查六层目录、切片入口、上下层及同层依赖、根 public API、具名实体 @x 和无法解析的本地导入。

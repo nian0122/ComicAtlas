@@ -58,6 +58,53 @@ const comicDetail = {
   updatedAt: '2026-08-11T00:00:00',
 }
 
+test('懒加载信息编辑页保持公共深色主题和统一控件尺寸', async ({ page }, testInfo) => {
+  await mockWorkspace(page, {
+    ...comicDetail,
+    sourceType: 'REGISTER',
+    sourceRef: '导入目录',
+    comicInfo: { series: '测试漫画', tags: ['合集'] },
+  })
+  for (const [path, data] of [
+    [`comics/${COMIC_ID}/metadata`, { title: '测试漫画', author: '作者', description: '', categoryId: null }],
+    [`comics/${COMIC_ID}/tags`, [1]],
+    ['tags', [{ id: 1, name: '合集' }]],
+    ['categories', []],
+  ] as const) {
+    await page.route(`**/api/manage/${path}`, (route) =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: resultBody(data) }),
+    )
+  }
+  await page.goto(`/manage/comics/${COMIC_ID}?tab=operations`)
+  await page.getByRole('tab', { name: '信息编辑' }).click()
+  await expect(page.getByPlaceholder('输入漫画标题')).toHaveValue('测试漫画')
+  const textarea = page.getByPlaceholder('写下这部漫画的简介、备注或阅读提示（可选）')
+  const input = page.getByPlaceholder('输入漫画标题')
+  const inputColor = await input.evaluate((element) => getComputedStyle(element).color)
+  const background = await page
+    .locator('.title-field .el-input__wrapper')
+    .evaluate((element) => getComputedStyle(element).backgroundColor)
+  await expect(textarea).toHaveCSS('color', inputColor)
+  await expect(textarea).toHaveCSS('background-color', background)
+  await expect(textarea).toHaveCSS('border-radius', '8px')
+  for (const control of [
+    page.locator('.title-field .el-input__wrapper'),
+    page.locator('.tag-select .el-select__wrapper'),
+    page.locator('.new-tag-input .el-input__wrapper'),
+    page.getByRole('button', { name: '添加', exact: true }),
+    page.getByRole('button', { name: '保存修改' }),
+  ]) {
+    const bounds = await control.boundingBox()
+    expect(bounds?.height).toBe(42)
+  }
+  await textarea.fill('编辑描述')
+  await expect(textarea).toHaveCSS('background-color', background)
+  await page.screenshot({ path: testInfo.outputPath('comic-edit-desktop.png'), fullPage: true })
+  await page.setViewportSize({ width: 390, height: 844 })
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+  await page.screenshot({ path: testInfo.outputPath('comic-edit-mobile.png'), fullPage: true })
+})
+
 test('工作区默认展示漫画概览与操作页', async ({ page }) => {
   await mockWorkspace(page, comicDetail)
   await page.goto(`/manage/comics/${COMIC_ID}?tab=operations`)

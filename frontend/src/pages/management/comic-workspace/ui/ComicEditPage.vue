@@ -1,15 +1,6 @@
 <template>
   <div v-loading="loading" class="comic-edit-page fade-in">
-    <div class="edit-intro">
-      <div>
-        <p class="edit-eyebrow">IDENTITY / METADATA</p>
-        <h2>编辑漫画信息</h2>
-        <p>维护阅读端展示的标题、归属和检索标签。</p>
-      </div>
-      <div class="edit-ref">
-        <span>RECORD</span><strong>#{{ comicId }}</strong>
-      </div>
-    </div>
+    <PanelHeader title="编辑漫画信息" description="维护阅读端展示的标题、归属和检索标签。" />
 
     <el-form ref="formRef" :model="form" :rules="rules" label-position="top" class="edit-form">
       <div class="edit-main-column">
@@ -19,10 +10,9 @@
             level="h3"
             title="基本信息"
             description="这些字段会直接影响漫画在列表和详情页中的呈现。"
-            ><template #leading>01</template></PanelHeader
-          >
+          />
           <el-form-item label="标题" prop="title" class="title-field">
-            <el-input v-model="form.title" placeholder="输入漫画标题" maxlength="255" show-word-limit size="large" />
+            <el-input v-model="form.title" placeholder="输入漫画标题" maxlength="255" show-word-limit />
           </el-form-item>
           <div class="field-grid">
             <el-form-item label="作者" prop="author">
@@ -52,8 +42,7 @@
             level="h3"
             title="归档与检索"
             description="用分类和标签建立你的漫画索引。"
-            ><template #leading>02</template></PanelHeader
-          >
+          />
           <el-form-item label="标签" prop="tags">
             <div class="tag-editor">
               <div v-if="selectedTags.length" class="selected-tags">
@@ -81,7 +70,6 @@
                   ></template>
                   <el-option v-for="tag in availableTags" :key="tag.id" :label="tag.name" :value="tag.id" />
                 </el-select>
-                <span class="or-divider">或</span>
                 <el-input
                   v-model="newTagName"
                   placeholder="创建新标签"
@@ -105,10 +93,9 @@
             level="h3"
             title="来源记录"
             description="来源信息由导入流程生成，仅供追溯。"
-            ><template #leading>03</template></PanelHeader
-          >
+          />
           <div class="source-display">
-            <span v-if="sourceType" class="source-tag">{{ sourceTypeLabel(sourceType) }}</span>
+            <el-tag v-if="sourceType" type="info">{{ sourceTypeLabel(sourceType) }}</el-tag>
             <span v-if="sourceRef" class="source-ref">{{ sourceRef }}</span>
             <span v-if="!sourceType && !sourceRef" class="source-empty">暂无来源记录</span>
           </div>
@@ -120,8 +107,7 @@
             level="h3"
             title="ComicInfo.xml 元数据"
             description="从导入文件中解析的标准漫画元数据，只读展示。"
-            ><template #leading>04</template></PanelHeader
-          >
+          />
           <div class="comicinfo-grid">
             <div v-if="comicInfo.series" class="comicinfo-item">
               <span>Series</span><strong>{{ comicInfo.series }}</strong>
@@ -138,14 +124,14 @@
           </div>
           <p v-if="comicInfo.summary" class="comicinfo-summary">{{ comicInfo.summary }}</p>
           <div v-if="comicInfo.tags.length" class="comicinfo-tags">
-            <span v-for="tag in comicInfo.tags" :key="tag">{{ tag }}</span>
+            <el-tag v-for="tag in comicInfo.tags" :key="tag" type="info">{{ tag }}</el-tag>
           </div>
         </ManagementPanel>
       </aside>
 
       <div class="form-actions">
         <AppButton variant="secondary" @click="goBack">取消</AppButton>
-        <AppButton variant="primary" size="lg" :loading="saving" @click="handleSave">保存修改</AppButton>
+        <AppButton variant="primary" :loading="saving" @click="handleSave">保存修改</AppButton>
       </div>
     </el-form>
   </div>

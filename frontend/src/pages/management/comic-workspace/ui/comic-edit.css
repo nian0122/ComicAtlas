@@ -9,55 +9,6 @@
   margin: 0;
   color: var(--text-primary);
 }
-.edit-intro {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: var(--space-5);
-  padding: 0 0 var(--space-5);
-  border-bottom: 1px solid var(--border);
-}
-.edit-eyebrow {
-  color: var(--accent);
-  font:
-    800 11px ui-monospace,
-    SFMono-Regular,
-    Consolas,
-    monospace;
-  letter-spacing: 0.16em;
-}
-.edit-intro h2 {
-  margin: var(--space-2) 0;
-  font-family: Georgia, 'Times New Roman', serif;
-  font-size: clamp(1.7rem, 3vw, 2.35rem);
-  letter-spacing: -0.04em;
-}
-.edit-intro p:last-child {
-  margin: 0;
-  color: var(--text-muted);
-  font-size: var(--text-sm);
-}
-.edit-ref {
-  display: grid;
-  gap: 4px;
-  min-width: 88px;
-  padding: 9px 12px;
-  border: 1px solid var(--border);
-  text-align: right;
-}
-.edit-ref span {
-  color: var(--text-muted);
-  font-size: 10px;
-  letter-spacing: 0.15em;
-}
-.edit-ref strong {
-  color: var(--accent);
-  font:
-    700 15px ui-monospace,
-    SFMono-Regular,
-    Consolas,
-    monospace;
-}
 .edit-form {
   display: grid;
   grid-template-columns: minmax(0, 1.55fr) minmax(280px, 0.85fr);
@@ -101,11 +52,6 @@
   gap: var(--space-2);
   min-height: 26px;
 }
-.selected-tag {
-  border-color: var(--accent-border);
-  background: var(--accent-bg);
-  color: var(--text-primary);
-}
 .tag-add-row {
   display: grid;
   grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr) auto;
@@ -120,14 +66,6 @@
 }
 .new-tag-input {
   min-width: 0;
-}
-.tag-add-row > :deep(.app-button) {
-  height: 52px;
-  min-height: 52px;
-  padding-inline: var(--space-4);
-}
-.or-divider {
-  display: none;
 }
 .field-hint {
   display: flex;
@@ -172,29 +110,15 @@
   gap: var(--space-2);
   margin-top: var(--space-4);
 }
-.comicinfo-tags span {
-  padding: 4px 8px;
-  border: 1px solid var(--accent-border);
-  background: var(--accent-bg);
-  color: var(--text-primary);
-  font-size: var(--text-xs);
-}
 .source-display {
   display: flex;
   align-items: center;
   gap: var(--space-3);
   min-height: 46px;
   padding: 0 var(--space-4);
-  border: 1px dashed var(--border);
+  border: 1px solid var(--border);
+  border-radius: var(--control-radius);
   color: var(--text-muted);
-}
-.source-tag {
-  padding: 4px 8px;
-  background: var(--accent-bg);
-  color: var(--accent);
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.08em;
 }
 .source-ref {
   overflow: hidden;
@@ -236,12 +160,6 @@
   }
 }
 @media (max-width: 820px) {
-  .edit-intro {
-    align-items: flex-start;
-  }
-  .edit-ref {
-    min-width: auto;
-  }
   .field-grid {
     grid-template-columns: 1fr;
     gap: 0;
