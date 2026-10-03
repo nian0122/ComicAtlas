@@ -1321,7 +1321,7 @@ onBeforeUnmount(() => {
   bottom: calc(env(safe-area-inset-bottom) + 132px);
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
   transition:
     opacity 180ms ease,
     transform 180ms ease;
@@ -1335,12 +1335,10 @@ onBeforeUnmount(() => {
   padding: 0;
   border: 0;
   border-radius: 50%;
-  background: rgb(15 15 20 / 46%);
-  box-shadow:
-    inset 0 0 0 1px rgb(255 255 255 / 18%),
-    0 8px 22px rgb(0 0 0 / 18%);
-  color: rgb(255 255 255 / 92%);
-  backdrop-filter: blur(12px);
+  background: rgb(15 15 20 / 22%);
+  box-shadow: none;
+  color: rgb(255 255 255 / 72%);
+  backdrop-filter: blur(6px);
   transition:
     transform 180ms cubic-bezier(0.2, 0.8, 0.2, 1),
     background 180ms ease,
@@ -1349,33 +1347,21 @@ onBeforeUnmount(() => {
 }
 
 .video-reaction svg {
-  width: 23px;
-  height: 23px;
+  width: 21px;
+  height: 21px;
 }
 
 .video-reaction.is-active {
-  background: rgb(255 255 255 / 92%);
-  color: #f04468;
-  box-shadow:
-    0 8px 26px rgb(240 68 104 / 28%),
-    inset 0 0 0 1px rgb(255 255 255 / 80%);
-  transform: scale(1.1);
+  background: rgb(15 15 20 / 32%);
+  color: #ef8194;
 }
 
 .video-reaction.is-active.is-dislike {
-  background: rgb(225 236 255 / 94%);
-  box-shadow:
-    0 8px 26px rgb(116 155 211 / 26%),
-    inset 0 0 0 1px rgb(255 255 255 / 80%);
-  color: #41658f;
+  color: #bdcde0;
 }
 
 .video-reaction:active {
   transform: scale(0.94);
-}
-
-.video-reaction.is-active:active {
-  transform: scale(1.02);
 }
 
 .video-reaction .reaction-heart {
