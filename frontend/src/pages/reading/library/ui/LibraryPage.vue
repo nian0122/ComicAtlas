@@ -2,6 +2,7 @@
   <div class="comic-list-page">
     <header
       ref="pageHeaderRef"
+      tabindex="-1"
       class="library-filter-header"
       :class="{ 'desktop-filter-hidden': isDesktopFilterHidden }"
     >
@@ -290,6 +291,19 @@
         <span v-else>已加载全部 {{ store.list.length }} 本</span>
       </div>
     </section>
+    <Transition name="back-to-top">
+      <AppButton
+        v-if="isBackToTopVisible"
+        class="library-back-to-top"
+        variant="ghost"
+        icon-only
+        aria-label="返回顶部"
+        title="返回顶部"
+        @click="backToTop"
+      >
+        <el-icon :size="18"><Top /></el-icon>
+      </AppButton>
+    </Transition>
   </div>
 </template>
 
@@ -303,7 +317,7 @@ import { useComicStore } from '@/pages/reading/library/model/comic-store'
 import { categoryApi } from '@/entities/category'
 import { tagApi } from '@/entities/tag'
 import { READING_SORT_OPTIONS, useReadingComicFilters } from '../model/reading-comic-filters'
-import { Search, CircleClose, Sort } from '@element-plus/icons-vue'
+import { Search, CircleClose, Sort, Top } from '@element-plus/icons-vue'
 import ReadingDesktopFilterPanel from './ReadingDesktopFilterPanel.vue'
 
 import { useLibraryPageLayout } from '../model/useLibraryPageLayout'
@@ -350,7 +364,8 @@ function selectMobileSort(nextSort: NonNullable<ComicListQuery['sort']>) {
 const allTags = ref<TagDTO[]>([])
 const allCategories = ref<CategoryDTO[]>([])
 const pageHeaderRef = ref<HTMLElement | null>(null)
-const { posterSize, isDesktopFilterHidden, isMobileViewport } = useLibraryPageLayout(pageHeaderRef)
+const { posterSize, isDesktopFilterHidden, isMobileViewport, isBackToTopVisible, backToTop } =
+  useLibraryPageLayout(pageHeaderRef)
 const loadMoreSentinelRef = ref<HTMLElement | null>(null)
 let loadMoreObserver: IntersectionObserver | null = null
 async function loadTags() {

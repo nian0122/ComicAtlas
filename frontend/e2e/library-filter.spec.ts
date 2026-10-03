@@ -88,6 +88,44 @@ test('移动漫画库搜索框仅由外层绘制背景和焦点边界', async ({
   await page.screenshot({ path: testInfo.outputPath('mobile-library-search.png') })
 })
 
+for (const viewport of [
+  { width: 1440, height: 900 },
+  { width: 502, height: 1078 },
+]) {
+  test(`漫画库返回顶部在 ${viewport.width}px 下滚动后出现并保留列表状态`, async ({ page }, testInfo) => {
+    await page.setViewportSize(viewport)
+    await mockRoutes(page, { status: [], category: [] })
+    await page.goto('/library?keyword=测试')
+    await expect(page.locator('.comic-poster').first()).toBeVisible()
+    const backToTop = page.getByRole('button', { name: '返回顶部', exact: true })
+    await expect(backToTop).toHaveCount(0)
+    await page.evaluate(() => window.scrollTo({ top: 800, behavior: 'instant' }))
+    await expect(backToTop).toBeVisible()
+    const bounds = await backToTop.boundingBox()
+    expect(bounds!.width).toBeGreaterThanOrEqual(44)
+    if (viewport.width === 502) {
+      const navigation = await page.getByRole('navigation', { name: '移动端主要导航' }).boundingBox()
+      expect(bounds!.y + bounds!.height).toBeLessThan(navigation!.y)
+    }
+    await page.screenshot({ path: testInfo.outputPath('library-back-to-top.png') })
+    const currentUrl = page.url()
+    const posterCount = await page.locator('.comic-poster').count()
+    await backToTop.click()
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0)
+    await expect(backToTop).toHaveCount(0)
+    expect(page.url()).toBe(currentUrl)
+    await expect(page.locator('.comic-poster')).toHaveCount(posterCount)
+    await expect(page.locator('.library-filter-header')).toBeFocused()
+    // 减少动态效果时立即回顶，避免强制平滑动画。
+    await page.emulateMedia({ reducedMotion: 'reduce' })
+    await page.evaluate(() => window.scrollTo({ top: 800, behavior: 'instant' }))
+    await expect(backToTop).toBeVisible()
+    await backToTop.focus()
+    await page.keyboard.press('Enter')
+    expect(await page.evaluate(() => window.scrollY)).toBe(0)
+  })
+}
+
 test('漫画库请求恒带 status=READY', async ({ page }) => {
   const captured: CapturedParams = { status: [], category: [] }
   await mockRoutes(page, captured)
