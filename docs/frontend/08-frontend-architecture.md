@@ -40,6 +40,7 @@ shared 的组件经 `shared/ui` 或具体组件目录的 index 引用。单文�
 - reader-settings 与 reader-navigation 是独立能力。阅读器状态与快捷键的协调放在 widgets/reader/model；纯手势与交互模式保留在 reader-interaction。跨页面的阅读会话导航归 features/reading-navigation，由 app/router 安装，详情页、阅读器和沉浸阅读共用。
 - 批量编辑依赖 category/tag/comic 实体，不能通过另一个 feature 获取实体状态。
 - 导入、上传、恢复等业务动作在 features 中封装，页面负责路由与组合。
+- 阅读端喜欢页面属于 `pages/reading/favorites`，分页与撤销状态放在本切片 model；`features/favorites` 封装阅读查询和标记动作。漫画、章节、媒体三个层级独立，阅读会话将喜欢页记录为返回来源。
 
 ## 路由、API 与样式
 

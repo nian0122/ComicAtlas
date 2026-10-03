@@ -17,6 +17,7 @@ function createScenario() {
       { path: '/', name: 'home', component: emptyPage },
       { path: '/library', name: 'library', component: emptyPage },
       { path: '/history', name: 'history', component: emptyPage },
+      { path: '/favorites', name: 'favorites', component: emptyPage },
       { path: '/comic/:id', name: 'comic-detail', component: emptyPage },
       { path: '/reader/:chapterId', name: 'reader', component: emptyPage },
       { path: '/videos/:chapterId', name: 'chapter-videos', component: emptyPage },
@@ -27,14 +28,17 @@ function createScenario() {
 }
 
 describe('阅读会话导航', () => {
-  it.each(['/', '/library?keyword=测试&page=3', '/history'])('详情返回完整来源 %s', async (sourcePath) => {
-    const { router, navigation } = createScenario()
-    await router.push(sourcePath)
-    await router.push('/comic/7')
-    navigation.goToSource()
-    await vi.waitFor(() => expect(router.currentRoute.value.path).toBe(router.resolve(sourcePath).path))
-    expect(router.currentRoute.value.query).toEqual(router.resolve(sourcePath).query)
-  })
+  it.each(['/', '/library?keyword=测试&page=3', '/history', '/favorites?tab=MEDIA&order=oldest'])(
+    '详情返回完整来源 %s',
+    async (sourcePath) => {
+      const { router, navigation } = createScenario()
+      await router.push(sourcePath)
+      await router.push('/comic/7')
+      navigation.goToSource()
+      await vi.waitFor(() => expect(router.currentRoute.value.path).toBe(router.resolve(sourcePath).path))
+      expect(router.currentRoute.value.query).toEqual(router.resolve(sourcePath).query)
+    },
+  )
 
   it.each(['/comic/7', '/reader/1', '/videos/1'])('直达 %s 时缺少来源，安全回到漫画库', async (entryPath) => {
     const { router, navigation } = createScenario()

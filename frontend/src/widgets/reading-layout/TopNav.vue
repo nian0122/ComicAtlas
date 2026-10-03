@@ -52,6 +52,7 @@
         <router-link to="/" class="nav-link" exact-active-class="active">首页</router-link>
         <router-link to="/library" class="nav-link" active-class="active">漫画库</router-link>
         <router-link to="/history" class="nav-link" active-class="active">阅读历史</router-link>
+        <router-link to="/favorites" class="nav-link" active-class="active">喜欢</router-link>
         <span v-if="!isPublicReading" class="nav-divider" aria-hidden="true" />
         <router-link v-if="!isPublicReading" to="/manage" class="nav-link nav-link--management" active-class="active">
           仓库管理
@@ -83,6 +84,10 @@
       <MaterialSymbolIcon name="history" class="mobile-tab-icon" />
       <span>历史</span>
     </router-link>
+    <router-link to="/favorites" class="mobile-tab" active-class="active">
+      <MaterialSymbolIcon name="favorite" class="mobile-tab-icon" />
+      <span>喜欢</span>
+    </router-link>
   </nav>
 </template>
 
@@ -108,6 +113,7 @@ const mobileHeaderKind = computed(() => {
   if (route.name === 'comic-detail') return 'detail'
   if (route.name === 'library') return 'library'
   if (route.name === 'history') return 'history'
+  if (route.name === 'favorites') return 'favorites'
   return 'home'
 })
 
@@ -228,7 +234,7 @@ onBeforeUnmount(() => {
 .desktop-nav {
   display: flex;
   align-items: center;
-  gap: var(--space-10);
+  gap: var(--space-6);
 }
 
 .nav-link {
@@ -452,7 +458,7 @@ onBeforeUnmount(() => {
     left: 0;
     z-index: var(--z-nav);
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(4, 1fr);
     height: calc(var(--mobile-tabbar-height) + env(safe-area-inset-bottom));
     min-height: calc(var(--mobile-tabbar-height) + env(safe-area-inset-bottom));
     box-sizing: border-box;

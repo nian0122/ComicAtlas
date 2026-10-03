@@ -1,7 +1,7 @@
 import { useRouter, type LocationQueryRaw, type Router } from 'vue-router'
 
 const HISTORY_KEY = 'comicAtlasReadingNavigation'
-const SOURCE_NAMES = new Set(['home', 'library', 'history'])
+const SOURCE_NAMES = new Set(['home', 'library', 'history', 'favorites'])
 const SESSION_NAMES = new Set(['comic-detail', 'reader', 'chapter-videos'])
 
 interface ReadingNavigationContext {

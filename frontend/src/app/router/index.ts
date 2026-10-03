@@ -21,6 +21,11 @@ const router = createRouter({
           component: () => import('@/pages/reading/library/index').then(({ LibraryPage }) => LibraryPage),
         },
         {
+          path: 'favorites',
+          name: 'favorites',
+          component: () => import('@/pages/reading/favorites').then(({ FavoritesPage }) => FavoritesPage),
+        },
+        {
           path: 'history',
           name: 'history',
           component: () => import('@/pages/reading/history/index').then(({ HistoryPage }) => HistoryPage),

@@ -22,7 +22,7 @@
 </template>
 
 <script setup lang="ts">
-type MaterialIconName = 'history' | 'home' | 'library' | 'play' | 'refresh'
+type MaterialIconName = 'history' | 'home' | 'library' | 'play' | 'refresh' | 'favorite'
 
 interface Props {
   readonly name: MaterialIconName
@@ -31,6 +31,7 @@ interface Props {
 defineProps<Props>()
 
 const paths: Readonly<Record<Exclude<MaterialIconName, 'play' | 'refresh'>, string>> = {
+  favorite: 'M12 20.2 4.7 13a4.8 4.8 0 0 1 6.8-6.8L12 6.7l.5-.5A4.8 4.8 0 0 1 19.3 13L12 20.2Z',
   history:
     'M13 3a9 9 0 0 0-9 9H1l4 4 4-4H6a7 7 0 1 1 2.05 4.95l-1.42 1.42A9 9 0 1 0 13 3Zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12Z',
   home: 'M12 3 2 12h3v9h6v-6h2v6h6v-9h3L12 3Zm5 16h-2v-6H9v6H7v-7.81l5-4.5 5 4.5V19Z',
