@@ -62,6 +62,32 @@ async function mockRoutes(page: Page, captured: CapturedParams) {
   })
 }
 
+test('移动漫画库搜索框仅由外层绘制背景和焦点边界', async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 502, height: 1078 })
+  await mockRoutes(page, { status: [], category: [] })
+  await page.goto('/library')
+  const search = page.getByRole('textbox', { name: '搜索漫画' })
+  await expect(search).toBeVisible()
+  async function expectSingleSearchSurface() {
+    await expect(search).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)')
+    await expect(search).toHaveCSS('border-top-width', '0px')
+    await expect(search).toHaveCSS('box-shadow', 'none')
+    await expect(search).toHaveCSS('outline-style', 'none')
+    const bounds = await search.boundingBox()
+    const container = await page.locator('.search-input').boundingBox()
+    expect(bounds!.height).toBeLessThan(container!.height)
+  }
+  await expectSingleSearchSurface()
+  await search.hover()
+  await expectSingleSearchSurface()
+  await search.fill('测试')
+  await expectSingleSearchSurface()
+  await page.getByRole('button', { name: '清除搜索' }).click()
+  await expect(search).toHaveValue('')
+  await expectSingleSearchSurface()
+  await page.screenshot({ path: testInfo.outputPath('mobile-library-search.png') })
+})
+
 test('漫画库请求恒带 status=READY', async ({ page }) => {
   const captured: CapturedParams = { status: [], category: [] }
   await mockRoutes(page, captured)

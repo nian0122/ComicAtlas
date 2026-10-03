@@ -62,6 +62,7 @@
               <el-icon :size="18"><Search /></el-icon>
               <input
                 v-model="keyword"
+                class="unstyled-input"
                 data-library-search
                 type="text"
                 placeholder="搜索"
