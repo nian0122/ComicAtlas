@@ -49,9 +49,9 @@
 
     <section class="structure-browser">
       <ManagementPanel as="aside" class="tree-panel" padding="compact">
-        <PanelHeader title="目录树" eyebrow="NAVIGATOR"
-          ><span class="node-count">{{ structureRows.length }} 个根节点</span></PanelHeader
-        >
+        <PanelHeader title="目录树" eyebrow="NAVIGATOR">
+          <AppButton size="sm" :disabled="loading || Boolean(error)" @click="beginChapterCreate()">新建章节</AppButton>
+        </PanelHeader>
         <el-input v-model="structureKeyword" clearable placeholder="搜索目录或章节" class="tree-search" />
         <p class="tree-sort-hint">拖动目录或章节可调整同级顺序；阅读顺序按目录树同步更新。</p>
         <el-table
@@ -60,11 +60,12 @@
           :data="filteredStructureRows"
           row-key="key"
           :tree-props="{ children: 'children' }"
-          :expand-row-keys="isStructureSearching ? expandedSearchRowKeys : undefined"
+          :expand-row-keys="isStructureSearching ? expandedSearchRowKeys : expandedNodeKeys"
           :row-class-name="rowClassName"
           :empty-text="emptyStateText"
           highlight-current-row
           @row-click="selectStructureRow"
+          @expand-change="handleStructureExpansion"
         >
           <el-table-column prop="title" min-width="0"
             ><template #default="{ row }"
@@ -83,6 +84,15 @@
                 <span class="tree-kind" :class="row.kind === 'CATALOG' ? 'is-catalog' : 'is-chapter'">{{
                   row.kind === 'CATALOG' ? '目录' : '章节'
                 }}</span>
+                <AppButton
+                  v-if="row.kind === 'CATALOG'"
+                  variant="text"
+                  size="sm"
+                  :aria-label="`在目录「${row.title}」新建章节`"
+                  title="在此目录新建章节"
+                  @click.stop="beginChapterCreate(row.id)"
+                  >＋</AppButton
+                >
               </div></template
             ></el-table-column
           >
@@ -360,26 +370,9 @@
             <template v-if="chapterWorkspaceTab === 'chapter'">
               <div class="chapter-editor-heading">
                 <div>
-                  <h3>
-                    {{
-                      chapterForm.action === 'create'
-                        ? '新建章节'
-                        : chapterForm.action === 'move'
-                          ? '移动章节'
-                          : '基本信息'
-                    }}
-                  </h3>
-                  <p v-if="chapterForm.action === 'move'">选择目标目录，章节中的媒体会一起移动。</p>
-                  <p v-else-if="chapterForm.action === 'create'">在本漫画中创建新章节，不修改当前章节。</p>
-                  <p v-else>原始编号仅用于展示，不改变全书阅读顺序。</p>
+                  <h3>基本信息</h3>
+                  <p>原始编号仅用于展示，不改变全书阅读顺序。</p>
                 </div>
-                <AppButton
-                  v-if="chapterForm.action !== 'rename'"
-                  variant="text"
-                  :disabled="chapterSubmitting"
-                  @click="returnToChapterEdit"
-                  >取消</AppButton
-                >
               </div>
               <el-form
                 label-position="top"
@@ -387,63 +380,37 @@
                 :disabled="chapterSubmitting"
                 @submit.prevent="submitChapter()"
               >
-                <template v-if="chapterForm.action !== 'move'">
-                  <el-form-item label="章节标题"
-                    ><el-input v-model="chapterForm.title" placeholder="输入章节标题" maxlength="255"
-                  /></el-form-item>
-                  <el-form-item label="原始章节编号"
-                    ><el-input v-model="chapterForm.chapterNo" placeholder="如 01、番外" maxlength="32"
-                  /></el-form-item>
-                </template>
-                <el-form-item
-                  v-if="chapterForm.action === 'create' || chapterForm.action === 'move'"
-                  :label="chapterForm.action === 'move' ? '移动到目录' : '所属目录'"
-                >
-                  <el-select v-model="chapterCatalogSelection" placeholder="选择目录">
-                    <el-option label="根目录" value="root" />
-                    <el-option
-                      v-for="catalog in catalogOptions"
-                      :key="catalog.id"
-                      :label="catalog.title"
-                      :value="catalog.id"
-                    />
-                  </el-select>
-                </el-form-item>
+                <el-form-item label="章节标题"
+                  ><el-input v-model="chapterForm.title" placeholder="输入章节标题" maxlength="255"
+                /></el-form-item>
+                <el-form-item label="原始章节编号"
+                  ><el-input v-model="chapterForm.chapterNo" placeholder="如 01、番外" maxlength="32"
+                /></el-form-item>
                 <AppButton
                   variant="primary"
                   block
                   type="submit"
                   :loading="chapterSubmitting"
                   :disabled="!canSubmitChapter"
+                  >保存修改</AppButton
                 >
-                  {{
-                    chapterForm.action === 'create'
-                      ? '创建章节'
-                      : chapterForm.action === 'move'
-                        ? '确认移动'
-                        : '保存修改'
-                  }}
-                </AppButton>
               </el-form>
-              <template v-if="chapterForm.action === 'rename'">
-                <div class="chapter-secondary-actions">
-                  <AppButton :disabled="chapterSubmitting" @click="beginChapterMove">移动章节</AppButton>
-                  <AppButton :disabled="chapterSubmitting" @click="beginChapterCreate">新建章节</AppButton>
+              <div class="chapter-secondary-actions">
+                <AppButton :disabled="chapterSubmitting" block @click="beginChapterMove">移动到…</AppButton>
+              </div>
+              <div class="chapter-danger-zone">
+                <div>
+                  <strong>回收章节</strong>
+                  <p>本章及其中的全部媒体将移入回收站。</p>
                 </div>
-                <div class="chapter-danger-zone">
-                  <div>
-                    <strong>回收章节</strong>
-                    <p>本章及其中的全部媒体将移入回收站。</p>
-                  </div>
-                  <AppButton
-                    variant="ghost"
-                    class="chapter-trash-button"
-                    :disabled="chapterSubmitting"
-                    @click="submitChapter('trash')"
-                    >回收章节…</AppButton
-                  >
-                </div>
-              </template>
+                <AppButton
+                  variant="ghost"
+                  class="chapter-trash-button"
+                  :disabled="chapterSubmitting"
+                  @click="submitChapter('trash')"
+                  >回收章节…</AppButton
+                >
+              </div>
             </template>
           </section>
           <div v-if="chapterWorkspaceTab === 'media'" class="chapter-feature-grid">
@@ -509,6 +476,17 @@
     </section>
   </div>
 
+  <ChapterPlacementDialog
+    v-model="chapterPlacementVisible"
+    :mode="chapterPlacementMode"
+    :comic-id="comicId"
+    :comic-title="comicTitle"
+    :catalogs="tree"
+    :chapter="selectedRow?.kind === 'CHAPTER' ? selectedRow : null"
+    :media-count="mediaItems.length"
+    :initial-catalog-id="newChapterCatalogId"
+    @completed="completeChapterPlacement"
+  />
   <el-dialog
     v-model="uploadDialogVisible"
     width="min(720px, calc(100vw - 32px))"
@@ -680,6 +658,7 @@ import {
   catalogManagementApi,
   chapterManagementApi,
   managementCatalogApi,
+  managementComicApi,
   managementChapterApi,
   mediaManagementApi,
   structureOrderingApi,
@@ -688,25 +667,24 @@ import { hqApi, storageAdminApi } from '@/entities/storage'
 import { uploadApi as trackedUploadApi } from '@/features/upload'
 import { formatUploadContentRange } from '@/features/upload'
 import { storageService } from '@/features/storage'
-import {
-  CATALOG_ACTIONS,
-  countRows,
-  filterStructureRows,
-  findStructureRow,
-  flattenCatalogOptions,
-  toStructureRows,
-} from '@/entities/comic'
-import type { CatalogAction, ChapterAction, StructureRow, CatalogNode } from '@/entities/comic'
+import { CATALOG_ACTIONS, countRows, filterStructureRows, findStructureRow, toStructureRows } from '@/entities/comic'
+import type { CatalogAction, StructureRow, CatalogNode } from '@/entities/comic'
 import { StorageStatusTag } from '@/entities/storage'
 import type { MediaItemInfo } from '@/entities/media'
 import type { ChapterStorageItem } from '@/entities/storage'
 import { StorageOperationType as StorageOperation } from '@/entities/storage'
 import type { CreateUploadSessionRequest, UploadFileManifest } from '@/features/upload'
 import { useMediaOrder } from '../model/useMediaOrder'
+import ChapterPlacementDialog from './ChapterPlacementDialog.vue'
 
 const route = useRoute()
 const comicId = ref(Number(route.params.id) || 1)
 const tree = ref<readonly CatalogNode[]>([])
+const comicTitle = ref('')
+const chapterPlacementVisible = ref(false)
+const expandedNodeKeys = ref<string[]>([])
+const chapterPlacementMode = ref<'create' | 'move'>('create')
+const newChapterCatalogId = ref<number | null>(null)
 const mediaItems = ref<readonly MediaItemInfo[]>([])
 const selectedMedia = ref<MediaItemInfo | null>(null)
 const selectedMediaIds = ref<number[]>([])
@@ -753,31 +731,14 @@ const catalogForm = reactive<{
   parentId?: number
   reparentTo?: number
 }>({ action: 'create', title: '' })
-const chapterForm = reactive<{
-  action: ChapterAction
-  id?: number
-  title: string
-  chapterNo: string
-  catalogId?: number | null
-}>({ action: 'create', title: '', chapterNo: '' })
+const chapterForm = reactive({ id: undefined as number | undefined, title: '', chapterNo: '' })
 const chapterSubmitting = ref(false)
-const chapterCatalogSelection = computed<number | 'root'>({
-  get: () => chapterForm.catalogId ?? 'root',
-  set: (catalogId) => {
-    chapterForm.catalogId = catalogId === 'root' ? null : catalogId
-  },
-})
-const chapterEditDraft = ref<{ title: string; chapterNo: string } | null>(null)
-const canSubmitChapter = computed(() => {
-  if (chapterForm.action === 'move')
-    return (chapterForm.catalogId ?? null) !== (selectedRow.value?.parentCatalogId ?? null)
-  if (!chapterForm.title.trim()) return false
-  return (
-    chapterForm.action === 'create' ||
-    chapterForm.title.trim() !== selectedRow.value?.title ||
-    chapterForm.chapterNo.trim() !== (selectedRow.value?.chapterNo ?? '')
-  )
-})
+const canSubmitChapter = computed(
+  () =>
+    Boolean(chapterForm.title.trim()) &&
+    (chapterForm.title.trim() !== selectedRow.value?.title ||
+      chapterForm.chapterNo.trim() !== (selectedRow.value?.chapterNo ?? '')),
+)
 const structureRows = computed<readonly StructureRow[]>(() => tree.value.flatMap((node) => toStructureRows(node)))
 const filteredStructureRows = computed<readonly StructureRow[]>(() =>
   filterStructureRows(structureRows.value, structureKeyword.value.trim().toLowerCase()),
@@ -789,7 +750,6 @@ const expandedSearchRowKeys = computed(() =>
     .filter((row) => row.kind === 'CATALOG' && Boolean(row.children?.length))
     .map((row) => row.key),
 )
-const catalogOptions = computed(() => flattenCatalogOptions(structureRows.value))
 const catalogCount = computed(() => countRows(structureRows.value, 'CATALOG'))
 const chapterCount = computed(() => countRows(structureRows.value, 'CHAPTER'))
 const rootChapterCount = computed(() => structureRows.value.filter((row) => row.kind === 'CHAPTER').length)
@@ -946,17 +906,31 @@ function selectStructureRow(row: StructureRow): void {
     return
   }
   chapterForm.id = selectedNode.id
-  chapterForm.action = 'rename'
   chapterForm.title = selectedNode.title
   chapterForm.chapterNo = selectedNode.chapterNo ?? ''
-  chapterForm.catalogId = selectedNode.parentCatalogId ?? null
-  chapterEditDraft.value = null
   mediaChapterId.value = selectedNode.id
   void loadMedia()
 }
 function locateChapter(chapterId: number): void {
   const row = findStructureRow(structureRows.value, chapterId)
-  if (row) selectStructureRow(row)
+  if (!row) return
+  expandedNodeKeys.value = [
+    ...new Set([...expandedNodeKeys.value, ...chapterParentKeys(structureRows.value, chapterId)]),
+  ]
+  selectStructureRow(row)
+}
+function chapterParentKeys(rows: readonly StructureRow[], chapterId: number): string[] {
+  for (const row of rows) {
+    if (row.kind === 'CATALOG' && findStructureRow(row.children ?? [], chapterId)) {
+      return [row.key, ...chapterParentKeys(row.children ?? [], chapterId)]
+    }
+  }
+  return []
+}
+function handleStructureExpansion(row: StructureRow, expanded: boolean): void {
+  expandedNodeKeys.value = expanded
+    ? [...new Set([...expandedNodeKeys.value, row.key])]
+    : expandedNodeKeys.value.filter((key) => key !== row.key)
 }
 function selectMediaRow(row: MediaItemInfo): void {
   selectedMedia.value = row
@@ -1023,29 +997,23 @@ function mediaCodec(item: MediaItemInfo): string {
   if (item.mediaType !== 'VIDEO') return item.container || '图片'
   return [item.container, item.videoCodec, item.audioCodec].filter(Boolean).join(' / ') || '未统计'
 }
-function rememberChapterEdit(): void {
-  chapterEditDraft.value = { title: chapterForm.title, chapterNo: chapterForm.chapterNo }
-}
-function returnToChapterEdit(): void {
-  chapterForm.action = 'rename'
-  chapterForm.id = selectedRow.value?.id
-  chapterForm.title = chapterEditDraft.value?.title ?? selectedRow.value?.title ?? ''
-  chapterForm.chapterNo = chapterEditDraft.value?.chapterNo ?? selectedRow.value?.chapterNo ?? ''
-  chapterForm.catalogId = selectedRow.value?.parentCatalogId ?? null
-  chapterEditDraft.value = null
-}
-function beginChapterCreate(): void {
-  rememberChapterEdit()
-  chapterForm.action = 'create'
-  chapterForm.id = undefined
-  chapterForm.title = ''
-  chapterForm.chapterNo = ''
-  chapterForm.catalogId = selectedRow.value?.parentCatalogId ?? null
+function beginChapterCreate(catalogId: number | null = null): void {
+  chapterPlacementMode.value = 'create'
+  newChapterCatalogId.value = catalogId
+  chapterPlacementVisible.value = true
 }
 function beginChapterMove(): void {
-  rememberChapterEdit()
-  chapterForm.action = 'move'
-  chapterForm.catalogId = selectedRow.value?.parentCatalogId ?? null
+  chapterPlacementMode.value = 'move'
+  chapterPlacementVisible.value = true
+}
+async function completeChapterPlacement(chapterId: number, mode: 'create' | 'move'): Promise<void> {
+  const editDraft = { ...chapterForm }
+  // 刷新时先阻止旧 URL 重新选中原章节，避免两个章节的媒体请求互相覆盖。
+  chapterSubmitting.value = true
+  await loadTree()
+  chapterSubmitting.value = false
+  locateChapter(chapterId)
+  if (mode === 'move' && editDraft.id === chapterId) Object.assign(chapterForm, editDraft)
 }
 function normalizedHqStatus(item: MediaItemInfo): string {
   return item.hqStatus || (item.hqUrl ? 'READY' : 'UNKNOWN')
@@ -1265,49 +1233,29 @@ async function submitCatalog(): Promise<void> {
     ElMessage.error(errorMessage(reason))
   }
 }
-async function submitChapter(action: ChapterAction = chapterForm.action): Promise<void> {
-  if (chapterSubmitting.value || (action !== 'trash' && !canSubmitChapter.value)) return
-  const chapterId = action === 'trash' ? selectedRow.value?.id : chapterForm.id
-  if (action !== 'create' && !chapterId) return
+async function submitChapter(action: 'rename' | 'trash' = 'rename'): Promise<void> {
+  if (chapterSubmitting.value || (action === 'rename' && !canSubmitChapter.value)) return
+  const chapterId = selectedRow.value?.id
+  if (!chapterId) return
   chapterSubmitting.value = true
-  let completedChapterId = chapterId
   try {
-    switch (action) {
-      case 'create': {
-        const response = await chapterManagementApi.create(comicId.value, {
-          title: chapterForm.title.trim(),
-          chapterNo: chapterForm.chapterNo.trim(),
-          catalogId: chapterForm.catalogId ?? null,
-        })
-        completedChapterId = response.data.id
-        break
-      }
-      case 'rename':
-        await chapterManagementApi.rename(comicId.value, chapterId!, {
-          title: chapterForm.title.trim(),
-          chapterNo: chapterForm.chapterNo.trim(),
-        })
-        break
-      case 'move':
-        await chapterManagementApi.move(comicId.value, chapterId!, { catalogId: chapterForm.catalogId ?? null })
-        break
-      case 'trash':
-        await ElMessageBox.confirm(
-          `“${selectedRow.value?.title}”及其中的全部媒体将进入回收站，可在回收站恢复。`,
-          '回收章节',
-          { type: 'warning', confirmButtonText: '确认回收', cancelButtonText: '保留章节' },
-        )
-        await chapterManagementApi.trash(comicId.value, chapterId!)
-        break
-      default:
-        assertNever(action)
+    if (action === 'rename') {
+      await chapterManagementApi.rename(comicId.value, chapterId, {
+        title: chapterForm.title.trim(),
+        chapterNo: chapterForm.chapterNo.trim(),
+      })
+    } else {
+      await ElMessageBox.confirm(
+        `“${selectedRow.value?.title}”及其中的全部媒体将进入回收站，可在回收站恢复。`,
+        '回收章节',
+        { type: 'warning', confirmButtonText: '确认回收', cancelButtonText: '保留章节' },
+      )
+      await chapterManagementApi.trash(comicId.value, chapterId)
     }
-    ElMessage.success(
-      { create: '章节已创建', rename: '修改已保存', move: '章节已移动', trash: '章节回收任务已提交' }[action],
-    )
+    ElMessage.success(action === 'rename' ? '修改已保存' : '章节回收任务已提交')
     await loadTree()
     chapterSubmitting.value = false
-    if (action !== 'trash' && completedChapterId) locateChapter(completedChapterId)
+    if (action === 'rename') locateChapter(chapterId)
   } catch (reason: unknown) {
     if (reason === 'cancel' || reason === 'close') return
     ElMessage.error(errorMessage(reason))
@@ -1435,6 +1383,15 @@ async function refreshStorage(): Promise<void> {
 
 onMounted(() => {
   void loadTree()
+  void managementComicApi
+    .detail(comicId.value)
+    .then((response) => {
+      comicTitle.value = response.data.title
+    })
+    .catch(() => {
+      // 名称加载失败时保留漫画 ID，目录与章节操作仍可使用。
+      comicTitle.value = ''
+    })
 })
 </script>
 

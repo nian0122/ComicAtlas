@@ -1,0 +1,107 @@
+.placement-body {
+  display: grid;
+  gap: var(--space-4);
+  min-width: 0;
+  max-height: calc(100dvh - 240px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.placement-comic,
+.placement-hint {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.placement-source {
+  display: grid;
+  gap: var(--space-2);
+  padding-bottom: var(--space-4);
+  border-bottom: 1px solid var(--border);
+  overflow-wrap: anywhere;
+}
+.placement-source strong {
+  color: var(--text-primary);
+  font-size: var(--text-md);
+}
+.placement-source span {
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+}
+.placement-destination {
+  display: grid;
+  gap: var(--space-2);
+}
+.placement-destination > label {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+.placement-tree-scroll {
+  max-height: 220px;
+  overflow: auto;
+  padding: var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--control-radius);
+}
+.placement-tree {
+  background: transparent;
+  color: var(--text-secondary);
+  --el-tree-node-hover-bg-color: var(--control-bg-hover);
+}
+.placement-tree :deep(.el-tree-node__content) {
+  height: auto;
+  min-height: var(--control-height);
+}
+.placement-directory {
+  width: 100%;
+  min-width: 0;
+  margin-block: var(--space-1);
+}
+.placement-directory-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  width: 100%;
+  min-width: 0;
+  text-align: left;
+}
+.placement-directory :deep(> span) {
+  width: 100%;
+}
+.placement-directory-content > span:first-child {
+  overflow-wrap: anywhere;
+}
+.placement-directory small {
+  flex-shrink: 0;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+.placement-directory.is-selected {
+  background: var(--accent-bg);
+  color: var(--accent);
+}
+.placement-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+.placement-preview {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-left: 2px solid var(--accent);
+  background: var(--bg-surface);
+  overflow-wrap: anywhere;
+}
+.placement-preview > span,
+.placement-preview p {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+.placement-preview strong {
+  color: var(--text-primary);
+  font-size: var(--text-sm);
+}
