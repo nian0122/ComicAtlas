@@ -328,107 +328,124 @@
           </ManagementPanel>
         </template>
         <template v-else-if="selectedRow?.kind === 'CHAPTER'">
-          <ManagementPanel class="action-card action-card--chapter" padding="compact">
-            <div class="action-card-head">
-              <div>
-                <span class="panel-kicker">CHAPTER MAINTENANCE</span>
-                <h2>章节操作</h2>
-                <p>只修改当前选中的章节，不影响其他章节。</p>
-              </div>
-              <span class="action-id">CH · {{ selectedRow.id }}</span>
-            </div>
-            <div class="action-context">
-              <span class="context-mark">▱</span>
-              <div>
-                <strong>{{ selectedRow.title }}</strong
-                ><small>全书顺序 {{ selectedRow.order ?? '—' }}</small>
-              </div>
+          <section class="chapter-inspector" aria-label="章节操作">
+            <PanelHeader title="章节操作" :description="`当前章节 · #${selectedRow.id}`" />
+            <div class="chapter-context">
+              <strong>{{ selectedRow.title }}</strong>
+              <span>目录内顺序 {{ selectedRow.order ?? '—' }} · {{ mediaItems.length }} 个媒体</span>
             </div>
             <nav class="chapter-workspace-tabs" aria-label="章节功能分区">
               <AppButton
-                type="button"
+                variant="ghost"
+                :aria-pressed="chapterWorkspaceTab === 'chapter'"
                 :class="{ 'is-active': chapterWorkspaceTab === 'chapter' }"
                 @click="chapterWorkspaceTab = 'chapter'"
+                >信息</AppButton
               >
-                <span>▱</span><strong>章节</strong><small>编辑</small></AppButton
-              ><AppButton
-                type="button"
+              <AppButton
+                variant="ghost"
+                :aria-pressed="chapterWorkspaceTab === 'media'"
                 :class="{ 'is-active': chapterWorkspaceTab === 'media' }"
                 @click="chapterWorkspaceTab = 'media'"
+                >媒体</AppButton
               >
-                <span>▤</span><strong>媒体</strong><small>排序与补充</small></AppButton
-              ><AppButton
-                type="button"
+              <AppButton
+                variant="ghost"
+                :aria-pressed="chapterWorkspaceTab === 'storage'"
                 :class="{ 'is-active': chapterWorkspaceTab === 'storage' }"
                 @click="chapterWorkspaceTab = 'storage'"
+                >存储</AppButton
               >
-                <span>◈</span><strong>存储</strong><small>HQ / LQ</small>
-              </AppButton>
             </nav>
-            <el-form v-if="chapterWorkspaceTab === 'chapter'" label-position="top" class="action-form">
-              <div class="chapter-action-toolbar">
-                <div><span class="panel-kicker">CHAPTER ACTIONS</span><strong>修改当前章节</strong></div>
-                <AppButton class="create-chapter-button" variant="primary" @click="toggleCreateChapter"
-                  ><span class="create-chapter-icon">＋</span
-                  >{{ chapterForm.action === 'create' ? '返回当前章节' : '新建章节' }}</AppButton
+            <template v-if="chapterWorkspaceTab === 'chapter'">
+              <div class="chapter-editor-heading">
+                <div>
+                  <h3>
+                    {{
+                      chapterForm.action === 'create'
+                        ? '新建章节'
+                        : chapterForm.action === 'move'
+                          ? '移动章节'
+                          : '基本信息'
+                    }}
+                  </h3>
+                  <p v-if="chapterForm.action === 'move'">选择目标目录，章节中的媒体会一起移动。</p>
+                  <p v-else-if="chapterForm.action === 'create'">在本漫画中创建新章节，不修改当前章节。</p>
+                  <p v-else>原始编号仅用于展示，不改变全书阅读顺序。</p>
+                </div>
+                <AppButton
+                  v-if="chapterForm.action !== 'rename'"
+                  variant="text"
+                  :disabled="chapterSubmitting"
+                  @click="returnToChapterEdit"
+                  >取消</AppButton
                 >
               </div>
-              <div v-if="chapterForm.action !== 'create'" class="chapter-choice">
-                <label>选择要执行的操作</label>
-                <div class="chapter-choice-grid">
-                  <AppButton
-                    v-for="item in CHAPTER_ACTIONS"
-                    :key="item.value"
-                    type="button"
-                    :class="{ 'is-active': chapterForm.action === item.value, 'is-danger': item.value === 'trash' }"
-                    @click="selectChapterAction(item.value)"
-                  >
-                    <span class="chapter-choice-option">
-                      <span class="chapter-choice-icon">{{ chapterActionIcon(item.value) }}</span>
-                      <strong>{{ item.label.replace('章节', '') }}</strong>
-                    </span>
-                  </AppButton>
-                </div>
-                <div class="chapter-choice-help">
-                  <span class="help-mark">i</span><small>{{ chapterActionDescription(chapterForm.action) }}</small>
-                </div>
-              </div>
-              <div v-else class="create-context">
-                <span class="context-mark">＋</span>
-                <div><strong>新建章节</strong><small>将在当前漫画中创建一个新章节</small></div>
-              </div>
-              <div v-if="['create', 'rename'].includes(chapterForm.action)" class="form-grid">
-                <el-form-item label="章节标题"
-                  ><el-input v-model="chapterForm.title" placeholder="输入章节标题" /></el-form-item
-                ><el-form-item label="原始章节编号"
-                  ><el-input v-model="chapterForm.chapterNo" placeholder="如 01、番外"
-                /></el-form-item>
-              </div>
-              <el-form-item v-if="chapterForm.action === 'create'" label="目标目录 ID"
-                ><el-input-number
-                  v-model="chapterForm.catalogId"
-                  :min="1"
-                  :controls="false"
-                  clearable
-                  placeholder="留空为根目录"
-              /></el-form-item>
-              <el-form-item v-if="chapterForm.action === 'move'" label="移动到目录"
-                ><el-select v-model="chapterForm.catalogId" clearable placeholder="选择目标目录，留空为根目录"
-                  ><el-option label="根目录" :value="null" /><el-option
-                    v-for="catalog in catalogOptions"
-                    :key="catalog.id"
-                    :label="catalog.title"
-                    :value="catalog.id" /></el-select
-              ></el-form-item>
-              <AppButton
-                class="action-submit"
-                :variant="chapterForm.action === 'trash' ? 'danger' : 'primary'"
-                block
-                @click="submitChapter"
-                >{{ chapterForm.action === 'trash' ? '回收当前章节' : '执行章节操作' }}</AppButton
+              <el-form
+                label-position="top"
+                class="action-form"
+                :disabled="chapterSubmitting"
+                @submit.prevent="submitChapter()"
               >
-            </el-form>
-          </ManagementPanel>
+                <template v-if="chapterForm.action !== 'move'">
+                  <el-form-item label="章节标题"
+                    ><el-input v-model="chapterForm.title" placeholder="输入章节标题" maxlength="255"
+                  /></el-form-item>
+                  <el-form-item label="原始章节编号"
+                    ><el-input v-model="chapterForm.chapterNo" placeholder="如 01、番外" maxlength="32"
+                  /></el-form-item>
+                </template>
+                <el-form-item
+                  v-if="chapterForm.action === 'create' || chapterForm.action === 'move'"
+                  :label="chapterForm.action === 'move' ? '移动到目录' : '所属目录'"
+                >
+                  <el-select v-model="chapterCatalogSelection" placeholder="选择目录">
+                    <el-option label="根目录" value="root" />
+                    <el-option
+                      v-for="catalog in catalogOptions"
+                      :key="catalog.id"
+                      :label="catalog.title"
+                      :value="catalog.id"
+                    />
+                  </el-select>
+                </el-form-item>
+                <AppButton
+                  variant="primary"
+                  block
+                  type="submit"
+                  :loading="chapterSubmitting"
+                  :disabled="!canSubmitChapter"
+                >
+                  {{
+                    chapterForm.action === 'create'
+                      ? '创建章节'
+                      : chapterForm.action === 'move'
+                        ? '确认移动'
+                        : '保存修改'
+                  }}
+                </AppButton>
+              </el-form>
+              <template v-if="chapterForm.action === 'rename'">
+                <div class="chapter-secondary-actions">
+                  <AppButton :disabled="chapterSubmitting" @click="beginChapterMove">移动章节</AppButton>
+                  <AppButton :disabled="chapterSubmitting" @click="beginChapterCreate">新建章节</AppButton>
+                </div>
+                <div class="chapter-danger-zone">
+                  <div>
+                    <strong>回收章节</strong>
+                    <p>本章及其中的全部媒体将移入回收站。</p>
+                  </div>
+                  <AppButton
+                    variant="ghost"
+                    class="chapter-trash-button"
+                    :disabled="chapterSubmitting"
+                    @click="submitChapter('trash')"
+                    >回收章节…</AppButton
+                  >
+                </div>
+              </template>
+            </template>
+          </section>
           <div v-if="chapterWorkspaceTab === 'media'" class="chapter-feature-grid">
             <ManagementPanel class="chapter-feature-card feature-order" padding="compact">
               <div class="feature-card-top">
@@ -673,7 +690,6 @@ import { formatUploadContentRange } from '@/features/upload'
 import { storageService } from '@/features/storage'
 import {
   CATALOG_ACTIONS,
-  CHAPTER_ACTIONS,
   countRows,
   filterStructureRows,
   findStructureRow,
@@ -742,8 +758,26 @@ const chapterForm = reactive<{
   id?: number
   title: string
   chapterNo: string
-  catalogId?: number
+  catalogId?: number | null
 }>({ action: 'create', title: '', chapterNo: '' })
+const chapterSubmitting = ref(false)
+const chapterCatalogSelection = computed<number | 'root'>({
+  get: () => chapterForm.catalogId ?? 'root',
+  set: (catalogId) => {
+    chapterForm.catalogId = catalogId === 'root' ? null : catalogId
+  },
+})
+const chapterEditDraft = ref<{ title: string; chapterNo: string } | null>(null)
+const canSubmitChapter = computed(() => {
+  if (chapterForm.action === 'move')
+    return (chapterForm.catalogId ?? null) !== (selectedRow.value?.parentCatalogId ?? null)
+  if (!chapterForm.title.trim()) return false
+  return (
+    chapterForm.action === 'create' ||
+    chapterForm.title.trim() !== selectedRow.value?.title ||
+    chapterForm.chapterNo.trim() !== (selectedRow.value?.chapterNo ?? '')
+  )
+})
 const structureRows = computed<readonly StructureRow[]>(() => tree.value.flatMap((node) => toStructureRows(node)))
 const filteredStructureRows = computed<readonly StructureRow[]>(() =>
   filterStructureRows(structureRows.value, structureKeyword.value.trim().toLowerCase()),
@@ -898,6 +932,7 @@ function flattenStructureRows(row: StructureRow): readonly StructureRow[] {
   return [row, ...(row.children ?? []).flatMap(flattenStructureRows)]
 }
 function selectStructureRow(row: StructureRow): void {
+  if (chapterSubmitting.value) return
   const selectedNode =
     structureRows.value
       .flatMap(flattenStructureRows)
@@ -914,6 +949,8 @@ function selectStructureRow(row: StructureRow): void {
   chapterForm.action = 'rename'
   chapterForm.title = selectedNode.title
   chapterForm.chapterNo = selectedNode.chapterNo ?? ''
+  chapterForm.catalogId = selectedNode.parentCatalogId ?? null
+  chapterEditDraft.value = null
   mediaChapterId.value = selectedNode.id
   void loadMedia()
 }
@@ -986,33 +1023,29 @@ function mediaCodec(item: MediaItemInfo): string {
   if (item.mediaType !== 'VIDEO') return item.container || '图片'
   return [item.container, item.videoCodec, item.audioCodec].filter(Boolean).join(' / ') || '未统计'
 }
-function chapterActionDescription(action: ChapterAction): string {
-  const descriptions: Readonly<Record<ChapterAction, string>> = {
-    create: '在当前漫画中新建一个章节',
-    rename: '修改章节标题或原始编号',
-    move: '将章节移动到其他目录',
-    trash: '将当前章节移入回收站',
-  }
-  return descriptions[action]
+function rememberChapterEdit(): void {
+  chapterEditDraft.value = { title: chapterForm.title, chapterNo: chapterForm.chapterNo }
 }
-function chapterActionIcon(action: ChapterAction): string {
-  return ({ create: '＋', rename: '✎', move: '⇄', trash: '⌫' } as const)[action]
+function returnToChapterEdit(): void {
+  chapterForm.action = 'rename'
+  chapterForm.id = selectedRow.value?.id
+  chapterForm.title = chapterEditDraft.value?.title ?? selectedRow.value?.title ?? ''
+  chapterForm.chapterNo = chapterEditDraft.value?.chapterNo ?? selectedRow.value?.chapterNo ?? ''
+  chapterForm.catalogId = selectedRow.value?.parentCatalogId ?? null
+  chapterEditDraft.value = null
 }
-function selectChapterAction(action: ChapterAction): void {
-  chapterForm.action = action
-}
-function toggleCreateChapter(): void {
-  if (chapterForm.action === 'create') {
-    chapterForm.action = 'rename'
-    chapterForm.id = selectedRow.value?.kind === 'CHAPTER' ? selectedRow.value.id : undefined
-    chapterForm.title = selectedRow.value?.kind === 'CHAPTER' ? selectedRow.value.title : ''
-    chapterForm.chapterNo = selectedRow.value?.kind === 'CHAPTER' ? (selectedRow.value.chapterNo ?? '') : ''
-    return
-  }
+function beginChapterCreate(): void {
+  rememberChapterEdit()
   chapterForm.action = 'create'
   chapterForm.id = undefined
   chapterForm.title = ''
   chapterForm.chapterNo = ''
+  chapterForm.catalogId = selectedRow.value?.parentCatalogId ?? null
+}
+function beginChapterMove(): void {
+  rememberChapterEdit()
+  chapterForm.action = 'move'
+  chapterForm.catalogId = selectedRow.value?.parentCatalogId ?? null
 }
 function normalizedHqStatus(item: MediaItemInfo): string {
   return item.hqStatus || (item.hqUrl ? 'READY' : 'UNKNOWN')
@@ -1232,37 +1265,54 @@ async function submitCatalog(): Promise<void> {
     ElMessage.error(errorMessage(reason))
   }
 }
-async function submitChapter(): Promise<void> {
+async function submitChapter(action: ChapterAction = chapterForm.action): Promise<void> {
+  if (chapterSubmitting.value || (action !== 'trash' && !canSubmitChapter.value)) return
+  const chapterId = action === 'trash' ? selectedRow.value?.id : chapterForm.id
+  if (action !== 'create' && !chapterId) return
+  chapterSubmitting.value = true
+  let completedChapterId = chapterId
   try {
-    const id = chapterForm.id ?? 0
-    switch (chapterForm.action) {
-      case 'create':
-        await chapterManagementApi.create(comicId.value, {
+    switch (action) {
+      case 'create': {
+        const response = await chapterManagementApi.create(comicId.value, {
           title: chapterForm.title.trim(),
           chapterNo: chapterForm.chapterNo.trim(),
           catalogId: chapterForm.catalogId ?? null,
         })
+        completedChapterId = response.data.id
         break
+      }
       case 'rename':
-        await chapterManagementApi.rename(comicId.value, id, {
-          title: chapterForm.title.trim() || undefined,
-          chapterNo: chapterForm.chapterNo.trim() || undefined,
+        await chapterManagementApi.rename(comicId.value, chapterId!, {
+          title: chapterForm.title.trim(),
+          chapterNo: chapterForm.chapterNo.trim(),
         })
         break
       case 'move':
-        await chapterManagementApi.move(comicId.value, id, { catalogId: chapterForm.catalogId ?? null })
+        await chapterManagementApi.move(comicId.value, chapterId!, { catalogId: chapterForm.catalogId ?? null })
         break
       case 'trash':
-        await ElMessageBox.confirm('章节将进入回收站。', '确认回收', { type: 'warning' })
-        await chapterManagementApi.trash(comicId.value, id)
+        await ElMessageBox.confirm(
+          `“${selectedRow.value?.title}”及其中的全部媒体将进入回收站，可在回收站恢复。`,
+          '回收章节',
+          { type: 'warning', confirmButtonText: '确认回收', cancelButtonText: '保留章节' },
+        )
+        await chapterManagementApi.trash(comicId.value, chapterId!)
         break
       default:
-        assertNever(chapterForm.action)
+        assertNever(action)
     }
-    ElMessage.success('章节操作完成')
+    ElMessage.success(
+      { create: '章节已创建', rename: '修改已保存', move: '章节已移动', trash: '章节回收任务已提交' }[action],
+    )
     await loadTree()
+    chapterSubmitting.value = false
+    if (action !== 'trash' && completedChapterId) locateChapter(completedChapterId)
   } catch (reason: unknown) {
+    if (reason === 'cancel' || reason === 'close') return
     ElMessage.error(errorMessage(reason))
+  } finally {
+    chapterSubmitting.value = false
   }
 }
 async function loadMedia(): Promise<void> {

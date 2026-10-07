@@ -22,12 +22,6 @@ export const CATALOG_ACTIONS = [
   { value: 'delete', label: '删除目录' },
 ] as const
 
-export const CHAPTER_ACTIONS = [
-  { value: 'rename', label: '重命名章节' },
-  { value: 'move', label: '移动章节' },
-  { value: 'trash', label: '回收章节' },
-] as const
-
 export function countRows(rows: readonly StructureRow[], kind: StructureRow['kind']): number {
   return rows.reduce(
     (count, row) => count + (row.kind === kind ? 1 : 0) + (row.children ? countRows(row.children, kind) : 0),

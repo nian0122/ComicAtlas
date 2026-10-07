@@ -193,3 +193,137 @@ test('媒体上传在漫画工作区按章节操作，选中媒体后可替换',
   await page.getByRole('button', { name: '替换此媒体' }).click()
   await expect(page.getByRole('heading', { name: '替换章节媒体' })).toBeVisible()
 })
+
+async function mockChapterEditor(page: Page): Promise<void> {
+  await mockWorkspace(page, comicDetail)
+  await page.route('**/api/manage/comics/7/catalog', (route) =>
+    route.fulfill({
+      contentType: 'application/json',
+      body: resultBody([
+        {
+          id: null,
+          title: null,
+          children: [{ id: 2, title: '第二卷', children: [], chapters: [] }],
+          chapters: [{ id: 9, chapterNo: '01', title: '第一章', globalOrder: 1, sortOrder: 0, pageCount: 0 }],
+        },
+      ]),
+    }),
+  )
+  await page.route('**/api/manage/chapters/9', (route) =>
+    route.fulfill({ contentType: 'application/json', body: resultBody({ pages: [] }) }),
+  )
+  await page.route('**/api/manage/admin/storage/comics/7/chapters', (route) =>
+    route.fulfill({ contentType: 'application/json', body: resultBody([]) }),
+  )
+}
+
+test('章节新建和移动可取消并保留编辑草稿，保存可清空原始编号', async ({ page }, testInfo) => {
+  await mockChapterEditor(page)
+  let savedChapter: unknown
+  await page.route('**/api/manage/comics/7/chapters/9', async (route) => {
+    savedChapter = route.request().postDataJSON()
+    await route.fulfill({ contentType: 'application/json', body: resultBody({ id: 9 }) })
+  })
+  await page.setViewportSize({ width: 1920, height: 1080 })
+  await page.goto('/manage/comics/7?tab=content&chapterId=9')
+  const editor = page.locator('.chapter-inspector')
+  const title = editor.getByPlaceholder('输入章节标题')
+  await expect(title).toHaveValue('第一章')
+  await expect(editor.getByRole('button', { name: '保存修改', exact: true })).toBeDisabled()
+  await editor.screenshot({ path: testInfo.outputPath('chapter-actions.png') })
+  await title.fill('修改后的章节')
+  await editor.getByPlaceholder('如 01、番外').fill('')
+  await editor.getByRole('button', { name: '新建章节', exact: true }).click()
+  await expect(title).toHaveValue('')
+  await expect(editor.getByRole('button', { name: '创建章节', exact: true })).toBeDisabled()
+  await editor.getByRole('button', { name: '取消', exact: true }).click()
+  await expect(title).toHaveValue('修改后的章节')
+  await expect(editor.getByPlaceholder('如 01、番外')).toHaveValue('')
+  await editor.getByRole('button', { name: '移动章节', exact: true }).click()
+  await expect(editor.getByRole('button', { name: '确认移动', exact: true })).toBeDisabled()
+  await editor.locator('.el-select__wrapper').click()
+  await page.getByRole('option', { name: '第二卷', exact: true }).click()
+  await expect(editor.getByRole('button', { name: '确认移动', exact: true })).toBeEnabled()
+  await editor.getByRole('button', { name: '取消', exact: true }).click()
+  await expect(title).toHaveValue('修改后的章节')
+  await editor.getByRole('button', { name: '保存修改', exact: true }).click()
+  await expect(page.getByText('修改已保存', { exact: true })).toBeVisible()
+  expect(savedChapter).toEqual({ title: '修改后的章节', chapterNo: '' })
+  await expect(title).toHaveValue('第一章')
+})
+
+test('回收章节明确说明范围，取消不发请求，确认只回收当前章节', async ({ page }) => {
+  await mockChapterEditor(page)
+  const recycledChapterIds: string[] = []
+  await page.route('**/api/manage/comics/7/chapters/*', async (route) => {
+    if (route.request().method() === 'DELETE') {
+      recycledChapterIds.push(route.request().url().split('/').pop()!)
+    }
+    await route.fulfill({ contentType: 'application/json', body: resultBody(null) })
+  })
+  await page.goto('/manage/comics/7?tab=content&chapterId=9')
+  const recycle = page.locator('.chapter-inspector').getByRole('button', { name: '回收章节…', exact: true })
+  await recycle.click()
+  const dialog = page.getByRole('dialog', { name: '回收章节', exact: true })
+  await expect(dialog).toContainText('“第一章”及其中的全部媒体')
+  await dialog.getByRole('button', { name: '保留章节' }).click()
+  await expect(dialog).toBeHidden()
+  expect(recycledChapterIds).toEqual([])
+  await expect(page.locator('.el-message--error')).toHaveCount(0)
+  await recycle.click()
+  await dialog.getByRole('button', { name: '确认回收' }).click()
+  await expect(page.getByText('章节回收任务已提交', { exact: true })).toBeVisible()
+  expect(recycledChapterIds).toEqual(['9'])
+})
+
+test('创建后选中新章节，移动后保留章节选择并刷新目录归属', async ({ page }) => {
+  await mockChapterEditor(page)
+  const createdChapter = { id: 10, title: '番外', chapterNo: '', globalOrder: 2, sortOrder: 1, pageCount: 0 }
+  let hasCreatedChapter = false
+  let hasMovedChapter = false
+  await page.route('**/api/manage/comics/7/catalog', (route) =>
+    route.fulfill({
+      contentType: 'application/json',
+      body: resultBody([
+        {
+          id: null,
+          title: null,
+          children: [{ id: 2, title: '第二卷', children: [], chapters: hasMovedChapter ? [createdChapter] : [] }],
+          chapters: [
+            { id: 9, title: '第一章', chapterNo: '01', globalOrder: 1, sortOrder: 0, pageCount: 0 },
+            ...(hasCreatedChapter && !hasMovedChapter ? [createdChapter] : []),
+          ],
+        },
+      ]),
+    }),
+  )
+  await page.route('**/api/manage/chapters/10', (route) =>
+    route.fulfill({ contentType: 'application/json', body: resultBody({ pages: [] }) }),
+  )
+  await page.route('**/api/manage/comics/7/chapters', async (route) => {
+    expect(route.request().postDataJSON()).toEqual({ title: '番外', chapterNo: '', catalogId: null })
+    hasCreatedChapter = true
+    await route.fulfill({ contentType: 'application/json', body: resultBody(createdChapter) })
+  })
+  await page.route('**/api/manage/comics/7/chapters/10/move', async (route) => {
+    expect(route.request().postDataJSON()).toEqual({ catalogId: 2 })
+    hasMovedChapter = true
+    await route.fulfill({ contentType: 'application/json', body: resultBody(createdChapter) })
+  })
+  await page.goto('/manage/comics/7?tab=content&chapterId=9')
+  const editor = page.locator('.chapter-inspector')
+  await editor.getByRole('button', { name: '新建章节', exact: true }).click()
+  await editor.getByPlaceholder('输入章节标题').fill('番外')
+  await editor.getByRole('button', { name: '创建章节', exact: true }).click()
+  await expect(editor).toContainText('当前章节 · #10')
+  await expect(editor.getByPlaceholder('输入章节标题')).toHaveValue('番外')
+  await editor.getByRole('button', { name: '移动章节', exact: true }).click()
+  await editor.locator('.el-select__wrapper').click()
+  await page.getByRole('option', { name: '第二卷', exact: true }).click()
+  await editor.getByRole('button', { name: '确认移动', exact: true }).click()
+  await expect(editor).toContainText('当前章节 · #10')
+  await expect(editor.getByPlaceholder('输入章节标题')).toHaveValue('番外')
+  await editor.getByRole('button', { name: '移动章节', exact: true }).click()
+  await expect(editor.locator('.el-select__placeholder')).toHaveText('第二卷')
+  await expect(editor.getByRole('button', { name: '确认移动', exact: true })).toBeDisabled()
+})
