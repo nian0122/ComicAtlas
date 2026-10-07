@@ -4,7 +4,7 @@
 
 阅读端的目标是找漫画与继续阅读。桌面端使用 `ReadingDesktopFilterPanel`；`LibraryPage.vue` 的移动端保留原有紧凑分类/标签按钮、横向滑动及排序弹层的布局与样式，两者使用独立于管理端的 `reading-comic-filters.ts` 状态模型，查询 `/api/comics`。后端 `ReadingComicFilterNormalizer` 与阅读列表 SQL 均限制漫画为 `READY`；请求传入其他生命周期也不能扩大阅读范围。
 
-管理端的目标是排查生命周期、来源与文件状态，并执行批量操作。`ManagementComicFilterPanel` 和 `management-comic-filters.ts` 负责管理筛选，查询 `/api/manage/comics`。管理端独立使用 `ManagementComicListQuery`、`ManagementComicFilterNormalizer`、`ManagementComicListMapper`，不复用阅读端的查询条件或状态模型。状态未指定时包含全部生命周期，默认按创建时间倒序。
+管理端的目标是排查生命周期、来源与文件状态，并执行批量操作。`ManagementComicFilterPanel` 和 `management-comic-filters.ts` 负责管理筛选，查询 `/api/manage/comics`。管理端独立使用 `ManagementComicListQuery`、`ManagementComicFilterNormalizer`、`ManagementComicListMapper`，不复用阅读端的查询条件或状态模型。状态未指定或清空时，默认排除已回收（`TRASHED`）及已永久删除（`DELETED`），保留导入中、导入失败等管理状态；显式选择已回收或已永久删除时仍可查询对应记录。分页总数与批量筛选快照遵循相同范围，默认按创建时间倒序。
 
 两端各自持有筛选实例，仅共用无业务含义的 HTTP 与分页基础设施。旧的 `useLibraryFilters`、`useManagementComicFilters`、`ComicListQueryNormalizer` 已删除；旧共享 Mapper 中的管理存储筛选及批量筛选 SQL 已移至管理域。
 

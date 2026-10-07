@@ -58,7 +58,8 @@ class ManagementComicFilterTest {
                     INSERT INTO comic (id, title, status) VALUES
                         (1, '排队漫画', 'READY'), (2, '生成漫画', 'READY'), (3, '草稿漫画', 'DRAFT'),
                         (4, '失败漫画', 'IMPORT_FAILED'), (5, '回收漫画', 'TRASHED'),
-                        (6, '视频漫画', 'READY'), (7, '回收章节漫画', 'READY'), (8, '缺失漫画', 'READY')
+                        (6, '视频漫画', 'READY'), (7, '回收章节漫画', 'READY'), (8, '缺失漫画', 'READY'),
+                        (11, '永久删除漫画', 'DELETED')
                     """);
             statement.execute("INSERT INTO tag VALUES (1, '热血'), (2, '冒险')");
             statement.execute("INSERT INTO comic_tag VALUES (1, 1), (2, 1), (2, 2)");
@@ -87,16 +88,24 @@ class ManagementComicFilterTest {
     }
 
     @Test
-    void emptyStatusIncludesNonReadyComicsOnlyInManagementQueries() {
+    void defaultStatusExcludesDeletedComicsWhileExplicitStatusCanInspectThem() {
         try (SqlSession session = sessionFactory.openSession()) {
             ManagementComicListMapper mapper = session.getMapper(ManagementComicListMapper.class);
             ManagementComicListQuery query = new ManagementComicListQuery();
-            assertEquals(8, mapper.selectPage(new Page<>(1, 20), query).getTotal());
+            assertEquals(7, mapper.selectPage(new Page<>(1, 20), query).getTotal());
+            assertEquals(List.of(1L, 2L, 3L, 4L, 6L, 7L, 8L), ids(mapper, query));
+            assertEquals(List.of(1L, 2L, 3L, 4L, 6L, 7L, 8L), mapper.selectIdsByQuery(query, List.of(), 20));
+            query.setStatus("");
+            assertEquals(7, mapper.selectPage(new Page<>(1, 20), query).getTotal());
             assertEquals(5, session.getMapper(ComicMapper.class).selectPage(new Page<>(1, 20), new com.comicatlas.contract.comic.dto.ComicListQuery()).getTotal());
             query.setStatus("IMPORT_FAILED");
             assertEquals(List.of(4L), ids(mapper, query));
             query.setStatus("TRASHED");
             assertEquals(List.of(5L), ids(mapper, query));
+            assertEquals(List.of(5L), mapper.selectIdsByQuery(query, List.of(), 20));
+            query.setStatus("DELETED");
+            assertEquals(List.of(11L), ids(mapper, query));
+            assertEquals(List.of(11L), mapper.selectIdsByQuery(query, List.of(), 20));
         }
     }
 

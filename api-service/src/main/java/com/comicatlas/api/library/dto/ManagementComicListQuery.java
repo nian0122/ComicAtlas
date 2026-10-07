@@ -13,7 +13,7 @@ public class ManagementComicListQuery {
     private List<String> tags;
     /** OR 任一、AND 全部、NOT 排除；_NONE 表示没有标签。 */
     private String tagMode = "OR";
-    /** 未指定时不限制漫画生命周期。 */
+    /** 未指定时排除已回收和已永久删除的漫画；指定状态时按该状态查询。 */
     private String status;
     /** 分类名称，_NONE 表示未分类。 */
     private String category;

@@ -4,7 +4,14 @@ package com.comicatlas.api.library.persistence.sql;
 public final class ManagementComicListSqlProvider {
     private static final String FILTERS = """
         <where>
-            <if test='query.status != null and query.status != ""'> AND c.status = #{query.status} </if>
+            <choose>
+                <when test='query.status != null and query.status != ""'>
+                    AND c.status = #{query.status}
+                </when>
+                <otherwise>
+                    AND c.status NOT IN ('TRASHED', 'DELETED')
+                </otherwise>
+            </choose>
             <if test='query.keyword != null and query.keyword != ""'>
                 AND (c.title LIKE CONCAT('%', #{query.keyword}, '%')
                      OR c.title_jpn LIKE CONCAT('%', #{query.keyword}, '%')

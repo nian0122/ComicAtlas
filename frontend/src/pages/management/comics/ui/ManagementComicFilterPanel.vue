@@ -52,7 +52,7 @@ const emit = defineEmits<{ apply: []; keyword: []; reset: [] }>()
         <span>生命周期</span>
         <el-select
           v-model="filters.status"
-          placeholder="全部状态"
+          placeholder="未删除状态"
           aria-label="管理生命周期"
           clearable
           class="filter-select"
