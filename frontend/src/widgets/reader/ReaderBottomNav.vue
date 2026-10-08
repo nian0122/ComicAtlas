@@ -1,7 +1,8 @@
 <template>
   <!-- 移动端底部导航：阅读进度展示 + 独立页码跳转 + 章节导航 -->
-  <nav class="reader-bottom-nav" aria-label="章节导航">
+  <FloatingPanel as="nav" class="reader-bottom-nav" aria-label="章节导航">
     <div class="nav-progress-wrap">
+      <div class="nav-progress-track" aria-hidden="true"><span :style="{ width: `${currentProgress}%` }" /></div>
       <AppButton
         id="mobile-reader-page-progress"
         type="button"
@@ -24,7 +25,7 @@
       <!-- 下一话（无下一话时禁用） -->
       <AppButton class="nav-btn" type="button" :disabled="!hasNext" @click="emit('nextChapter')">下一话 →</AppButton>
     </div>
-  </nav>
+  </FloatingPanel>
 
   <Transition name="page-jump">
     <div v-if="jumpVisible" class="mobile-page-jump" @click.self="closePageJump">
@@ -134,6 +135,7 @@
 
 <script setup lang="ts">
 import { AppButton } from '@/shared/ui/button'
+import { FloatingPanel } from '@/shared/ui/floating-panel'
 import { computed, nextTick, ref } from 'vue'
 // 哑组件：只负责导航展示，不接触 store / composable。
 // 显示与隐藏由父级（ReaderPage）通过 v-if 控制。
@@ -216,99 +218,85 @@ function confirmPageJump() {
 <style scoped>
 .reader-bottom-nav {
   position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  z-index: 30;
-  display: flex;
-  flex-direction: column;
-  /* 内容区与阅读端底栏一致，确保进度条和 48px 触控按钮不越出视口。 */
-  height: calc(var(--mobile-tabbar-height) + env(safe-area-inset-bottom));
-  padding-bottom: env(safe-area-inset-bottom);
-  /* 半透明深色背景 + 毛玻璃，与顶部工具栏一致 */
-  background: var(--bg-primary);
-  background: rgb(8 8 8 / 88%);
-  background: color-mix(in srgb, var(--bg-primary) 80%, transparent);
-  -webkit-backdrop-filter: blur(12px);
-  backdrop-filter: blur(12px);
-  animation: nav-fade-in 200ms ease both;
+  bottom: calc(var(--space-3) + env(safe-area-inset-bottom));
+  left: var(--space-3);
+  right: var(--space-3);
+  z-index: var(--z-nav);
+  display: grid;
+  gap: var(--space-1);
+  max-width: var(--floating-content-max);
+  margin: 0 auto;
+  min-height: var(--reader-mobile-nav-height);
+  animation: nav-fade-in 160ms ease both;
 }
-
 @keyframes nav-fade-in {
   from {
     opacity: 0;
+    transform: translateY(4px);
   }
   to {
     opacity: 1;
+    transform: translateY(0);
   }
 }
-
-/* 只读进度条：连续阅读只更新展示，不触发页码定位。 */
 .nav-progress-wrap {
   display: flex;
   align-items: center;
-  justify-content: center;
-  height: 30px;
-  padding: 0 12px;
+  gap: var(--space-3);
+  padding: 0 var(--space-2);
 }
-
-.nav-page-progress {
-  display: inline-flex;
-  min-width: 0;
-  min-height: 30px;
-  padding: 0 var(--space-3);
-  border: 0;
+.nav-progress-track {
+  flex: 1;
+  height: 2px;
+  overflow: hidden;
+  background: var(--color-progress-track);
   border-radius: var(--radius-pill);
+}
+.nav-progress-track > span {
+  display: block;
+  height: 100%;
+  background: var(--text-secondary);
+}
+.nav-page-progress {
+  min-width: 0;
+  min-height: 32px;
+  padding: 0 var(--space-1);
+  border: 0;
   background: transparent;
   color: var(--text-secondary);
-  font-size: 11px;
+  font-size: var(--text-xs);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
 }
-
-.nav-page-progress:active {
-  background: rgb(255 255 255 / 10%);
-  color: var(--text-primary);
-}
-
 .nav-buttons {
-  flex: 1;
-  display: flex;
-  align-items: stretch;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-2);
 }
-
-/* 大触控目标：按钮撑满剩余高度（≥ 48px） */
 .nav-btn {
-  flex: 1;
-  min-height: 48px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0 var(--space-sm);
+  min-width: 0;
+  min-height: var(--control-min-size);
+  padding: 0 var(--space-2);
   background: transparent;
-  border: none;
-  color: var(--text-primary);
-  font-size: 14px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
   white-space: nowrap;
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
 }
-
-.nav-btn:active:not(:disabled) {
-  background: var(--bg-surface);
+.nav-btn:nth-child(2) {
+  background: var(--color-overlay-faint);
+  color: var(--text-primary);
 }
-
 .nav-btn:disabled {
-  opacity: 0.35;
+  opacity: var(--disabled-opacity);
   cursor: default;
 }
 
 .mobile-page-jump {
   position: fixed;
   inset: 0;
-  z-index: 40;
+  z-index: var(--z-popover);
   background: var(--color-overlay-scrim);
   animation: page-jump-fade 160ms ease both;
 }
@@ -316,12 +304,12 @@ function confirmPageJump() {
 .page-jump-dialog {
   position: absolute;
   right: var(--mobile-page-gutter);
-  bottom: calc(var(--mobile-tabbar-height) + var(--space-3) + env(safe-area-inset-bottom));
+  bottom: calc(var(--reader-mobile-nav-height) + var(--space-6) + env(safe-area-inset-bottom));
   left: var(--mobile-page-gutter);
   display: grid;
   gap: var(--space-5);
   width: min(calc(100% - 2 * var(--mobile-page-gutter)), 440px);
-  max-height: calc(100dvh - var(--mobile-tabbar-height) - var(--space-6) - env(safe-area-inset-bottom));
+  max-height: calc(100dvh - var(--reader-mobile-nav-height) - var(--space-8) - env(safe-area-inset-bottom));
   padding: var(--space-5);
   margin: 0 auto;
   overflow-y: auto;

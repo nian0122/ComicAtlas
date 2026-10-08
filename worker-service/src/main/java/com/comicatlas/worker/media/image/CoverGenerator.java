@@ -73,11 +73,13 @@ public class CoverGenerator {
                     "-chapter-id", COVER_CHAPTER_ID,
                     "-chapter-no", COVER_CHAPTER_NO,
                     "-quality", String.valueOf(config.getCover().getQuality()),
+                    "-max-long-edge", String.valueOf(config.getCover().getMaxLongEdge()),
                     "-workers", String.valueOf(config.getCover().getWorkers()),
                     "-json"
             ));
 
-            log.info("生成封面: comicId={}, quality={}", comicId, config.getCover().getQuality());
+            log.info("生成封面: comicId={}, quality={}, maxLongEdge={}",
+                    comicId, config.getCover().getQuality(), config.getCover().getMaxLongEdge());
 
             ProcessBuilder processBuilder = new ProcessBuilder(command);
             ExternalProcessRunner.ExternalProcessResult result =

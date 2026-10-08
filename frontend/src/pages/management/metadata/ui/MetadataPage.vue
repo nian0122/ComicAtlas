@@ -37,7 +37,7 @@
       </el-tab-pane>
 
       <el-tab-pane label="标签" name="tag">
-        <section class="tag-workspace" aria-label="标签词库管理">
+        <ManagementPanel class="tag-workspace" aria-label="标签词库管理">
           <div class="tag-toolbar">
             <div class="tag-total" aria-label="标签总数">
               <strong>{{ tagStore.list.length }}</strong>
@@ -83,7 +83,7 @@
             <strong>{{ tagSearch ? '没有找到匹配的标签' : '还没有标签' }}</strong>
             <span>{{ tagSearch ? '试试其他关键词' : '添加标签后，会显示在这里' }}</span>
           </div>
-        </section>
+        </ManagementPanel>
       </el-tab-pane>
     </el-tabs>
 
@@ -107,7 +107,7 @@
 
 <script setup lang="ts">
 import { AppButton } from '@/shared/ui/button'
-import { StatGrid } from '@/shared/ui/management-panel'
+import { ManagementPanel, StatGrid } from '@/shared/ui/management-panel'
 import { StatCard } from '@/shared/ui/management-panel'
 import { PageHeader } from '@/shared/ui/page-header'
 import { computed, ref, onMounted } from 'vue'
@@ -269,33 +269,10 @@ async function onUpdateTag() {
   background-color: var(--border);
 }
 
-.metadata-page :deep(.el-input__wrapper) {
-  box-shadow: 0 0 0 1px var(--border) inset;
-}
-
-.metadata-page :deep(.el-input__wrapper:hover) {
-  box-shadow: 0 0 0 1px var(--border-strong) inset;
-}
-
-.metadata-page :deep(.el-input__wrapper.is-focus) {
-  box-shadow:
-    inset 0 0 0 1px var(--accent),
-    var(--shadow-sm) !important;
-}
-
 .tag-list {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 230px), 1fr));
   gap: 10px;
-}
-
-.tag-workspace {
-  padding: clamp(18px, 3vw, 30px);
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  background:
-    radial-gradient(ellipse at 8% 0%, color-mix(in srgb, var(--accent) 8%, transparent), transparent 36%),
-    var(--surface-raised, var(--bg-secondary));
 }
 
 .tag-toolbar,
@@ -320,7 +297,7 @@ async function onUpdateTag() {
   align-items: baseline;
   gap: 8px;
   color: var(--text-muted);
-  font-size: 13px;
+  font-size: var(--text-sm);
 }
 
 .tag-total strong {
@@ -357,7 +334,7 @@ async function onUpdateTag() {
   gap: 10px;
   padding: 0 12px 0 14px;
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--card-radius);
   background: var(--bg-primary);
   transition:
     border-color 160ms ease,
@@ -374,7 +351,7 @@ async function onUpdateTag() {
 .tag-card__name {
   overflow: hidden;
   color: var(--text-primary);
-  font-size: 13px;
+  font-size: var(--text-sm);
   font-weight: 560;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -391,7 +368,7 @@ async function onUpdateTag() {
   color: var(--text-muted);
   background: transparent;
   font: inherit;
-  font-size: 11px;
+  font-size: var(--text-xs);
   cursor: pointer;
   transition: color 140ms ease;
 }
@@ -404,7 +381,7 @@ async function onUpdateTag() {
 .tag-action:focus-visible {
   outline: 2px solid var(--control-focus-border);
   outline-offset: 3px;
-  border-radius: 2px;
+  border-radius: var(--radius-xs);
 }
 
 .tag-action--delete:hover,
@@ -425,14 +402,14 @@ async function onUpdateTag() {
   align-content: center;
   gap: 7px;
   border: 1px dashed var(--border-strong);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   color: var(--text-muted);
-  font-size: 13px;
+  font-size: var(--text-sm);
 }
 
 .tag-empty strong {
   color: var(--text-secondary);
-  font-size: 14px;
+  font-size: var(--text-sm);
 }
 
 .tag-empty__mark {
@@ -441,7 +418,7 @@ async function onUpdateTag() {
   height: 34px;
   margin-bottom: 3px;
   place-items: center;
-  border-radius: 10px;
+  border-radius: var(--card-radius);
   color: var(--accent);
   background: color-mix(in srgb, var(--accent) 10%, transparent);
   font-size: 20px;

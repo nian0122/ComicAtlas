@@ -6,11 +6,7 @@ import com.comicatlas.api.storage.dto.ChapterStorageDTO;
 import com.comicatlas.api.storage.dto.ComicStorageDTO;
 import com.comicatlas.api.storage.dto.ComicStorageQuery;
 import com.comicatlas.api.storage.dto.ComicTranscodeStatusVO;
-import com.comicatlas.api.storage.dto.StorageStatsDTO;
-import com.comicatlas.common.constant.StorageRootKeys;
-import com.comicatlas.contract.comic.cache.ComicReferenceCache;
 import com.comicatlas.api.storage.persistence.mapper.StorageMapper;
-import com.comicatlas.api.storage.adapter.StorageCapacityAdapter;
 import com.comicatlas.persistence.storage.FileUrlResolver;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -19,9 +15,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
-import java.nio.file.Path;
-import org.springframework.cache.annotation.Cacheable;
-import com.comicatlas.api.storage.config.ApiStorageProperties;
 
 @Service
 @RequiredArgsConstructor
@@ -29,22 +22,6 @@ public class StorageQueryServiceImpl implements StorageQueryService {
 
     private final StorageMapper storageMapper;
     private final FileUrlResolver fileUrlResolver;
-    private final ApiStorageProperties storageProperties;
-    private final StorageCapacityAdapter storageCapacityAdapter;
-
-    @Override
-    @Cacheable(cacheNames = ComicReferenceCache.STORAGE_STATS,
-            key = "'" + ComicReferenceCache.ALL_KEY + "'", unless = "#result == null")
-    public StorageStatsDTO getStorageStats() {
-        StorageStatsDTO stats = storageMapper.selectStorageStats();
-        if (stats == null) {
-            stats = new StorageStatsDTO();
-        }
-        Path thumbRoot = storageProperties.root(StorageRootKeys.THUMBS).getPath();
-        stats.setThumbBytes(storageCapacityAdapter.directorySize(thumbRoot));
-        stats.setComicCount((int) storageMapper.countActiveComics());
-        return stats;
-    }
 
     @Override
     public List<ComicStorageDTO> listComics(ComicStorageQuery query, int page, int size) {

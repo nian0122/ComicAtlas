@@ -277,7 +277,9 @@ const autoRefresh = ref(true)
 const updatedAt = ref('')
 let timer: ReturnType<typeof setInterval> | undefined
 
-const taskCountsByStatus = computed(() => new Map(statusCounts.value.map(({ status, taskCount }) => [status, taskCount])))
+const taskCountsByStatus = computed(
+  () => new Map(statusCounts.value.map(({ status, taskCount }) => [status, taskCount])),
+)
 const activeCount = computed(
   () =>
     (taskCountsByStatus.value.get('QUEUED') ?? 0) +
@@ -467,7 +469,7 @@ onBeforeUnmount(() => {
 .task-meta,
 .detail-hint {
   color: var(--text-muted);
-  font-size: var(--text-caption);
+  font-size: var(--text-xs);
 }
 .task-cards {
   display: grid;
@@ -538,7 +540,7 @@ onBeforeUnmount(() => {
   flex-wrap: wrap;
   gap: var(--space-2) var(--space-4);
   color: var(--text-secondary);
-  font-size: var(--text-caption);
+  font-size: var(--text-xs);
 }
 .task-card-progress {
   display: grid;
@@ -546,19 +548,19 @@ onBeforeUnmount(() => {
 }
 .progress-label {
   color: var(--text-secondary);
-  font-size: var(--text-caption);
+  font-size: var(--text-xs);
 }
 .progress-label strong {
   color: var(--text-primary);
 }
 .task-card-footer {
   color: var(--text-muted);
-  font-size: var(--text-caption);
+  font-size: var(--text-xs);
 }
 .task-card-error {
   margin: calc(var(--space-2) * -1) 0 0;
   color: var(--danger);
-  font-size: var(--text-caption);
+  font-size: var(--text-xs);
   line-height: 1.5;
 }
 .task-card-actions {
@@ -581,7 +583,7 @@ onBeforeUnmount(() => {
 }
 .detail-eyebrow {
   color: var(--accent);
-  font-size: var(--text-caption);
+  font-size: var(--text-xs);
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -626,7 +628,7 @@ onBeforeUnmount(() => {
 .detail-section-heading span,
 .detail-fields span {
   color: var(--text-muted);
-  font-size: var(--text-caption);
+  font-size: var(--text-xs);
 }
 .detail-stat-grid strong {
   color: var(--text-primary);
@@ -645,7 +647,7 @@ onBeforeUnmount(() => {
 .detail-section-heading h3 {
   margin: 0;
   color: var(--text-primary);
-  font-size: var(--text-subtitle);
+  font-size: var(--text-lg);
 }
 .detail-fields {
   display: grid;
@@ -666,7 +668,7 @@ onBeforeUnmount(() => {
 .detail-fields strong {
   overflow: hidden;
   color: var(--text-primary);
-  font-size: var(--text-caption);
+  font-size: var(--text-xs);
   text-overflow: ellipsis;
   white-space: nowrap;
 }

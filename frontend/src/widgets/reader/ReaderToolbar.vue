@@ -16,6 +16,10 @@
     :next-chapter-id="nextChapterId"
     :chapter-id="chapterId"
     :reaction="reaction"
+    :is-fullscreen="isFullscreen"
+    :fullscreen-pending="fullscreenPending"
+    :visibility-override="visibilityOverride"
+    @toggle-fullscreen="emit('toggleFullscreen')"
     @back="emit('back')"
     @prev-chapter="emit('prevChapter')"
     @next-chapter="emit('nextChapter')"
@@ -27,6 +31,9 @@
     v-else
     :title="title"
     :reaction="reaction"
+    :is-fullscreen="isFullscreen"
+    :fullscreen-pending="fullscreenPending"
+    @toggle-fullscreen="emit('toggleFullscreen')"
     @back="emit('back')"
     @open-settings="emit('openSettings')"
     @open-immersive="emit('openImmersive')"
@@ -55,6 +62,9 @@ interface Props {
   nextChapterId?: number | null
   chapterId?: number | null
   reaction?: 'NONE' | 'LIKE' | 'DISLIKE'
+  isFullscreen?: boolean
+  fullscreenPending?: boolean
+  visibilityOverride?: boolean
 }
 
 withDefaults(defineProps<Props>(), {
@@ -64,6 +74,9 @@ withDefaults(defineProps<Props>(), {
   nextChapterId: null,
   chapterId: null,
   reaction: 'NONE',
+  isFullscreen: false,
+  fullscreenPending: false,
+  visibilityOverride: undefined,
 })
 
 const emit = defineEmits<{
@@ -78,6 +91,7 @@ const emit = defineEmits<{
   /** 页码跳转——桌面变体发出 */
   (e: 'jumpToPage', page: number): void
   (e: 'openImmersive'): void
+  (e: 'toggleFullscreen'): void
   (e: 'toggleReaction', reaction: 'NONE' | 'LIKE' | 'DISLIKE'): void
 }>()
 </script>

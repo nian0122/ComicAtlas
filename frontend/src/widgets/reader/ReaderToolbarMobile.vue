@@ -1,43 +1,36 @@
 <template>
-  <!-- 移动端顶部工具栏：返回 / 漫画名 / 更多（打开设置抽屉） -->
-  <header class="reader-toolbar-mobile">
-    <!-- 返回按钮 -->
-    <AppButton class="toolbar-btn" type="button" aria-label="返回" @click="emit('back')">
-      <svg
-        width="24"
-        height="24"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        stroke-width="2"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-        aria-hidden="true"
-      >
-        <path d="M15 18l-6-6 6-6" />
-      </svg>
-    </AppButton>
-
-    <!-- 漫画标题（超长省略） -->
-    <span class="toolbar-title">{{ title }}</span>
-    <MediaReactionButtons :reaction="reaction" compact @toggle="emit('toggleReaction', $event)" />
-
-    <!-- 更多入口 ⋯（打开设置抽屉） -->
-    <AppButton class="toolbar-btn" type="button" aria-label="阅读设置" @click="emit('openSettings')">
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-        <circle cx="5" cy="12" r="2" />
-        <circle cx="12" cy="12" r="2" />
-        <circle cx="19" cy="12" r="2" />
-      </svg>
-    </AppButton>
-    <AppButton class="toolbar-btn immersive-btn" type="button" aria-label="短视频阅读" @click="emit('openImmersive')">
-      <span aria-hidden="true">▶</span>
-    </AppButton>
-  </header>
+  <!-- 标题与操作分组，长标题不挤占触控按钮。 -->
+  <FloatingPanel as="header" class="reader-toolbar-mobile">
+    <div class="toolbar-heading">
+      <AppButton variant="ghost" class="toolbar-btn" icon-only aria-label="返回" @click="emit('back')">
+        <el-icon :size="22"><ArrowLeft /></el-icon>
+      </AppButton>
+      <span class="toolbar-title" :title="title">{{ title }}</span>
+      <AppButton variant="ghost" class="toolbar-btn" icon-only aria-label="阅读设置" @click="emit('openSettings')">
+        <el-icon :size="22"><Setting /></el-icon>
+      </AppButton>
+    </div>
+    <div class="toolbar-actions">
+      <MediaReactionButtons :reaction="reaction" @toggle="emit('toggleReaction', $event)" />
+      <div class="toolbar-view-actions">
+        <FullscreenButton
+          class="toolbar-btn"
+          :active="isFullscreen"
+          :pending="fullscreenPending"
+          @toggle="emit('toggleFullscreen')"
+        />
+        <AppButton variant="ghost" class="immersive-btn" aria-label="短视频阅读" @click="emit('openImmersive')">
+          <el-icon :size="18"><VideoPlay /></el-icon><span>沉浸阅读</span>
+        </AppButton>
+      </div>
+    </div>
+  </FloatingPanel>
 </template>
 
 <script setup lang="ts">
-import { AppButton } from '@/shared/ui/button'
+import { AppButton, FullscreenButton } from '@/shared/ui/button'
+import { FloatingPanel } from '@/shared/ui/floating-panel'
+import { ArrowLeft, Setting, VideoPlay } from '@element-plus/icons-vue'
 import { MediaReactionButtons } from '@/entities/media'
 // 哑组件：props 进、emits 出，不接触任何 store / composable。
 // 显示与隐藏由父级（ReaderPage）通过 v-if 控制。
@@ -45,6 +38,8 @@ interface Props {
   /** 漫画名（移动端不展示长章节标题） */
   title: string
   reaction: 'NONE' | 'LIKE' | 'DISLIKE'
+  isFullscreen?: boolean
+  fullscreenPending?: boolean
 }
 
 defineProps<Props>()
@@ -53,6 +48,7 @@ const emit = defineEmits<{
   (e: 'back'): void
   (e: 'openSettings'): void
   (e: 'openImmersive'): void
+  (e: 'toggleFullscreen'): void
   (e: 'toggleReaction', reaction: 'NONE' | 'LIKE' | 'DISLIKE'): void
 }>()
 </script>
@@ -60,70 +56,79 @@ const emit = defineEmits<{
 <style scoped>
 .reader-toolbar-mobile {
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  z-index: 30;
+  top: calc(var(--space-3) + env(safe-area-inset-top));
+  left: var(--space-3);
+  right: var(--space-3);
+  z-index: var(--z-nav);
+  display: grid;
+  gap: var(--space-1);
+  max-width: var(--floating-content-max);
+  margin: 0 auto;
+  animation: toolbar-fade-in 160ms ease both;
+}
+.toolbar-heading,
+.toolbar-actions,
+.toolbar-view-actions {
   display: flex;
   align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.toolbar-actions {
   justify-content: space-between;
-  gap: var(--space-sm);
-  /* 内容区高度 48px + 刘海安全区 */
-  height: calc(48px + env(safe-area-inset-top));
-  padding: env(safe-area-inset-top) var(--space-xs) 0;
-  /* 半透明深色背景 + 毛玻璃 */
-  background: var(--bg-primary);
-  background: rgb(8 8 8 / 88%);
-  background: color-mix(in srgb, var(--bg-primary) 80%, transparent);
-  -webkit-backdrop-filter: blur(12px);
-  backdrop-filter: blur(12px);
-  animation: toolbar-fade-in 200ms ease both;
+  padding-top: var(--space-1);
+  border-top: 1px solid var(--border);
 }
-
-@keyframes toolbar-fade-in {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-/* 触控目标 ≥ 48px */
 .toolbar-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 48px;
-  height: 48px;
   flex-shrink: 0;
-  padding: 0;
-  background: transparent;
-  border: none;
+  width: var(--control-min-size);
+  height: var(--control-min-size);
+  border: 0;
+  color: var(--text-secondary);
   border-radius: var(--radius-sm);
-  color: var(--text-primary);
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
 }
-
-.toolbar-btn:active {
-  background: var(--bg-surface);
-}
-
 .toolbar-title {
   flex: 1;
   min-width: 0;
-  max-width: 60vw;
-  margin: 0 auto;
-  text-align: center;
-  font-size: 16px;
-  font-weight: 600;
   color: var(--text-primary);
+  font-size: var(--text-sm);
+  font-weight: 650;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-
+.toolbar-actions :deep(.reaction-buttons .app-button) {
+  width: var(--control-min-size);
+  height: var(--control-min-size);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  border-color: transparent;
+}
+.toolbar-actions :deep(.reaction-buttons .app-button.active) {
+  background: var(--accent-bg);
+  border-color: var(--accent-border);
+}
+.immersive-btn {
+  min-height: var(--control-min-size);
+  padding: 0 var(--space-2);
+  border: 0;
+  color: var(--text-secondary);
+}
+.immersive-btn :deep(span) {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+@keyframes toolbar-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
 @media (prefers-reduced-motion: reduce) {
   .reader-toolbar-mobile {
     animation: none;

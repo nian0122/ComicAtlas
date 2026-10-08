@@ -1,13 +1,13 @@
 .import-page {
   width: 100%;
-  max-width: 1120px;
-  margin: 0 auto;
+  margin: 0;
   padding: 0 0 var(--space-3xl);
   background: var(--bg-primary);
   min-height: 100%;
 }
 
 .import-form-card {
+  max-width: var(--form-content-max);
   margin-bottom: var(--space-2xl);
 }
 
@@ -21,7 +21,7 @@
 
 .form-label {
   display: block;
-  font-size: 13px;
+  font-size: var(--text-sm);
   font-weight: 600;
   color: var(--text-muted);
   text-transform: uppercase;
@@ -69,13 +69,13 @@
 }
 
 .radio-title {
-  font-size: 14px;
+  font-size: var(--text-sm);
   font-weight: 600;
   color: var(--text-primary);
 }
 
 .radio-desc {
-  font-size: 12px;
+  font-size: var(--text-xs);
   color: var(--text-muted);
   line-height: 1.4;
 }
@@ -88,7 +88,7 @@
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   color: var(--text-primary);
-  font-size: 14px;
+  font-size: var(--text-sm);
   font-family: var(--mono);
   transition: border-color 150ms ease;
   box-sizing: border-box;
@@ -104,7 +104,7 @@
 }
 
 .form-hint {
-  font-size: 12px;
+  font-size: var(--text-xs);
   color: var(--text-muted);
   margin: 6px 0 0;
 }
@@ -120,7 +120,7 @@
 .ghost-link {
   color: var(--text-secondary);
   text-decoration: none;
-  font-size: 14px;
+  font-size: var(--text-sm);
   transition: color 150ms ease;
 }
 
@@ -137,7 +137,7 @@
 }
 
 .section-title {
-  font-size: 14px;
+  font-size: var(--text-sm);
   font-weight: 600;
   color: var(--text-primary);
   margin: 0 0 var(--space-base);
@@ -164,7 +164,7 @@
 }
 
 .recent-name {
-  font-size: 13px;
+  font-size: var(--text-sm);
   color: var(--text-primary);
   font-weight: 500;
   overflow: hidden;
@@ -174,7 +174,7 @@
 }
 
 .recent-status {
-  font-size: 12px;
+  font-size: var(--text-xs);
   color: var(--text-secondary);
 }
 
@@ -197,7 +197,7 @@
   margin-top: var(--space-base);
   color: var(--text-secondary);
   text-decoration: none;
-  font-size: 13px;
+  font-size: var(--text-sm);
   transition: color 150ms ease;
 }
 

@@ -18,3 +18,5 @@
 | 通用外观 | `shared/ui` | 按钮、状态标签、标题、空态、面板和加载指示器 |
 
 页面私有组件留在对应 `pages/*/ui`；跨页面组合放在 `widgets`；用户动作放在 `features`；稳定业务对象展示放在 `entities`。通用组件的视觉值统一读取 `app/styles/tokens.css`，设计依据见 [设计系统](design-system.md)。
+
+统计卡通过 `StatCard` 的 `compact` 属性表达紧凑、顶部对齐的内容；统计网格通过 `StatGrid.mobileColumns` 指定窄屏一列或两列，默认仍为一列。存储页面使用这些公共属性，不在页面复制统计卡主题。筛选字段继续消费公共控件样式，可通过 `--filter-label-size` 和 `--filter-label-color` 调整标签层级。

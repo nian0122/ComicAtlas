@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="个人技术笔记与日常记录。">
+  <title>个人技术笔记</title>
+  <style>
+    :root { color-scheme: light; --paper: #f1ede3; --ink: #202b24; --muted: #667067; --rule: #c9c7bb; --red: #a63d2d; font-family: "Songti SC", "Noto Serif CJK SC", "STSong", serif; color: var(--ink); background: var(--paper); }
+    * { box-sizing: border-box; }
+    body { margin: 0; line-height: 1.85; }
+    .page { width: min(980px, 100% - 3rem); margin-inline: auto; }
+    header { padding-top: 2rem; }
+    .masthead { display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--ink); padding-bottom: .8rem; font: 600 .76rem/1.4 "Microsoft YaHei", sans-serif; letter-spacing: .12em; text-transform: uppercase; }
+    .masthead span:last-child { color: var(--red); }
+    .hero { padding: clamp(3rem, 9vw, 7rem) 0 3rem; display: grid; grid-template-columns: 1fr minmax(180px, 270px); gap: 2rem; align-items: end; }
+    h1 { font-size: clamp(3.5rem, 11vw, 7.5rem); font-weight: 500; line-height: 1.02; letter-spacing: -.08em; margin: 0; }
+    .hero p { max-width: 25rem; margin: 0 0 .5rem; color: var(--muted); }
+    main { border-top: 3px double var(--ink); padding: 2rem 0 4rem; display: grid; grid-template-columns: 1fr 2fr; gap: 3rem; }
+    .section-label { color: var(--red); font: 600 .75rem/1.5 "Microsoft YaHei", sans-serif; letter-spacing: .13em; }
+    h2 { font-size: 1.45rem; font-weight: 600; margin: .35rem 0 .8rem; }
+    p { margin: .5rem 0; }
+    .about { padding-right: 1.5rem; border-right: 1px solid var(--rule); }
+    .entries { display: grid; grid-template-columns: 1fr 1fr; gap: 1.2rem; }
+    .entry { border-top: 1px solid var(--ink); padding-top: .8rem; }
+    .entry h3 { margin: 0 0 .45rem; font-size: 1.08rem; }
+    .entry p { color: var(--muted); font-size: .95rem; }
+    footer { border-top: 1px solid var(--rule); padding: 1rem 0 2rem; color: var(--muted); font: .8rem/1.6 "Microsoft YaHei", sans-serif; }
+    @media (max-width: 650px) { .page { width: min(100% - 2rem, 980px); } .hero, main { grid-template-columns: 1fr; } .hero { gap: 1.5rem; padding-block: 3.5rem 2rem; } main { gap: 2rem; } .about { border-right: 0; border-bottom: 1px solid var(--rule); padding: 0 0 1.5rem; } .entries { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header>
+      <div class="masthead"><span>私人札记 · 技术与日常</span><span>个人非经营性网站</span></div>
+      <div class="hero">
+        <h1>技术<br>随记</h1>
+        <p>记录软件开发、自托管服务与日常数字生活中的实践和思考。</p>
+      </div>
+    </header>
+    <main>
+      <section class="about" aria-labelledby="about-title">
+        <div class="section-label">ABOUT / 01</div>
+        <h2 id="about-title">关于本站</h2>
+        <p>这里整理个人学习笔记与实践记录，主题包括软件开发、个人服务维护和数字生活。</p>
+        <p>本站用于个人内容分享，不提供商品交易、付费服务或广告推广。</p>
+      </section>
+      <section aria-labelledby="notes-title">
+        <div class="section-label">FIELD NOTES / 02</div>
+        <h2 id="notes-title">近期笔记</h2>
+        <div class="entries">
+      <article class="entry">
+        <h3>自托管服务的日常维护</h3>
+        <p>维护个人服务时，可将配置、数据备份和状态检查分开管理。容器编排文件记录服务依赖，异地备份则通过恢复演练确认数据可用。</p>
+      </article>
+      <article class="entry">
+        <h3>把重复操作整理成脚本</h3>
+        <p>为常用的部署和维护步骤编写脚本时，先明确输入、检查前置条件，再记录结果与错误原因，能减少手工遗漏，也方便复查。</p>
+      </article>
+        </div>
+      </section>
+    </main>
+    <footer>个人学习与生活记录 · 非商业用途 · <!-- ICP_FOOTER --></footer>
+  </div>
+</body>
+</html>

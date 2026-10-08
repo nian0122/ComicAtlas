@@ -173,6 +173,7 @@ public class WorkerConfig {
     @Data
     public static class Cover {
         private int quality = 25;
+        private int maxLongEdge = 400;
         private long timeoutSeconds = 600;
         private long frameTimeoutSeconds = 120;
         private int workers = 1;

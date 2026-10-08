@@ -13,7 +13,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
-import com.comicatlas.contract.comic.dto.ComicListQuery;
+import com.comicatlas.api.library.dto.ManagementComicListQuery;
 
 /**
  * 管理域漫画查询接口，管理端不得跨域调用阅读服务查询接口。
@@ -32,7 +32,7 @@ public class ManagementComicQueryController {
      * @return 管理端漫画分页结果
      */
     @GetMapping
-    public Result<PageResponse<ManagementComicListVO>> list(ComicListQuery query) {
+    public Result<PageResponse<ManagementComicListVO>> list(ManagementComicListQuery query) {
         IPage<ManagementComicListVO> page = queryService.list(query);
         return Result.ok(PageResponse.of(page.getRecords(), page.getTotal(), page.getCurrent(), page.getSize()));
     }

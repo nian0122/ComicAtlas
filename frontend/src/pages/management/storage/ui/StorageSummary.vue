@@ -7,142 +7,111 @@ import type { StorageStats } from '@/entities/storage'
 
 const props = defineProps<{
   stats: StorageStats | null
+  loading: boolean
+  error: string
 }>()
 
-const total = computed(() => {
-  const stats = props.stats
-  if (!stats) return 0
-  return stats.totalBytes || stats.hqBytes + stats.lqBytes + stats.thumbBytes
-})
+const total = computed(() => props.stats?.totalBytes ?? null)
+const isComplete = computed(() => props.stats?.snapshotAvailable === true && total.value !== null)
 const hqPercent = computed(() => percent(props.stats?.hqBytes))
 const lqPercent = computed(() => percent(props.stats?.lqBytes))
-const thumbPercent = computed(() => percent(props.stats?.thumbBytes))
-const unknownPercent = computed(() => Math.max(0, 100 - hqPercent.value - lqPercent.value - thumbPercent.value))
+const refreshMessage = computed(() => {
+  if (props.error) return props.error
+  if (!props.stats) return props.loading ? '正在读取统计…' : '统计尚不可用'
+  if (props.stats.refreshStatus === 'FAILED')
+    return props.stats.snapshotAvailable ? '容量核对失败，保留上次成功结果' : '容量核对失败，尚无可用快照'
+  if (props.stats.refreshStatus === 'RUNNING' || props.stats.refreshStatus === 'PENDING')
+    return props.stats.snapshotAvailable ? '正在后台核对缩略图容量，暂显示上次结果' : '首次容量统计中…'
+  return '缩略图容量已核对'
+})
+const updatedTime = computed(() => {
+  const value = props.stats?.thumbUpdatedAt
+  if (!value) return ''
+  // 后端快照时间为 UTC，无偏移的数据库时间需要明确按 UTC 解释。
+  const date = new Date(/Z$|[+-]\d{2}:\d{2}$/.test(value) ? value : `${value}Z`)
+  return Number.isNaN(date.getTime()) ? '' : date.toLocaleString('zh-CN', { hour12: false })
+})
 
 function percent(bytes: number | undefined): number {
-  if (!bytes || total.value <= 0) return 0
+  if (!bytes || total.value === null || total.value <= 0) return 0
   return Math.round((bytes / total.value) * 100)
 }
 </script>
 
 <template>
-  <section class="storage-overview">
-    <div class="total-card">
-      <span class="overview-kicker">TOTAL STORAGE</span>
-      <strong>{{ formatSize(total) }}</strong>
-      <span>当前已统计的漫画文件与缩略图</span>
-      <div class="capacity-bar" aria-label="存储占用分布">
-        <i class="bar-hq" :style="{ width: `${hqPercent}%` }" />
-        <i class="bar-lq" :style="{ width: `${lqPercent}%` }" />
-        <i class="bar-thumb" :style="{ width: `${thumbPercent}%` }" />
-        <i class="bar-unknown" :style="{ width: `${unknownPercent}%` }" />
-      </div>
-      <div class="distribution-legend">
-        <span><i class="dot dot-hq" />HQ {{ hqPercent }}%</span><span><i class="dot dot-lq" />LQ {{ lqPercent }}%</span
-        ><span><i class="dot dot-thumb" />缩略图 {{ thumbPercent }}%</span>
-      </div>
-    </div>
-    <StatGrid class="stat-grid" :columns="3">
+  <section class="storage-overview" aria-label="全库容量统计">
+    <StatGrid :columns="4" :mobile-columns="2">
       <StatCard
-        label="HQ 主文件"
-        :value="formatSize(stats?.hqBytes)"
-        :description="'原始质量 · ' + hqPercent + '%'"
-        tone="primary"
+        compact
+        label="全库占用"
+        :value="isComplete ? formatSize(total ?? 0) : '待完成统计'"
+        description="HQ、LQ 与缩略图合计"
       />
       <StatCard
-        label="LQ 衍生文件"
-        :value="formatSize(stats?.lqBytes)"
-        :description="'阅读优化 · ' + lqPercent + '%'"
-        tone="success"
+        compact
+        label="HQ 原文件"
+        :value="stats ? formatSize(stats.hqBytes) : '—'"
+        :description="isComplete ? '全库占用的 ' + hqPercent + '%' : '数据库登记的就绪文件'"
       />
       <StatCard
+        compact
+        label="LQ 阅读副本"
+        :value="stats ? formatSize(stats.lqBytes) : '—'"
+        :description="isComplete ? '全库占用的 ' + lqPercent + '%' : '数据库登记的就绪图片'"
+      />
+      <StatCard
+        compact
         label="缩略图"
-        :value="formatSize(stats?.thumbBytes)"
-        :description="'列表预览 · ' + thumbPercent + '%'"
-        tone="warning"
+        :value="stats?.snapshotAvailable ? formatSize(stats.thumbBytes) : '尚未统计'"
+        :description="stats?.snapshotAvailable ? stats.thumbFileCount + ' 个文件 · 最近成功快照' : '后台核对目录容量'"
       />
     </StatGrid>
+    <div class="snapshot-meta">
+      <p
+        class="snapshot-status"
+        :class="{ 'snapshot-status--error': error || stats?.refreshStatus === 'FAILED' }"
+        role="status"
+      >
+        <span class="snapshot-dot" aria-hidden="true" />{{ refreshMessage }}
+      </p>
+      <span v-if="updatedTime">缩略图更新于 {{ updatedTime }}</span>
+    </div>
   </section>
 </template>
 
 <style scoped>
 .storage-overview {
   display: grid;
-  grid-template-columns: minmax(300px, 1.1fr) minmax(0, 1.9fr);
-  gap: var(--space-base);
-  margin-bottom: var(--space-xl);
-}
-.total-card {
-  display: grid;
-  align-content: center;
-  gap: var(--space-sm);
-  min-height: 190px;
-  padding: var(--space-xl);
-  border: 1px solid var(--border-strong);
-  background: linear-gradient(145deg, var(--bg-elevated), var(--bg-surface));
-}
-.overview-kicker {
-  color: var(--accent);
-  font: 800 10px var(--mono);
-  letter-spacing: 0.16em;
-}
-.total-card strong {
-  color: var(--text-primary);
-  font-size: clamp(2rem, 4vw, 3rem);
-  letter-spacing: -0.04em;
-}
-.total-card > span:not(.overview-kicker) {
-  color: var(--text-muted);
-  font-size: 11px;
-}
-.capacity-bar {
-  display: flex;
-  height: 8px;
-  overflow: hidden;
-  margin-top: var(--space-sm);
-  background: var(--bg-primary);
-}
-.capacity-bar i {
-  display: block;
+  gap: var(--space-3);
   min-width: 0;
-  transition: width 300ms ease;
 }
-.bar-hq,
-.dot-hq {
-  background: var(--accent);
-}
-.bar-lq,
-.dot-lq {
-  background: var(--success);
-}
-.bar-thumb,
-.dot-thumb {
-  background: var(--warning);
-}
-.bar-unknown {
-  background: var(--border-strong);
-}
-.distribution-legend {
+.snapshot-meta {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-3);
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-4);
   color: var(--text-secondary);
-  font-size: 10px;
+  font-size: var(--text-xs);
 }
-.distribution-legend span {
+.snapshot-status {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: var(--space-2);
+  margin: 0;
+  line-height: 1.5;
 }
-.dot {
-  width: 7px;
-  height: 7px;
+.snapshot-dot {
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
+  background: var(--text-muted);
+  flex-shrink: 0;
 }
-
-@media (max-width: 900px) {
-  .storage-overview {
-    grid-template-columns: 1fr;
-  }
+.snapshot-status--error {
+  color: var(--warning);
+}
+.snapshot-status--error .snapshot-dot {
+  background: currentColor;
 }
 </style>

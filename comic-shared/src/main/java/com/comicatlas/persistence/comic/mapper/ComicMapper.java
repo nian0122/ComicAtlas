@@ -65,14 +65,7 @@ public interface ComicMapper extends BaseMapper<Comic> {
         <script>
         SELECT c.id, c.title, c.author, c.total_pages, c.category_id, c.status, c.created_at, c.hq_size, c.reaction, c.reaction_at FROM comic c
         <where>
-            <choose>
-                <when test='query.status != null and query.status != ""'>
-                    AND c.status = #{query.status}
-                </when>
-                <otherwise>
-                    AND c.status = 'READY'
-                </otherwise>
-            </choose>
+            AND c.status = 'READY'
             <if test='query.keyword != null and query.keyword != ""'>
                 AND (c.title LIKE CONCAT('%', #{query.keyword}, '%')
                      OR c.title_jpn LIKE CONCAT('%', #{query.keyword}, '%')
@@ -125,65 +118,6 @@ public interface ComicMapper extends BaseMapper<Comic> {
             <if test='query.sourceType != null and query.sourceType != ""'>
                 AND c.source_type = #{query.sourceType}
             </if>
-            <if test='query.hqStatus == "HAS_HQ"'>
-                AND EXISTS (
-                    SELECT 1 FROM chapter hq_chapter
-                    JOIN page hq_page ON hq_page.chapter_id = hq_chapter.id
-                    WHERE hq_chapter.comic_id = c.id
-                    <if test='activeMediaOnly'> AND hq_chapter.status = 'READY' AND hq_page.status = 'READY' </if>
-                      AND hq_page.hq_status = 'READY'
-                )
-            </if>
-            <if test='query.hqStatus == "NO_HQ"'>
-                AND NOT EXISTS (
-                    SELECT 1 FROM chapter no_hq_chapter
-                    JOIN page no_hq_page ON no_hq_page.chapter_id = no_hq_chapter.id
-                    WHERE no_hq_chapter.comic_id = c.id
-                    <if test='activeMediaOnly'> AND no_hq_chapter.status = 'READY' AND no_hq_page.status = 'READY' </if>
-                      AND no_hq_page.hq_status = 'READY'
-                )
-            </if>
-            <if test='query.hqStatus != null and query.hqStatus != "" and query.hqStatus != "HAS_HQ" and query.hqStatus != "NO_HQ"'>
-                AND EXISTS (
-                    SELECT 1 FROM chapter status_hq_chapter
-                    JOIN page status_hq_page ON status_hq_page.chapter_id = status_hq_chapter.id
-                    WHERE status_hq_chapter.comic_id = c.id
-                    <if test='activeMediaOnly'> AND status_hq_chapter.status = 'READY' AND status_hq_page.status = 'READY' </if>
-                      AND status_hq_page.hq_status = #{query.hqStatus}
-                )
-            </if>
-            <if test='query.lqStatus == "HAS_LQ"'>
-                AND EXISTS (
-                    SELECT 1 FROM chapter has_lq_chapter
-                    JOIN page has_lq_page ON has_lq_page.chapter_id = has_lq_chapter.id
-                    WHERE has_lq_chapter.comic_id = c.id
-                    <if test='activeMediaOnly'> AND has_lq_chapter.status = 'READY' AND has_lq_page.status = 'READY' </if>
-                      AND has_lq_page.media_type = 'IMAGE'
-                      AND has_lq_page.lq_status = 'READY'
-                )
-            </if>
-            <if test='query.lqStatus != null and query.lqStatus != "" and query.lqStatus != "HAS_LQ" and query.lqStatus != "NO_LQ"'>
-                AND EXISTS (
-                    SELECT 1 FROM chapter status_lq_chapter
-                    JOIN page status_lq_page ON status_lq_page.chapter_id = status_lq_chapter.id
-                    WHERE status_lq_chapter.comic_id = c.id
-                    <if test='activeMediaOnly'> AND status_lq_chapter.status = 'READY' AND status_lq_page.status = 'READY' </if>
-                      AND status_lq_page.media_type = 'IMAGE'
-                      AND (status_lq_page.lq_status = #{query.lqStatus}
-                           OR (#{query.lqStatus} IN ('QUEUED', 'GENERATING')
-                               AND status_lq_page.lq_status IN ('QUEUED', 'GENERATING')))
-                )
-            </if>
-            <if test='query.lqStatus == "NO_LQ"'>
-                AND NOT EXISTS (
-                    SELECT 1 FROM chapter no_lq_chapter
-                    JOIN page no_lq_page ON no_lq_page.chapter_id = no_lq_chapter.id
-                    WHERE no_lq_chapter.comic_id = c.id
-                    <if test='activeMediaOnly'> AND no_lq_chapter.status = 'READY' AND no_lq_page.status = 'READY' </if>
-                      AND no_lq_page.media_type = 'IMAGE'
-                      AND no_lq_page.lq_status = 'READY'
-                )
-            </if>
         </where>
         ORDER BY
         <choose>
@@ -201,8 +135,7 @@ public interface ComicMapper extends BaseMapper<Comic> {
         , c.id ASC
         </script>
     """)
-    IPage<Comic> selectPage(Page<Comic> page, @Param("query") ComicListQuery query,
-                            @Param("activeMediaOnly") boolean activeMediaOnly);
+    IPage<Comic> selectPage(Page<Comic> page, @Param("query") ComicListQuery query);
 
     @Update("UPDATE comic SET reaction = #{reaction}, reaction_at = #{reactionAt} WHERE id = #{comicId} AND status = 'READY'")
     int updateReaction(@Param("comicId") Long comicId, @Param("reaction") MediaReaction reaction,
@@ -240,76 +173,4 @@ public interface ComicMapper extends BaseMapper<Comic> {
         """)
     Comic selectByIdForUpdate(@Param("id") Long id);
 
-    /**
-     * 批量操作 FILTER 解析：返回匹配筛选条件的全部漫画 id。
-     * <p>
-     * 与列表查询不同：不强制 READY（批量可作用于 TRASHED/DRAFT 等），
-     * 按 {@code id ASC} 稳定排序，最多返回 limit 行（用于探测超限）。
-     */
-    @Select("""
-        <script>
-        SELECT c.id FROM comic c
-        <where>
-            <if test='query.keyword != null and query.keyword != ""'>
-                AND (c.title LIKE CONCAT('%', #{query.keyword}, '%')
-                     OR c.title_jpn LIKE CONCAT('%', #{query.keyword}, '%')
-                     OR c.author LIKE CONCAT('%', #{query.keyword}, '%')
-                     OR EXISTS (SELECT 1 FROM comic_tag ct JOIN tag t ON t.id = ct.tag_id
-                                 WHERE ct.comic_id = c.id AND t.name LIKE CONCAT('%', #{query.keyword}, '%')))
-            </if>
-            <if test='query.tag != null and query.tag != ""'>
-                AND EXISTS (SELECT 1 FROM comic_tag ct JOIN tag t ON t.id = ct.tag_id
-                            WHERE ct.comic_id = c.id AND t.name = #{query.tag})
-            </if>
-            <if test='query.tags != null and query.tags.size > 0'>
-                <choose>
-                    <when test='query.tags.contains(&quot;_NONE&quot;)'>
-                        AND NOT EXISTS (SELECT 1 FROM comic_tag ct WHERE ct.comic_id = c.id)
-                    </when>
-                    <otherwise>
-                        <choose>
-                            <when test='query.tagMode == &quot;NOT&quot;'>
-                                AND NOT EXISTS (SELECT 1 FROM comic_tag ct JOIN tag t ON t.id = ct.tag_id
-                                                WHERE ct.comic_id = c.id AND t.name IN
-                                                <foreach collection='query.tags' item='tagName' open='(' separator=',' close=')'>#{tagName}</foreach>)
-                            </when>
-                            <when test='query.tagMode == &quot;AND&quot;'>
-                                AND (SELECT COUNT(DISTINCT t.name) FROM comic_tag ct JOIN tag t ON t.id = ct.tag_id
-                                     WHERE ct.comic_id = c.id AND t.name IN
-                                     <foreach collection='query.tags' item='tagName' open='(' separator=',' close=')'>#{tagName}</foreach>
-                                    ) = #{query.tagCount}
-                            </when>
-                            <otherwise>
-                                AND EXISTS (SELECT 1 FROM comic_tag ct JOIN tag t ON t.id = ct.tag_id
-                                            WHERE ct.comic_id = c.id AND t.name IN
-                                            <foreach collection='query.tags' item='tagName' open='(' separator=',' close=')'>#{tagName}</foreach>
-                                           )
-                            </otherwise>
-                        </choose>
-                    </otherwise>
-                </choose>
-            </if>
-            <if test='query.status != null and query.status != ""'>
-                AND c.status = #{query.status}
-            </if>
-            <if test='query.category != null and query.category != ""'>
-                <choose>
-                    <when test='query.category == &quot;_NONE&quot;'>
-                        AND c.category_id IS NULL
-                    </when>
-                    <otherwise>
-                        AND EXISTS (SELECT 1 FROM category cat WHERE cat.id = c.category_id AND cat.name = #{query.category})
-                    </otherwise>
-                </choose>
-            </if>
-            <if test='query.sourceType != null and query.sourceType != ""'>
-                AND c.source_type = #{query.sourceType}
-            </if>
-        </where>
-        ORDER BY c.id ASC
-        LIMIT #{limit}
-        </script>
-    """)
-    List<Long> selectIdsByQuery(@Param("query") com.comicatlas.contract.comic.dto.ComicListQuery query,
-                                @Param("limit") int limit);
 }

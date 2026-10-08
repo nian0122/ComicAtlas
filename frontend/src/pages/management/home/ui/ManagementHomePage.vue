@@ -87,7 +87,7 @@
         ><template #icon
           ><el-icon :size="24"><Collection /></el-icon></template
       ></StatCard>
-      <StatCard label="存储占用" :value="formatBytes(storage?.totalBytes)"
+      <StatCard label="存储占用" :value="storage?.totalBytes == null ? '待完成统计' : formatBytes(storage.totalBytes)"
         ><template #icon
           ><el-icon :size="24"><FolderOpened /></el-icon></template
       ></StatCard>
@@ -198,9 +198,7 @@ onMounted(async () => {
     const countByStatus = new Map(taskStatusCounts.data.map(({ status, taskCount }) => [status, taskCount]))
     failedTaskCount.value = (countByStatus.get('FAILED') ?? 0) + (countByStatus.get('PARTIALLY_SUCCEEDED') ?? 0)
     activeTaskCount.value =
-      (countByStatus.get('QUEUED') ?? 0) +
-      (countByStatus.get('RUNNING') ?? 0) +
-      (countByStatus.get('CANCELLING') ?? 0)
+      (countByStatus.get('QUEUED') ?? 0) + (countByStatus.get('RUNNING') ?? 0) + (countByStatus.get('CANCELLING') ?? 0)
     storage.value = storageSummary
     updatedAt.value = new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
   } catch (reason: unknown) {

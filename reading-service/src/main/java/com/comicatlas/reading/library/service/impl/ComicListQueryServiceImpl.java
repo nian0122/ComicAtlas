@@ -15,7 +15,7 @@ import com.comicatlas.persistence.reader.entity.ReadingHistory;
 import com.comicatlas.persistence.reader.mapper.ReadingHistoryMapper;
 import com.comicatlas.reading.library.service.ComicListQueryService;
 import com.comicatlas.reading.library.cache.ComicListCacheService;
-import com.comicatlas.reading.library.support.ComicListQueryNormalizer;
+import com.comicatlas.reading.library.support.ReadingComicFilterNormalizer;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -39,7 +39,7 @@ public class ComicListQueryServiceImpl implements ComicListQueryService {
 
     /** 查询一页漫画并组装为阅读端分页 DTO。 */
     public ComicListPage listComics(ComicListQuery query) {
-        ComicListQueryNormalizer.normalize(query);
+        ReadingComicFilterNormalizer.normalize(query);
         String cacheKey = comicListCacheService.buildKey(query);
         ComicListPage cachedPage = comicListCacheService.get(cacheKey);
         if (cachedPage != null) {
@@ -53,7 +53,7 @@ public class ComicListQueryServiceImpl implements ComicListQueryService {
 
     private ComicListPage queryBasePage(ComicListQuery query) {
         Page<Comic> page = new Page<>(query.getPage(), query.getSize());
-        IPage<Comic> result = comicMapper.selectPage(page, query, false);
+        IPage<Comic> result = comicMapper.selectPage(page, query);
         List<Comic> comics = result.getRecords();
         if (comics.isEmpty()) {
             return ComicListPage.of(new ArrayList<>(), result.getTotal(), result.getCurrent(), result.getSize());

@@ -1,6 +1,6 @@
 import { api } from '@/shared/api/http'
 import type { OperationSubmitResult, PageResult } from '@/shared/api/types'
-import type { CatalogNode, ComicDetailVO, ComicListQuery, ComicListVO } from '@/entities/comic/model/types'
+import type { CatalogNode, ComicDetailVO, ComicListVO } from '@/entities/comic/model/types'
 import type { ComicTagUpdateDTO } from '@/entities/tag/@x/comic'
 import type {
   BatchComicUpdateDTO,
@@ -10,6 +10,7 @@ import type {
   ChapterManagementVO,
   ComicMetadataDTO,
   ComicMetadataUpdateDTO,
+  ManagementComicListQuery,
   MediaReorderRequest,
   MediaReorderResult,
   StructureOrderRequest,
@@ -24,7 +25,7 @@ export const managementCatalogApi = {
 }
 
 export const managementComicApi = {
-  list: (params?: ComicListQuery) => api.get<PageResult<ComicListVO>>('/manage/comics', { params }),
+  list: (params?: ManagementComicListQuery) => api.get<PageResult<ComicListVO>>('/manage/comics', { params }),
   detail: (id: number) => api.get<ComicDetailVO>(`/manage/comics/${id}`),
   getMetadata: (id: number) => api.get<ComicMetadataDTO>(`/manage/comics/${id}/metadata`),
   getTags: (id: number) => api.get<number[]>(`/manage/comics/${id}/tags`),

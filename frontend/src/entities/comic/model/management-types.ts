@@ -1,3 +1,33 @@
+import type { ComicStatus } from './types'
+
+/** 管理列表专属协议：生命周期、来源和文件完整性，不依赖阅读列表筛选范围。 */
+export interface ManagementComicListQuery {
+  keyword?: string
+  tag?: string
+  tags?: string[]
+  tagMode?: 'AND' | 'OR' | 'NOT'
+  status?: ComicStatus
+  category?: string
+  sourceType?: 'ZIP' | 'CBZ' | 'DIRECTORY' | 'EHENTAI'
+  hqStatus?:
+    | 'HAS_HQ'
+    | 'ALL_HQ'
+    | 'PARTIAL_HQ'
+    | 'NO_HQ'
+    | 'PENDING'
+    | 'MISSING'
+    | 'DELETE_QUEUED'
+    | 'DELETING'
+    | 'DELETED'
+    | 'FAILED'
+  lqStatus?:
+    'HAS_LQ' | 'ALL_LQ' | 'PARTIAL_LQ' | 'NO_LQ' | 'NOT_GENERATED' | 'QUEUED' | 'GENERATING' | 'MISSING' | 'FAILED'
+  sort?: 'createdAt' | 'updatedAt' | 'title' | 'pageCount' | 'fileSize' | 'lastReadTime'
+  order?: 'asc' | 'desc'
+  page?: number
+  size?: number
+}
+
 export interface ComicMetadataDTO {
   title: string
   author?: string

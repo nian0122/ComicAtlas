@@ -1,6 +1,5 @@
-import { computed, ref, watch } from 'vue'
+import { computed, ref } from 'vue'
 import type { ComputedRef, Ref } from 'vue'
-import { useAutoHide } from './useAutoHide'
 
 /**
  * Reader 工具栏状态机（设计规范 §3）。
@@ -19,7 +18,7 @@ export const ReaderUiState = {
   IMMERSIVE: 0,
   /** 工具栏 + 底部导航可见 */
   TOOLBAR: 1,
-  /** 设置抽屉打开（暂停自动隐藏计时） */
+  /** 设置抽屉打开 */
   SETTINGS: 2,
 } as const
 
@@ -33,8 +32,6 @@ export const ReaderAction = {
   OpenSettings: 1,
   /** 关闭设置（× / 遮罩点击 / 下滑） */
   CloseSettings: 2,
-  /** 4s 无操作超时 */
-  AutoHideTimeout: 3,
   /** Android 返回键（Overlay Stack 原则：优先关闭最上层） */
   AndroidBack: 4,
   /** 移动端上滑隐藏工具栏 */
@@ -63,19 +60,17 @@ export const TRANSITIONS: Record<string, Record<string, ReaderUiState | 'EXIT'>>
   [ReaderUiState.TOOLBAR]: {
     /** 工具栏可见时点击中央 → 收起工具栏回到全屏 */
     [ReaderAction.TapCenter]: ReaderUiState.IMMERSIVE,
-    /** 4s 无操作超时 → 自动收起工具栏 */
-    [ReaderAction.AutoHideTimeout]: ReaderUiState.IMMERSIVE,
     /** 点击 ⋯ 按钮 → 打开设置抽屉 */
     [ReaderAction.OpenSettings]: ReaderUiState.SETTINGS,
     /** 工具栏可见时按返回键 → 先收起工具栏（不退出） */
     [ReaderAction.AndroidBack]: ReaderUiState.IMMERSIVE,
     /** 工具栏可见时上滑 → 回到沉浸阅读 */
     [ReaderAction.SwipeUp]: ReaderUiState.IMMERSIVE,
-    /** 下滑保持工具栏可见，并重置自动隐藏倒计时 */
+    /** 下滑保持工具栏可见 */
     [ReaderAction.SwipeDown]: ReaderUiState.TOOLBAR,
   },
   [ReaderUiState.SETTINGS]: {
-    /** 关闭设置抽屉 → 回到工具栏（重启自动隐藏计时） */
+    /** 关闭设置抽屉 → 回到工具栏 */
     [ReaderAction.CloseSettings]: ReaderUiState.TOOLBAR,
     /** 设置打开时按返回键 → 关闭最上层 Overlay 回到工具栏 */
     [ReaderAction.AndroidBack]: ReaderUiState.TOOLBAR,
@@ -84,8 +79,6 @@ export const TRANSITIONS: Record<string, Record<string, ReaderUiState | 'EXIT'>>
 
 /** useReaderToolbar 可选配置 */
 export interface UseReaderToolbarOptions {
-  /** 工具栏无操作自动隐藏毫秒数，透传给 useAutoHide，默认 4000 */
-  autoHideTimeout?: number
   /**
    * EXIT 哨兵回调。
    *
@@ -114,42 +107,11 @@ export interface ReaderToolbarControls {
  * Reader 工具栏状态机 composable（设计规范 §3）。
  *
  * 唯一事实来源是 TRANSITIONS 表：dispatch 只查表迁移，绝不硬编码状态跳转。
- * 内部组合 useAutoHide 执行自动隐藏副作用（按迁移后的新状态触发）：
- * - 进入 TOOLBAR：常规路径 autoHide.show()（重启完整倒计时）；
- *   CloseSettings 迁移改用 autoHide.resume()，与 SETTINGS 期间的 pause() 配对
- * - 进入 IMMERSIVE：autoHide.hide()
- * - 进入 SETTINGS：autoHide.pause()（抽屉打开期间冻结倒计时）
- *
- * 超时接线：sync watch 监听 autoHide.visible，翻转为 false 且当前仍处于
- * TOOLBAR 态时派发 AutoHideTimeout（TOOLBAR → IMMERSIVE）。
- *
- * 防死循环设计：dispatch 先写 state.value、后执行副作用，因此进入
- * IMMERSIVE 时 hide() 触发的 watch 回调读到的已是 IMMERSIVE，守卫不成立；
- * 超时派发路径中 hide() 再次置 false 属于同值写入，不会重复触发 watch。
+ * 工具栏不会因无操作自动收起；进入沉浸态只通过点击中央、上滑或用户返回操作。
  */
 export function useReaderToolbar(options: UseReaderToolbarOptions = {}): ReaderToolbarControls {
   /** 初始态：全屏沉浸阅读 */
   const state = ref<ReaderUiState>(ReaderUiState.IMMERSIVE)
-  const autoHide = useAutoHide(options.autoHideTimeout)
-
-  /** 迁移完成后的副作用（依据动作 + 新状态，规则见函数头注释） */
-  const applySideEffects = (action: ReaderAction, next: ReaderUiState): void => {
-    switch (next) {
-      case ReaderUiState.TOOLBAR:
-        if (action === ReaderAction.CloseSettings) {
-          autoHide.resume()
-        } else {
-          autoHide.show()
-        }
-        break
-      case ReaderUiState.IMMERSIVE:
-        autoHide.hide()
-        break
-      case ReaderUiState.SETTINGS:
-        autoHide.pause()
-        break
-    }
-  }
 
   const dispatch = (action: ReaderAction): void => {
     const next = TRANSITIONS[state.value]?.[action]
@@ -162,22 +124,8 @@ export function useReaderToolbar(options: UseReaderToolbarOptions = {}): ReaderT
       options.onExit?.()
       return
     }
-    // 先写状态、后跑副作用——该顺序是防死循环的关键（见函数头注释）
     state.value = next
-    applySideEffects(action, next)
   }
-
-  // 自动隐藏倒计时到点：visible 翻 false 且仍在 TOOLBAR 态 → 派发超时动作。
-  // sync flush 保证超时迁移即时完成，不依赖组件渲染周期。
-  watch(
-    autoHide.visible,
-    (visible) => {
-      if (!visible && state.value === ReaderUiState.TOOLBAR) {
-        dispatch(ReaderAction.AutoHideTimeout)
-      }
-    },
-    { flush: 'sync' },
-  )
 
   const toolbarVisible = computed(() => state.value !== ReaderUiState.IMMERSIVE)
   const isToolbar = computed(() => state.value === ReaderUiState.TOOLBAR)

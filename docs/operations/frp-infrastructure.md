@@ -1,5 +1,7 @@
 # FRP 基础设施连接
 
+公网阅读使用独立隧道与 HTTP 入口，见 [公网阅读入口](public-reading.md)。本页描述的基础设施端口保持不向公网开放。
+
 ComicAtlas 使用 FRP STCP 访问远端 MySQL、Redis、RabbitMQ、Nacos 和 FRPS Dashboard。远端服务与 Dashboard 继续只绑定 `127.0.0.1`，公网只需开放 `.env` 中 `FRP_SERVER_PORT` 对应的 TCP 端口。
 
 连接由三个进程组成：

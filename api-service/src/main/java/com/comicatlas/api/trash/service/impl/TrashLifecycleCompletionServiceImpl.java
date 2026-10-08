@@ -1,6 +1,7 @@
 package com.comicatlas.api.trash.service.impl;
 
 import com.comicatlas.api.catalog.cache.CatalogCacheInvalidator;
+import com.comicatlas.api.storage.service.ThumbnailSnapshotService;
 import com.comicatlas.api.storage.service.ComicStatsService;
 import com.comicatlas.common.constant.StorageRootKeys;
 import com.comicatlas.common.dto.TrashManifestItemDTO;
@@ -56,6 +57,7 @@ public class TrashLifecycleCompletionServiceImpl implements TrashLifecycleComple
     private final CatalogMapper catalogMapper;
     private final TrashManifestService trashManifestService;
     private final CatalogCacheInvalidator catalogCacheInvalidator;
+    private final ThumbnailSnapshotService thumbnailSnapshotService;
     private final ComicStatsService comicStatsService;
     private final TrashDataMapper trashDataMapper;
 
@@ -69,6 +71,7 @@ public class TrashLifecycleCompletionServiceImpl implements TrashLifecycleComple
             comic.setTrashedAt(LocalDateTime.now());
             comicMapper.updateById(comic);
             catalogCacheInvalidator.evict(comicId);
+            thumbnailSnapshotService.filesChangedAfterCommit();
             log.info("整本回收完成业务更新（回收站）: comicId={}", comicId);
         }
     }
@@ -118,6 +121,7 @@ public class TrashLifecycleCompletionServiceImpl implements TrashLifecycleComple
             comic.setTrashedAt(null);
             comicMapper.updateById(comic);
             catalogCacheInvalidator.evict(comicId);
+            thumbnailSnapshotService.filesChangedAfterCommit();
             log.info("漫画恢复完成业务更新: comicId={}", comicId);
         }
     }
@@ -183,6 +187,7 @@ public class TrashLifecycleCompletionServiceImpl implements TrashLifecycleComple
             comicMapper.updateById(comic);
         }
         catalogCacheInvalidator.evict(comicId);
+        thumbnailSnapshotService.filesChangedAfterCommit();
         log.info("漫画永久清理完成: comicId={}, chapters={}, media={}", comicId, chapters.size(), chapterIds.size());
     }
 

@@ -14,6 +14,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Comparator;
 import java.util.List;
 import java.util.StringJoiner;
+import java.util.stream.Collectors;
 
 /** 漫画列表基础数据缓存，阅读进度不进入缓存。 */
 @Component
@@ -21,7 +22,7 @@ import java.util.StringJoiner;
 @Slf4j
 public class ComicListCacheService {
 
-    private static final String KEY_VERSION = "v1";
+    private static final String KEY_VERSION = "v2";
 
     private final CacheManager cacheManager;
 
@@ -58,7 +59,9 @@ public class ComicListCacheService {
         List<String> normalizedTags = query.getTags() == null
                 ? List.of()
                 : query.getTags().stream().sorted(Comparator.naturalOrder()).toList();
-        addKeyPart(keyBuilder, "tags", String.join(",", normalizedTags));
+        // 使用长度前缀避免标签名称含逗号时，不同组合命中同一缓存键。
+        addKeyPart(keyBuilder, "tags", normalizedTags.stream()
+                .map(tag -> tag.length() + ":" + tag).collect(Collectors.joining()));
         addKeyPart(keyBuilder, "tagMode", query.getTagMode());
         addKeyPart(keyBuilder, "status", query.getStatus());
         addKeyPart(keyBuilder, "category", query.getCategory());

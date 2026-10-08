@@ -1,6 +1,7 @@
 package com.comicatlas.api.importer.service.impl;
 
 import com.comicatlas.api.catalog.cache.CatalogCacheInvalidator;
+import com.comicatlas.api.storage.service.ThumbnailSnapshotService;
 import com.comicatlas.api.importer.enums.ImportTaskStatus;
 import com.comicatlas.api.importer.persistence.entity.ImportTask;
 import com.comicatlas.api.importer.persistence.mapper.ImportTaskMapper;
@@ -52,6 +53,7 @@ public class ImportFinalizationServiceImpl implements com.comicatlas.api.importe
     private final ImportTaskMapper taskMapper;
     private final ManagementTaskService managementTaskService;
     private final CatalogCacheInvalidator catalogCacheInvalidator;
+    private final ThumbnailSnapshotService thumbnailSnapshotService;
     private final MetadataUpdateCoordinator metadataUpdateCoordinator;
     private final ApiStorageProperties storageProperties;
     /** 用于计算 targetDir 相对 HQ 根的前缀；不能注入 HQ 根本身。 */
@@ -98,6 +100,7 @@ public class ImportFinalizationServiceImpl implements com.comicatlas.api.importe
                         null, RESULT_REF_TYPE, event.taskId());
             }
             catalogCacheInvalidator.evict(event.comicId());
+            thumbnailSnapshotService.filesChangedAfterCommit();
         });
         metadataUpdateCoordinator.requestSync(event.comicId(), event.taskId(), "导入最终化完成");
     }
@@ -125,6 +128,7 @@ public class ImportFinalizationServiceImpl implements com.comicatlas.api.importe
                         task.getErrorMessage(), RESULT_REF_TYPE, event.taskId());
             }
             catalogCacheInvalidator.evict(event.comicId());
+            thumbnailSnapshotService.filesChangedAfterCommit();
         });
     }
 

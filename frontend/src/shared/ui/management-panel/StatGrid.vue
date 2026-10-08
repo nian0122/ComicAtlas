@@ -1,9 +1,17 @@
 <script setup lang="ts">
-withDefaults(defineProps<{ columns?: 3 | 4 | 5; spaced?: boolean }>(), { columns: 3 })
+withDefaults(defineProps<{ columns?: 3 | 4 | 5; spaced?: boolean; mobileColumns?: 1 | 2 }>(), {
+  columns: 3,
+  mobileColumns: 1,
+})
 </script>
 
 <template>
-  <section class="stat-grid" :class="[`stat-grid--${columns}`, { 'stat-grid--spaced': spaced }]"><slot /></section>
+  <section
+    class="stat-grid"
+    :class="[`stat-grid--${columns}`, `stat-grid--mobile-${mobileColumns}`, { 'stat-grid--spaced': spaced }]"
+  >
+    <slot />
+  </section>
 </template>
 
 <style scoped>
@@ -35,6 +43,9 @@ withDefaults(defineProps<{ columns?: 3 | 4 | 5; spaced?: boolean }>(), { columns
 @media (max-width: 520px) {
   .stat-grid {
     grid-template-columns: minmax(0, 1fr);
+  }
+  .stat-grid--mobile-2 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 </style>

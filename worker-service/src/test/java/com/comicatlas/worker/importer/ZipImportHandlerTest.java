@@ -109,8 +109,8 @@ class ZipImportHandlerTest {
     }
 
     @Test
-    @DisplayName("失败（解压失败）：主异常原样保留、临时目录保留用于恢复、日志不含完整源路径")
-    void failure_propagatesCause_andKeepsTempRootForRecovery_logWithoutSourcePath() throws Exception {
+    @DisplayName("解压失败时保留主异常并清理无效解压目录，日志不含完整源路径")
+    void extractionFailurePreservesCauseAndCleansTemporaryDirectory() throws Exception {
         Path mangaRoot = tempRoot.resolve("manga2");
         Path zip = mangaRoot.resolve("私人下载/绝密漫画.zip");
         Files.createDirectories(zip.getParent());
@@ -125,8 +125,8 @@ class ZipImportHandlerTest {
                         TASK_ID, COMIC_ID, mangaRoot));
 
         assertSame(cause, thrown, "主异常必须原样保留（含 cause 链）");
-        assertTrue(Files.exists(mangaRoot.resolve("temp").resolve(String.valueOf(TASK_ID))),
-                "失败后临时目录必须保留以便整理阶段续做");
+        assertFalse(Files.exists(mangaRoot.resolve("temp").resolve(String.valueOf(TASK_ID))),
+                "解压失败后无可续做的整理现场，必须清理临时目录");
 
         List<String> messages = loggedMessages();
         assertTrue(messages.stream().noneMatch(m -> m.contains("私人下载")),
@@ -134,6 +134,31 @@ class ZipImportHandlerTest {
         assertTrue(messages.stream().noneMatch(m -> m.contains("绝密漫画.zip")
                 && m.contains(mangaRoot.toString())),
                 "日志不得同时出现文件名与完整目录: " + messages);
+    }
+
+    @Test
+    @DisplayName("整理失败后保留已完整解压的恢复现场与原始异常")
+    void directoryFailurePreservesExtractedRecoveryFiles() throws Exception {
+        Path mangaRoot = tempRoot.resolve("recovery");
+        Path archivePath = mangaRoot.resolve("comic.zip");
+        Files.createDirectories(mangaRoot);
+        Files.writeString(archivePath, "zip");
+        config.setTempDir(mangaRoot.resolve("temp").toString());
+        Path extractedDirectory = mangaRoot.resolve("temp").resolve(String.valueOf(TASK_ID)).resolve("extracted");
+        Path extractedPage = extractedDirectory.resolve("001.jpg");
+        when(zipExtractor.extract(archivePath, extractedDirectory)).thenAnswer(invocation -> {
+            Files.writeString(extractedPage, "image");
+            return List.of(extractedPage);
+        });
+        IOException failure = new IOException("整理中断");
+        when(directoryHandler.handle(any(), any(), any(), any())).thenThrow(failure);
+
+        IOException actualFailure = assertThrows(IOException.class,
+                () -> handler.importZip(new ImportContext("ZIP", archivePath, false, false),
+                        TASK_ID, COMIC_ID, mangaRoot));
+
+        assertSame(failure, actualFailure);
+        assertEquals("image", Files.readString(extractedPage), "整理失败不能删除可供续做的源文件");
     }
 
     @Test

@@ -29,11 +29,15 @@ export interface ChapterStorageItem {
 }
 
 export interface StorageStats {
-  totalBytes: number
+  totalBytes: number | null
   hqBytes: number
   lqBytes: number
   thumbBytes: number
   comicCount: number
+  snapshotAvailable: boolean
+  thumbFileCount: number
+  thumbUpdatedAt: string | null
+  refreshStatus: 'PENDING' | 'RUNNING' | 'READY' | 'FAILED'
 }
 
 export interface ComicStorageQuery {

@@ -5,7 +5,6 @@ import com.comicatlas.reading.reader.dto.ReaderDTO;
 import com.comicatlas.reading.reader.dto.MediaReactionDTO;
 import com.comicatlas.reading.reader.dto.MediaReactionRequest;
 import com.comicatlas.reading.reader.dto.ReactionDTO;
-import com.comicatlas.contract.common.enums.MediaReaction;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;

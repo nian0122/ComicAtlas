@@ -1,7 +1,7 @@
 <template>
   <main
     class="short-video-page"
-    :class="{ 'controls-hidden': !controlsVisible }"
+    :class="{ 'controls-hidden': !controlsVisible, 'is-fullscreen': isFullscreen }"
     @touchstart="onTouchStart"
     @touchmove.prevent="onTouchMove"
     @touchend="onTouchEnd"
@@ -13,6 +13,12 @@
       <span v-if="items.length" class="video-count"
         >{{ currentIndex + 1 }} <span>/ {{ items.length }}</span></span
       >
+      <FullscreenButton
+        class="video-fullscreen"
+        :active="isFullscreen"
+        :pending="fullscreenPending"
+        @toggle="toggleFullscreen"
+      />
     </header>
 
     <div v-if="loading" class="video-state">正在加载阅读内容…</div>
@@ -115,6 +121,7 @@
           class="video-play-button"
           type="button"
           aria-label="播放视频"
+          title="播放 / 暂停（空格或 K）"
           @click="togglePlayback"
           >▶</AppButton
         >
@@ -127,6 +134,7 @@
           class="video-sound"
           type="button"
           :aria-label="muted ? '开启声音' : '静音'"
+          title="静音 / 开启声音（M）"
           @click="toggleMute"
         >
           <svg
@@ -215,8 +223,12 @@
         />
       </section>
       <div class="video-nav">
-        <AppButton type="button" aria-label="上一项" :disabled="!hasPrevious" @click="move(-1)">↑</AppButton>
-        <AppButton type="button" aria-label="下一项" :disabled="!hasNext" @click="move(1)">↓</AppButton>
+        <AppButton type="button" aria-label="上一项" title="上一项（↑）" :disabled="!hasPrevious" @click="move(-1)"
+          >↑</AppButton
+        >
+        <AppButton type="button" aria-label="下一项" title="下一项（↓）" :disabled="!hasNext" @click="move(1)"
+          >↓</AppButton
+        >
       </div>
       <video
         v-if="nextItem && isVideoMedia(nextItem)"
@@ -240,7 +252,8 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { AppButton } from '@/shared/ui/button'
+import { useReadingNavigation } from '@/features/reading-navigation'
+import { AppButton, FullscreenButton } from '@/shared/ui/button'
 import { getApiErrorMessage } from '@/shared/api/http'
 import { readerApi, type ReaderDTO } from '@/entities/chapter'
 import { catalogApi, type CatalogNode } from '@/entities/comic'
@@ -251,10 +264,14 @@ import { useScreenWakeLock } from '@/shared/lib/device/useScreenWakeLock'
 import { VideoProgressControl, VideoSpeedSheet } from './components'
 import { useAutoHideControls } from './composables/useAutoHideControls'
 import { useImmersiveSwipe } from './composables/useImmersiveSwipe'
+import { useReaderFullscreen } from './composables/useReaderFullscreen'
+import { useShortVideoKeyboard } from './composables/useShortVideoKeyboard'
 import { useReadingProgressPersistence, type ReadingProgressPayload } from './composables/useReadingProgressPersistence'
 
 const route = useRoute()
 const router = useRouter()
+const { isFullscreen, isPending: fullscreenPending, toggleFullscreen } = useReaderFullscreen()
+const readingNavigation = useReadingNavigation()
 const chapter = shallowRef<ReaderDTO | null>(null)
 const catalogTreeCache = new Map<number, CatalogNode[]>()
 const nextChapter = shallowRef<ReaderDTO | null>(null)
@@ -744,11 +761,11 @@ function resetMediaState(): void {
   imageReloadKey.value = 0
 }
 
-function togglePlayback(): void {
+function togglePlayback(event?: Event): void {
   if (!currentIsVideo.value) return
   if (suppressVideoClick) {
     suppressVideoClick = false
-    return
+    if (event) return
   }
   showControls(false)
   const video = videoRef.value
@@ -939,10 +956,13 @@ function onProgressTouchEnd(event: TouchEvent): void {
 }
 
 function onProgressKeydown(event: KeyboardEvent): void {
+  if (isSpeedSheetOpen.value) return
+  if (event.ctrlKey || event.metaKey || event.altKey || event.isComposing) return
   if (duration.value <= 0) return
   const step = event.shiftKey ? 10 : 5
   if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
     event.preventDefault()
+    event.stopPropagation()
     const direction = event.key === 'ArrowLeft' ? -1 : 1
     const video = videoRef.value
     if (!video) return
@@ -1026,20 +1046,26 @@ function onWheel(event: WheelEvent): void {
   void move(event.deltaY > 0 ? 1 : -1)
 }
 
-function onKeydown(event: KeyboardEvent): void {
-  if (event.key === 'ArrowDown') {
-    event.preventDefault()
-    void move(1)
-  }
-  if (event.key === 'ArrowUp') {
-    event.preventDefault()
-    void move(-1)
-  }
-  if (event.code === 'Space' && currentIsVideo.value) {
-    event.preventDefault()
-    togglePlayback()
-  }
-}
+useShortVideoKeyboard({
+  isVideo: () => currentIsVideo.value,
+  isDialogOpen: () => isSpeedSheetOpen.value,
+  move: (direction) => {
+    void move(direction)
+  },
+  togglePlayback: () => togglePlayback(),
+  seek: (seconds) => {
+    const video = videoRef.value
+    if (!video || duration.value <= 0 || isSeeking.value) return
+    video.currentTime = Math.min(duration.value, Math.max(0, video.currentTime + seconds))
+    onTimeUpdate()
+  },
+  toggleMute,
+  toggleFullscreen: () => {
+    void toggleFullscreen()
+  },
+  closeDialog: closeSpeedSheet,
+  showControls,
+})
 
 function currentProgress(): ReadingProgressPayload | null {
   if (!chapter.value || !currentItem.value) return null
@@ -1068,13 +1094,9 @@ function scheduleProgressSave(): void {
 
 function goBack(): void {
   if (chapter.value && currentItem.value) {
-    void router.push({
-      name: 'reader',
-      params: { chapterId: chapter.value.chapterId },
-      query: { ...route.query, page: currentItem.value.pageNumber },
-    })
+    readingNavigation.goToReader(chapter.value.chapterId, { ...route.query, page: currentItem.value.pageNumber })
   } else {
-    router.back()
+    readingNavigation.goToSource()
   }
 }
 
@@ -1091,7 +1113,6 @@ watch(
 onMounted(() => {
   previousOverflow = document.body.style.overflow
   document.body.style.overflow = 'hidden'
-  document.addEventListener('keydown', onKeydown)
   void loadChapter()
 })
 
@@ -1109,7 +1130,6 @@ onBeforeUnmount(() => {
   disposeControls()
   stopCurrent()
   document.body.style.overflow = previousOverflow
-  document.removeEventListener('keydown', onKeydown)
 })
 </script>
 
@@ -1151,6 +1171,15 @@ onBeforeUnmount(() => {
   font-size: 25px;
 }
 
+.video-fullscreen {
+  justify-self: end;
+  width: 44px;
+  height: 44px;
+  color: #fff;
+  border: 0;
+  background: transparent;
+}
+
 .video-count {
   font-size: 13px;
   font-variant-numeric: tabular-nums;
@@ -1168,6 +1197,10 @@ onBeforeUnmount(() => {
   margin: 0 auto;
   overflow: hidden;
   background: #000;
+}
+
+.short-video-page.is-fullscreen .video-stage {
+  width: 100%;
 }
 
 .video-media-frame {
@@ -1288,7 +1321,7 @@ onBeforeUnmount(() => {
   bottom: calc(env(safe-area-inset-bottom) + 132px);
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
   transition:
     opacity 180ms ease,
     transform 180ms ease;
@@ -1302,12 +1335,10 @@ onBeforeUnmount(() => {
   padding: 0;
   border: 0;
   border-radius: 50%;
-  background: rgb(15 15 20 / 46%);
-  box-shadow:
-    inset 0 0 0 1px rgb(255 255 255 / 18%),
-    0 8px 22px rgb(0 0 0 / 18%);
-  color: rgb(255 255 255 / 92%);
-  backdrop-filter: blur(12px);
+  background: rgb(15 15 20 / 22%);
+  box-shadow: none;
+  color: rgb(255 255 255 / 72%);
+  backdrop-filter: blur(6px);
   transition:
     transform 180ms cubic-bezier(0.2, 0.8, 0.2, 1),
     background 180ms ease,
@@ -1316,33 +1347,21 @@ onBeforeUnmount(() => {
 }
 
 .video-reaction svg {
-  width: 23px;
-  height: 23px;
+  width: 21px;
+  height: 21px;
 }
 
 .video-reaction.is-active {
-  background: rgb(255 255 255 / 92%);
-  color: #f04468;
-  box-shadow:
-    0 8px 26px rgb(240 68 104 / 28%),
-    inset 0 0 0 1px rgb(255 255 255 / 80%);
-  transform: scale(1.1);
+  background: rgb(15 15 20 / 32%);
+  color: #ef8194;
 }
 
 .video-reaction.is-active.is-dislike {
-  background: rgb(225 236 255 / 94%);
-  box-shadow:
-    0 8px 26px rgb(116 155 211 / 26%),
-    inset 0 0 0 1px rgb(255 255 255 / 80%);
-  color: #41658f;
+  color: #bdcde0;
 }
 
 .video-reaction:active {
   transform: scale(0.94);
-}
-
-.video-reaction.is-active:active {
-  transform: scale(1.02);
 }
 
 .video-reaction .reaction-heart {
@@ -1409,6 +1428,10 @@ onBeforeUnmount(() => {
   gap: 8px;
   transform: translateY(-50%);
   transition: opacity 180ms ease;
+}
+
+.short-video-page.is-fullscreen .video-nav {
+  right: max(20px, env(safe-area-inset-right));
 }
 
 .video-nav :deep(button) {
@@ -1509,6 +1532,9 @@ onBeforeUnmount(() => {
   .video-stage {
     width: 100%;
   }
+}
+
+@media (max-width: 680px), (pointer: coarse) {
   .video-nav {
     display: none;
   }

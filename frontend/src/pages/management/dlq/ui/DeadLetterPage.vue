@@ -250,5 +250,4 @@ onMounted(loadQueues)
   min-width: 196px;
   white-space: nowrap;
 }
-
 </style>

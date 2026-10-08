@@ -49,6 +49,9 @@
   --success: var(--color-success);
   --warning: var(--color-warning);
   --danger: var(--color-danger);
+  --danger-bg: color-mix(in srgb, var(--danger) 14%, var(--bg-surface));
+  --danger-hover: color-mix(in srgb, var(--danger) 85%, var(--color-on-brand));
+  --warning-bg: color-mix(in srgb, var(--warning) 14%, var(--bg-surface));
   --info: var(--color-info);
 
   /* 旧组件兼容映射 */
@@ -105,6 +108,10 @@
   --radius-pill: 999px;
   --radius: var(--radius-sm);
   --card-radius: var(--radius-md);
+  --floating-panel-radius: var(--radius-lg);
+  --floating-panel-bg: var(--bg-secondary);
+  --floating-content-max: 600px;
+  --form-content-max: 1120px;
   --content-max: 1440px;
   --content-narrow: 420px;
   --content-gutter: clamp(16px, 3vw, 40px);
@@ -138,6 +145,7 @@
   --nav-height: 84px;
   --mobile-nav-height: 64px;
   --mobile-tabbar-height: 64px;
+  --reader-mobile-nav-height: 98px;
   --mobile-page-gutter: clamp(16px, 4.1vw, 28px);
   --mobile-search-top: 12px;
   --mobile-search-width: clamp(138px, 33vw, 218px);
@@ -156,8 +164,8 @@
   --mobile-history-play-inset: 2px;
   --mobile-history-play-icon-size: 20px;
   --mobile-history-end-icon-size: 34px;
-  --mobile-history-brand-size: 32px;
-  --mobile-history-brand-font-size: 24px;
+  --mobile-history-brand-size: var(--mobile-brand-mark-size);
+  --mobile-history-brand-font-size: var(--mobile-brand-font-size);
   --mobile-history-brand-radius: 4px;
   --mobile-history-tab-indicator-width: 24px;
   --mobile-history-content-max: 672px;
@@ -175,7 +183,7 @@
   --mobile-detail-summary-min-height: 230px;
   --mobile-brand-mark-size: 40px;
   --mobile-brand-font-size: clamp(17px, 4.5vw, 22px);
-  --mobile-detail-brand-font-size: clamp(15px, 5vw, 24px);
+  --mobile-detail-brand-font-size: var(--mobile-brand-font-size);
   --mobile-profile-size: 34px;
   --tablet-hero-max-height: 720px;
   --page-width: var(--content-max);

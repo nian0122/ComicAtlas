@@ -9,65 +9,74 @@ function success(route: Route, data: unknown) {
 }
 
 test('统一管理任务页展示完整任务类型并可筛选导入任务', async ({ page }) => {
-  await page.route('/api/manage/tasks**', (route) => success(route, {
-    records: [{
-      id: 101,
-      taskType: 'IMPORT',
-      operation: '导入漫画',
-      targetType: 'COMIC',
-      targetId: 501,
-      targetName: '179漫画',
-      batchId: null,
-      isBatch: false,
-      status: 'SUCCEEDED',
-      stage: null,
-      progress: 100,
-      totalCount: 1,
-      successCount: 1,
-      failureCount: 0,
-      cancelledCount: 0,
-      errorMessage: null,
-      attempt: 1,
-      version: 1,
-      createdAt: '2026-08-11T10:00:00Z',
-      updatedAt: '2026-08-11T10:01:00Z',
-      startedAt: '2026-08-11T10:00:01Z',
-      completedAt: '2026-08-11T10:01:00Z',
-    }, {
-      id: 102,
-      taskType: 'METADATA_REFRESH',
-      operation: '刷新元数据',
-      targetType: 'COMIC',
-      targetId: 502,
-      targetName: '元数据示例',
-      batchId: null,
-      isBatch: false,
-      status: 'RUNNING',
-      stage: '扫描 HQ',
-      progress: 40,
-      totalCount: 1,
-      successCount: 0,
-      failureCount: 0,
-      cancelledCount: 0,
-      errorMessage: null,
-      attempt: 1,
-      version: 1,
-      createdAt: '2026-08-11T10:02:00Z',
-      updatedAt: '2026-08-11T10:02:30Z',
-      startedAt: '2026-08-11T10:02:01Z',
-      completedAt: null,
-    }],
-    total: 2,
-  }))
-  await page.route('/api/manage/tasks/101/items', (route) => success(route, [{
-    id: 1001,
-    taskId: 101,
-    targetType: 'COMIC',
-    targetId: 501,
-    operationType: 'IMPORT',
-    status: 'SUCCEEDED',
-    progress: 100,
-  }]))
+  await page.route('/api/manage/tasks**', (route) =>
+    success(route, {
+      records: [
+        {
+          id: 101,
+          taskType: 'IMPORT',
+          operation: '导入漫画',
+          targetType: 'COMIC',
+          targetId: 501,
+          targetName: '179漫画',
+          batchId: null,
+          isBatch: false,
+          status: 'SUCCEEDED',
+          stage: null,
+          progress: 100,
+          totalCount: 1,
+          successCount: 1,
+          failureCount: 0,
+          cancelledCount: 0,
+          errorMessage: null,
+          attempt: 1,
+          version: 1,
+          createdAt: '2026-08-11T10:00:00Z',
+          updatedAt: '2026-08-11T10:01:00Z',
+          startedAt: '2026-08-11T10:00:01Z',
+          completedAt: '2026-08-11T10:01:00Z',
+        },
+        {
+          id: 102,
+          taskType: 'METADATA_REFRESH',
+          operation: '刷新元数据',
+          targetType: 'COMIC',
+          targetId: 502,
+          targetName: '元数据示例',
+          batchId: null,
+          isBatch: false,
+          status: 'RUNNING',
+          stage: '扫描 HQ',
+          progress: 40,
+          totalCount: 1,
+          successCount: 0,
+          failureCount: 0,
+          cancelledCount: 0,
+          errorMessage: null,
+          attempt: 1,
+          version: 1,
+          createdAt: '2026-08-11T10:02:00Z',
+          updatedAt: '2026-08-11T10:02:30Z',
+          startedAt: '2026-08-11T10:02:01Z',
+          completedAt: null,
+        },
+      ],
+      total: 2,
+    }),
+  )
+  await page.route('/api/manage/tasks/101/items', (route) =>
+    success(route, [
+      {
+        id: 1001,
+        taskId: 101,
+        targetType: 'COMIC',
+        targetId: 501,
+        operationType: 'IMPORT',
+        status: 'SUCCEEDED',
+        progress: 100,
+      },
+    ]),
+  )
   await page.route('/api/manage/comics/501', (route) => success(route, { id: 501, title: '179漫画' }))
   await page.goto('/manage/tasks')
 
@@ -91,19 +100,29 @@ test('统一管理任务页展示完整任务类型并可筛选导入任务', as
   await expect(page.getByRole('option', { name: '导入漫画' })).toBeVisible()
   await page.getByRole('option', { name: '导入漫画' }).click()
   await expect(page.getByRole('option', { name: '导入漫画' })).toBeHidden()
-  await page.screenshot({ path: 'C:\\Users\\Acer\\.codex\\visualizations\\2026\\08\\11\\management-tasks-final.png', fullPage: true })
+  await page.screenshot({
+    path: test.info().outputPath('management-tasks-final.png'),
+    fullPage: true,
+  })
 })
 
 test('统一管理任务自动刷新不覆盖当前列表', async ({ page }) => {
   let requestCount = 0
   let releaseSecondRequest: (() => void) | undefined
   await page.route('/api/manage/tasks**', async (route) => {
+    if (new URL(route.request().url()).pathname.endsWith('/status-counts')) {
+      await success(route, [])
+      return
+    }
     requestCount += 1
-    if (requestCount === 2) await new Promise<void>((resolve) => { releaseSecondRequest = resolve })
+    if (requestCount === 2)
+      await new Promise<void>((resolve) => {
+        releaseSecondRequest = resolve
+      })
     await success(route, { records: [], total: 0 })
   })
   await page.goto('/manage/tasks')
-  await expect(page.locator('.empty-state')).toBeVisible()
+  await expect(page.getByText('当前筛选条件下暂无任务', { exact: true })).toBeVisible()
 
   await page.clock.install()
   await page.clock.fastForward(2500)

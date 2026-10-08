@@ -31,7 +31,7 @@
   overflow: hidden;
 }
 .structure-table :deep(.el-table__header th) {
-  background: var(--bg-elevated);
+  background: var(--surface-highlight);
   color: var(--text-secondary);
   font-size: var(--text-xs);
 }
@@ -102,8 +102,7 @@
   display: flex;
   flex-direction: column;
   background:
-    linear-gradient(145deg, color-mix(in srgb, var(--accent) 5%, transparent), transparent 42%),
-    var(--bg-surface);
+    linear-gradient(145deg, color-mix(in srgb, var(--accent) 5%, transparent), transparent 42%), var(--bg-surface);
 }
 .detail-panel {
   display: flex;
@@ -132,26 +131,6 @@
 }
 .tree-search {
   margin: var(--space-4) 0 var(--space-3);
-}
-.tree-search :deep(.el-input__wrapper) {
-  min-height: 40px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--bg-elevated) 74%, var(--bg-surface));
-  box-shadow: none;
-  transition:
-    border-color var(--transition-fast),
-    background-color var(--transition-fast),
-    box-shadow var(--transition-fast);
-}
-.tree-search :deep(.el-input__wrapper.is-focus) {
-  border-color: var(--accent);
-  background: var(--bg-elevated);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 13%, transparent);
-}
-.tree-search :deep(.el-input__inner) {
-  color: var(--text-primary);
-  font-size: 12px;
 }
 .tree-panel .structure-table {
   display: flex;
@@ -200,7 +179,7 @@
     border-color var(--transition-fast);
 }
 .tree-panel .structure-table :deep(.el-table__row:hover > td) {
-  background: color-mix(in srgb, var(--bg-elevated) 84%, transparent);
+  background: color-mix(in srgb, var(--surface-highlight) 84%, transparent);
 }
 .tree-panel .structure-table :deep(.el-table__row.current-row > td) {
   border-bottom-color: color-mix(in srgb, var(--accent) 26%, var(--border));
@@ -224,7 +203,7 @@
   height: 24px;
   margin-right: 2px;
   border: 1px solid transparent;
-  border-radius: 5px;
+  border-radius: var(--radius-sm);
   color: var(--text-muted);
   transition:
     color var(--transition-fast),
@@ -233,11 +212,11 @@
 }
 .tree-panel .structure-table :deep(.el-table__expand-icon:hover) {
   border-color: var(--border-strong);
-  background: var(--bg-elevated);
+  background: var(--surface-highlight);
   color: var(--text-primary);
 }
 .tree-panel .structure-table :deep(.el-table__expand-icon .el-icon) {
-  font-size: 11px;
+  font-size: var(--text-xs);
 }
 .tree-panel .structure-table :deep(.el-table__row--level-0) .cell {
   font-weight: 650;
@@ -259,7 +238,7 @@
 .tree-sort-hint {
   margin: -4px 0 var(--space-3);
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: var(--text-xs);
 }
 .tree-title--draggable {
   cursor: grab;
@@ -271,10 +250,14 @@
   opacity: 0.42;
 }
 .tree-title--drop-before {
-  box-shadow: inset 0 2px var(--accent), 0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent);
+  box-shadow:
+    inset 0 2px var(--accent),
+    0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent);
 }
 .tree-title--drop-after {
-  box-shadow: inset 0 -2px var(--accent), 0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent);
+  box-shadow:
+    inset 0 -2px var(--accent),
+    0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent);
 }
 .catalog-drag-handle {
   display: inline-grid;
@@ -283,10 +266,12 @@
   width: 13px;
   height: 22px;
   color: color-mix(in srgb, var(--text-muted) 54%, transparent);
-  font-size: 14px;
+  font-size: var(--text-sm);
   line-height: 1;
   opacity: 0.35;
-  transition: opacity var(--transition-fast), color var(--transition-fast);
+  transition:
+    opacity var(--transition-fast),
+    color var(--transition-fast);
 }
 .tree-title:hover .catalog-drag-handle,
 .tree-title:focus-visible .catalog-drag-handle,
@@ -306,7 +291,7 @@
   flex: 0 0 auto;
   padding: 3px 6px;
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   color: var(--text-muted);
   font-size: 9px;
   font-weight: 600;
@@ -319,7 +304,7 @@
   color: var(--accent);
 }
 .tree-kind.is-chapter {
-  background: color-mix(in srgb, var(--bg-elevated) 70%, transparent);
+  background: color-mix(in srgb, var(--surface-highlight) 70%, transparent);
 }
 .selected-header {
   padding-bottom: var(--space-5);
@@ -474,7 +459,7 @@
   border: 1px solid var(--accent-border);
   background: var(--accent-bg);
   color: var(--accent);
-  font-size: 11px;
+  font-size: var(--text-xs);
 }
 .media-selection-toolbar > div {
   display: flex;
@@ -484,12 +469,12 @@
 .media-selection-toolbar .app-button {
   margin: 0;
   padding: 3px 6px;
-  font-size: 10px;
+  font-size: var(--text-micro);
 }
 .media-summary span,
 .media-summary small {
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: var(--text-xs);
 }
 .media-summary strong {
   color: var(--text-primary);
@@ -501,7 +486,7 @@
   min-height: 22px;
   padding: 0 7px;
   border: 1px solid transparent;
-  font-size: 11px;
+  font-size: var(--text-xs);
   white-space: nowrap;
 }
 .media-status.is-ready {
@@ -530,7 +515,7 @@
 }
 .media-hint {
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: var(--text-xs);
 }
 .media-hint.is-ok {
   color: var(--success);

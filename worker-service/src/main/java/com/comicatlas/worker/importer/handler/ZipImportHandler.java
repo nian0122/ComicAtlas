@@ -21,7 +21,7 @@ import java.util.stream.Stream;
  * ZIP 导入处理器 — 解压到任务唯一临时目录后委托 {@link DirectoryImportHandler}。
  *
  * <p>安全语义：解压复用 {@link ZipExtractor}（含标准分卷 .zNN 支持与全套安全校验）；
- * 无论成功失败，finally 一律用 NIO {@link Files#walk} 逆序递归删除临时目录；删除失败
+ * 解压失败或导入成功后，用 NIO {@link Files#walk} 逆序递归删除临时目录；整理失败保留恢复现场。删除失败
  * 不得静默（聚合记录 cause），但绝不掩盖主异常 cause（主异常优先保留）。
  * 日志与异常消息不含源 zip 完整路径，只记录文件名。
  */
@@ -53,8 +53,10 @@ public class ZipImportHandler {
         Files.createDirectories(extractDir);
 
         boolean importPrepared = false;
+        boolean extractionCompleted = false;
         try {
             zipExtractor.extract(zipFile, extractDir);
+            extractionCompleted = true;
             log.info("ZIP 解压完成: archive={}", zipFile.getFileName());
 
             String fileName = zipFile.getFileName().toString();
@@ -69,7 +71,7 @@ public class ZipImportHandler {
             importPrepared = true;
             return metadataPath;
         } finally {
-            if (importPrepared) {
+            if (importPrepared || !extractionCompleted) {
                 deleteRecursively(tempRoot);
             } else {
                 log.info("导入未完成，保留解压恢复现场: taskId={}", taskId);

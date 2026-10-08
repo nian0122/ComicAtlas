@@ -6,8 +6,8 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
-/** 漫画列表查询参数归一化器，统一边界值、排序白名单和标签语义。 */
-public final class ComicListQueryNormalizer {
+/** 阅读筛选仅返回可阅读漫画，独立于管理端的生命周期及文件完整性查询。 */
+public final class ReadingComicFilterNormalizer {
 
     public static final int MIN_PAGE = 1;
     public static final int DEFAULT_PAGE_SIZE = 24;
@@ -16,7 +16,7 @@ public final class ComicListQueryNormalizer {
     private static final Set<String> SORT_FIELDS = Set.of(
             "createdAt", "updatedAt", "title", "pageCount", "lastReadTime", "fileSize");
 
-    private ComicListQueryNormalizer() {
+    private ReadingComicFilterNormalizer() {
     }
 
     public static void normalize(ComicListQuery query) {
@@ -27,7 +27,7 @@ public final class ComicListQueryNormalizer {
         query.setTag(trimToNull(query.getTag()));
         query.setCategory(trimToNull(query.getCategory()));
         query.setSourceType(trimToNull(query.getSourceType()));
-        query.setStatus(trimToNull(query.getStatus()));
+        query.setStatus("READY");
         String tagMode = query.getTagMode();
         if ("AND".equalsIgnoreCase(tagMode)) {
             query.setTagMode("AND");
@@ -56,6 +56,8 @@ public final class ComicListQueryNormalizer {
         }
         if (normalizedTags.contains("_NONE")) {
             query.setTags(List.of("_NONE"));
+            query.setTag(null);
+            query.setTagMode("OR");
         } else {
             query.setTags(normalizedTags.isEmpty() ? null : List.copyOf(normalizedTags));
         }

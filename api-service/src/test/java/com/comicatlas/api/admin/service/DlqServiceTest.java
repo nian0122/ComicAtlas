@@ -32,14 +32,15 @@ class DlqServiceTest {
 
         var queues = service.listQueues();
 
-        // DLQ_ROUTES 冻结路由共 7 条（旧完整删除 comic.delete 与旧 LQ/HQ 独立链路的 DLQ 已随链路移除）
+        // 包含管理命令结果死信；旧完整删除与旧 LQ/HQ 独立链路的死信已移除。
         assertThat(queues)
-            .hasSize(7)
+            .hasSize(8)
             .extracting(DlqService.DlqQueueVO::name)
             .contains(
                 "export.started.result.dlq",
                 "export.completed.result.dlq",
-                "export.failed.result.dlq"
+                "export.failed.result.dlq",
+                "management.result.dlq"
             );
     }
 

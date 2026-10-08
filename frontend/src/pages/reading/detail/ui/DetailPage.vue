@@ -151,7 +151,8 @@
 import { AppButton } from '@/shared/ui/button'
 import { ContentState } from '@/shared/ui/content-state'
 import { ref, computed, onMounted } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute } from 'vue-router'
+import { useReadingNavigation } from '@/features/reading-navigation'
 import { PictureFilled, Search } from '@element-plus/icons-vue'
 import { comicApi, catalogApi } from '@/entities/comic'
 import { getApiErrorMessage } from '@/shared/api/http'
@@ -169,7 +170,7 @@ import type { MediaReaction } from '@/entities/media'
 import { chapterOrder, collectChapters, countChapters, findChapterById } from '@/entities/comic'
 
 const route = useRoute()
-const router = useRouter()
+const navigation = useReadingNavigation()
 
 // 交互模式检测：mobile 时给根容器加 is-mobile 类，驱动下方移动端布局
 const { mode } = useInteractionMode()
@@ -251,13 +252,13 @@ function formatBytes(bytes: number): string {
 
 function continueRead() {
   if (!comic.value?.lastReadChapterId) return
-  router.push(`/reader/${comic.value.lastReadChapterId}?page=${comic.value.lastReadPage || 1}`)
+  navigation.goToReader(comic.value.lastReadChapterId, { page: String(comic.value.lastReadPage || 1) })
 }
 
 function startRead() {
   const ch = firstChapter.value
   if (!ch) return
-  router.push(`/reader/${ch.id}?page=1`)
+  navigation.goToReader(ch.id, { page: '1' })
 }
 
 function readComic() {
@@ -265,11 +266,7 @@ function readComic() {
 }
 
 function goReader(chapterId: number) {
-  router.push({
-    name: 'reader',
-    params: { chapterId },
-    query: { page: '1', ...(isSearching.value ? { search: searchKeyword.value.trim() } : {}) },
-  })
+  navigation.goToReader(chapterId, { page: '1', ...(isSearching.value ? { search: searchKeyword.value.trim() } : {}) })
 }
 
 async function loadData() {
@@ -502,22 +499,6 @@ onMounted(loadData)
 
 .chapter-search-box {
   margin-left: auto;
-}
-
-.clear-search-button {
-  border: 0;
-  padding: 7px 12px;
-  border-radius: var(--radius-sm);
-  background: var(--accent-bg);
-  color: var(--accent);
-  cursor: pointer;
-  font: inherit;
-  font-size: 12px;
-}
-
-.clear-search-button:hover {
-  background: var(--accent);
-  color: var(--text-primary);
 }
 
 .catalog-header__action {

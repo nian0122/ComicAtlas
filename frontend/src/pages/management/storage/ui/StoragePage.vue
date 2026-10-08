@@ -1,20 +1,22 @@
 <template>
   <div class="storage-page">
-    <PageHeader
-      spaced
-      title="存储统计"
-      description="查看 HQ、LQ 与缩略图的占用分布，并定位需要处理的漫画。"
-      eyebrow="COMIC / STORAGE"
-    >
+    <PageHeader title="存储统计" description="全库容量概览；筛选仅影响下方漫画存储记录。">
       <div class="page-actions">
-        <span class="comic-count">{{ store.serverTotal }} 本漫画</span>
-        <AppButton :loading="store.loading" @click="reload">刷新统计</AppButton>
+        <span class="comic-count">{{ store.summary?.comicCount ?? '—' }} 本库内漫画</span>
+        <AppButton :loading="isRequestingRefresh" :disabled="isScanning" @click="refreshStatistics">{{
+          isScanning ? '容量核对中' : '刷新统计'
+        }}</AppButton>
       </div>
     </PageHeader>
 
-    <StorageSummary :stats="store.summary" />
+    <StorageSummary :stats="store.summary" :loading="store.summaryLoading" :error="store.summaryError" />
 
-    <StorageToolbar v-model:filter="filterState" v-model:sort="sortState" />
+    <StorageToolbar
+      v-model:filter="filterState"
+      v-model:sort="sortState"
+      :total="store.serverTotal"
+      :loading="store.loading"
+    />
 
     <StorageTable
       :list="pagedList"
@@ -32,7 +34,7 @@
 <script setup lang="ts">
 import { AppButton } from '@/shared/ui/button'
 import { PageHeader } from '@/shared/ui/page-header'
-import { watch, onMounted, nextTick } from 'vue'
+import { watch, onMounted, onBeforeUnmount, nextTick, computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import type { LocationQuery } from 'vue-router'
 import type { ComicStorageQuery } from '@/entities/storage'
@@ -45,6 +47,24 @@ import StorageTable from './StorageTable.vue'
 const route = useRoute()
 const router = useRouter()
 const store = useStorageStore()
+const isRequestingRefresh = ref(false)
+const isScanning = computed(() => ['PENDING', 'RUNNING'].includes(store.summary?.refreshStatus ?? ''))
+let summaryPollTimer: ReturnType<typeof setTimeout> | undefined
+let isPageDisposed = false
+
+function scheduleSummaryPoll() {
+  if (summaryPollTimer) clearTimeout(summaryPollTimer)
+  if (!isScanning.value || isPageDisposed) return
+  summaryPollTimer = setTimeout(async () => {
+    if (document.visibilityState === 'visible') await store.loadSummary()
+    scheduleSummaryPoll()
+  }, 2000)
+}
+watch(isScanning, scheduleSummaryPoll)
+onBeforeUnmount(() => {
+  isPageDisposed = true
+  if (summaryPollTimer) clearTimeout(summaryPollTimer)
+})
 
 function queryString(value: LocationQuery[string]): string | undefined {
   return typeof value === 'string' ? value : undefined
@@ -99,6 +119,15 @@ const {
 
 function reload() {
   void store.loadComics(buildQuery())
+}
+
+async function refreshStatistics() {
+  isRequestingRefresh.value = true
+  try {
+    await Promise.all([store.refreshStatistics(), store.loadComics(buildQuery())])
+  } finally {
+    isRequestingRefresh.value = false
+  }
 }
 
 const storageQueryKeys = [
@@ -191,7 +220,10 @@ onMounted(async () => {
 
 <style scoped>
 .storage-page {
-  max-width: 1440px;
+  display: grid;
+  gap: var(--space-4);
+  width: 100%;
+  min-width: 0;
 }
 .page-actions {
   display: flex;
@@ -200,7 +232,7 @@ onMounted(async () => {
 }
 .comic-count {
   color: var(--text-secondary);
-  font: 700 11px var(--mono);
+  font-size: var(--text-sm);
   white-space: nowrap;
 }
 

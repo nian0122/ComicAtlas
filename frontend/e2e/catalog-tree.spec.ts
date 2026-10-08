@@ -13,6 +13,7 @@ interface ChapterFixture {
   chapterNo: string
   title: string
   globalOrder: number
+  sortOrder: number
   pageCount: number
 }
 
@@ -20,6 +21,7 @@ interface CatalogNodeFixture {
   id: number | null
   title: string | null
   globalOrder?: number | null
+  sortOrder?: number | null
   chapters: ChapterFixture[]
   children: CatalogNodeFixture[]
 }
@@ -29,34 +31,38 @@ const treeFixture: CatalogNodeFixture[] = [
     id: null,
     title: null,
     globalOrder: null,
+    sortOrder: null,
     chapters: [
-      { id: 101, chapterNo: '散1', title: '散页A', globalOrder: 10, pageCount: 5 },
-      { id: 102, chapterNo: '散2', title: '散页B', globalOrder: 30, pageCount: 6 },
+      { id: 101, chapterNo: '散1', title: '散页A', globalOrder: 10, sortOrder: 10, pageCount: 5 },
+      { id: 102, chapterNo: '散2', title: '散页B', globalOrder: 30, sortOrder: 30, pageCount: 6 },
     ],
     children: [
       {
         id: 1,
         title: 'Vol 1',
         globalOrder: 1,
+        sortOrder: 1,
         chapters: [
-          { id: 11, chapterNo: '1', title: '第一话', globalOrder: 2, pageCount: 10 },
-          { id: 12, chapterNo: '2', title: '第二话', globalOrder: 5, pageCount: 12 },
+          { id: 11, chapterNo: '1', title: '第一话', globalOrder: 2, sortOrder: 2, pageCount: 10 },
+          { id: 12, chapterNo: '2', title: '第二话', globalOrder: 5, sortOrder: 5, pageCount: 12 },
         ],
         children: [
           {
             id: 11,
             title: 'Vol 1-1',
             globalOrder: 1,
+            sortOrder: 1,
             chapters: [
-              { id: 111, chapterNo: '1', title: '第一章', globalOrder: 1, pageCount: 8 },
-              { id: 112, chapterNo: '2', title: '第二章', globalOrder: 3, pageCount: 9 },
+              { id: 111, chapterNo: '1', title: '第一章', globalOrder: 1, sortOrder: 1, pageCount: 8 },
+              { id: 112, chapterNo: '2', title: '第二章', globalOrder: 3, sortOrder: 3, pageCount: 9 },
             ],
             children: [
               {
                 id: 111,
                 title: 'Vol 1-1-1',
                 globalOrder: 1,
-                chapters: [{ id: 1111, chapterNo: '1', title: '深层话', globalOrder: 4, pageCount: 4 }],
+                sortOrder: 1,
+                chapters: [{ id: 1111, chapterNo: '1', title: '深层话', globalOrder: 4, sortOrder: 4, pageCount: 4 }],
                 children: [],
               },
             ],
@@ -67,25 +73,28 @@ const treeFixture: CatalogNodeFixture[] = [
         id: 2,
         title: 'Vol 2',
         globalOrder: 20,
-        chapters: [{ id: 21, chapterNo: '3', title: '第三话', globalOrder: 20, pageCount: 11 }],
+        sortOrder: 20,
+        chapters: [{ id: 21, chapterNo: '3', title: '第三话', globalOrder: 20, sortOrder: 20, pageCount: 11 }],
         children: [
           {
             id: null,
             title: '同名',
             globalOrder: 21,
-            chapters: [{ id: 211, chapterNo: '1', title: '同名A话', globalOrder: 21, pageCount: 7 }],
+            sortOrder: 21,
+            chapters: [{ id: 211, chapterNo: '1', title: '同名A话', globalOrder: 21, sortOrder: 21, pageCount: 7 }],
             children: [],
           },
           {
             id: null,
             title: '同名',
             globalOrder: 22,
-            chapters: [{ id: 212, chapterNo: '1', title: '同名B话', globalOrder: 22, pageCount: 7 }],
+            sortOrder: 22,
+            chapters: [{ id: 212, chapterNo: '1', title: '同名B话', globalOrder: 22, sortOrder: 22, pageCount: 7 }],
             children: [],
           },
         ],
       },
-      { id: 3, title: 'Vol 3', globalOrder: null, chapters: [], children: [] },
+      { id: 3, title: 'Vol 3', globalOrder: null, sortOrder: null, chapters: [], children: [] },
     ],
   },
 ]
@@ -169,9 +178,7 @@ function headerByTitle(page: Page, title: string) {
 
 /** 按标题定位可见章节行 */
 function chapterByTitle(page: Page, title: string) {
-  return page
-    .locator('.catalog-tree .chapter-row')
-    .filter({ hasText: title, visible: true })
+  return page.locator('.catalog-tree .chapter-row').filter({ hasText: title, visible: true })
 }
 
 /**
@@ -184,7 +191,7 @@ async function clickHeaderAtVisualIndex(page: Page, title: string, visualIndex: 
     els.map((el) => {
       const r = el.getBoundingClientRect()
       return { x: r.x + r.width / 2, y: r.y + r.height / 2 }
-    })
+    }),
   )
   boxes.sort((a, b) => a.y - b.y)
   await page.mouse.click(boxes[visualIndex].x, boxes[visualIndex].y)
@@ -192,19 +199,17 @@ async function clickHeaderAtVisualIndex(page: Page, title: string, visualIndex: 
 
 /** 读取当前可见行的顺序标签（H=目录 header，C=章节行，跳过池化隐藏节点） */
 async function readRowLabels(page: Page): Promise<string[]> {
-  return page
-    .locator('.catalog-tree .node-header, .catalog-tree .chapter-row')
-    .evaluateAll((els) =>
-      els
-        .filter((el) => window.getComputedStyle(el).visibility !== 'hidden')
-        .map((el) => {
-          const title = el.querySelector<HTMLElement>('.node-title')?.textContent?.trim()
-          if (title) return `H:${title}`
-          const no = el.querySelector<HTMLElement>('.chapter-no')?.textContent?.trim()
-          const t = el.querySelector<HTMLElement>('.chapter-title')?.textContent?.trim()
-          return `C:${no} ${t}`
-        })
-    )
+  return page.locator('.catalog-tree .node-header, .catalog-tree .chapter-row').evaluateAll((els) =>
+    els
+      .filter((el) => window.getComputedStyle(el).visibility !== 'hidden')
+      .map((el) => {
+        const title = el.querySelector<HTMLElement>('.node-title')?.textContent?.trim()
+        if (title) return `H:${title}`
+        const no = el.querySelector<HTMLElement>('.chapter-no')?.textContent?.trim()
+        const t = el.querySelector<HTMLElement>('.chapter-title')?.textContent?.trim()
+        return `C:${no} ${t}`
+      }),
+  )
 }
 
 test.beforeEach(async ({ page }) => {
@@ -231,13 +236,7 @@ test.describe('desktop', () => {
 
     // 初始仅顶层可见：Vol1(1) < 散A(10) < Vol2(20) < 散B(30) < Vol3(null 排最后)
     const initialLabels = await readRowLabels(page)
-    expect(initialLabels).toEqual([
-      'H:Vol 1',
-      'C:第散1话 散页A',
-      'H:Vol 2',
-      'C:第散2话 散页B',
-      'H:Vol 3',
-    ])
+    expect(initialLabels).toEqual(['H:Vol 1', 'C:#10 散页A', 'H:Vol 2', 'C:#30 散页B', 'H:Vol 3'])
 
     // 三层展开：子目录话数保持递归值
     await headerByTitle(page, 'Vol 1').click()
@@ -326,6 +325,7 @@ test.describe('mobile', () => {
 
     // 匿名根无 header、递归话数正确（初始仅 3 个顶层命名目录有 header）
     const headers = page.locator('.catalog-tree .node-header')
+    await headers.first().scrollIntoViewIfNeeded()
     await expect(headers.first()).toBeVisible()
     await expect(headers).toHaveCount(3)
     await expect(headerByTitle(page, 'Vol 1')).toContainText('5 话')

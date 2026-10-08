@@ -35,18 +35,24 @@ shared 的组件经 `shared/ui` 或具体组件目录的 index 引用。单文�
 ## 状态与业务编排
 
 - 阅读库、管理漫画列表与首页的查询状态属于各自 pages/model，实例独立。
+- 阅读与管理使用独立筛选组件、状态模型与后端查询范围，管理列表及批量快照共用管理谓词；详见[漫画列表筛选](../architecture/comic-list-filtering.md)。
 - 分类、标签、历史 Store 属于 entities/model，用于维护共享实体数据；reader-navigation 保存进度后通过历史实体同步已加载记录。
-- reader-settings 与 reader-navigation 是独立能力。路由导航和快捷键需要协调两者，因此放在 widgets/reader/model；纯手势与交互模式保留在 reader-interaction。
+- reader-settings 与 reader-navigation 是独立能力。阅读器状态与快捷键的协调放在 widgets/reader/model；纯手势与交互模式保留在 reader-interaction。跨页面的阅读会话导航归 features/reading-navigation，由 app/router 安装，详情页、阅读器和沉浸阅读共用。
 - 批量编辑依赖 category/tag/comic 实体，不能通过另一个 feature 获取实体状态。
 - 导入、上传、恢复等业务动作在 features 中封装，页面负责路由与组合。
+- 阅读端喜欢页面属于 `pages/reading/favorites`，分页与撤销状态放在本切片 model；`features/favorites` 封装阅读查询和标记动作。漫画、章节、媒体三个层级独立，阅读会话将喜欢页记录为返回来源。
 
 ## 路由、API 与样式
 
 路由唯一装配点为 `src/app/router/index.ts`，懒加载引用 pages/widgets 根入口；移动端管理拦截继续由路由守卫执行。页面移动不得改变现有路径或跳转行为。
 
+阅读会话通过浏览器每条历史记录中的 `comicAtlasReadingNavigation` 保存来源完整路径、来源位置及漫画详情位置，不使用全局固定返回地址。详情返回首页、漫画库或历史页等实际来源，保留来源查询参数；直达链接缺少来源时回到漫画库。普通阅读和沉浸阅读切换、章节切换使用同一个历史项。阅读器返回已有详情时按历史位置回退，缺少详情入口时替换当前历史项；详情返回来源时跨过阅读会话中的中间记录。历史状态随刷新保留，浏览器前进、后退恢复对应历史项的会话；失败或取消的导航不更新会话。
+
 `shared/api/http.ts` 提供 Axios 客户端与错误解包，阅读接口使用 `/api/**`，管理接口使用 `/api/manage/**`；目录调整不改变端点和数据协议。
 
 全局样式只从 `app/styles/index.scss` 装配。页面 CSS 放在所属切片 ui 下，通过 `<style scoped src="…">` 引入，不允许在 pages 分组下散落共用样式。组件私有样式就近维护，设计值使用全局令牌。
+
+Element Plus 基础样式已在全局入口加载，组件自动导入配置使用 `ElementPlusResolver({ importStyle: false })`，避免懒加载页面再次注入默认样式、覆盖深色主题。漫画工作区使用公共 `PageHeader`、`PanelHeader`、`ManagementPanel`、`AppButton` 和标签组件，不另设标题字体或控件尺寸。
 
 ## 自动门禁
 

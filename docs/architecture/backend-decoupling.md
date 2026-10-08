@@ -102,10 +102,10 @@ P1 表示优先处理的事务/跨业务边界问题，P2 表示可随对应功�
 
 ### DECOUPLE-11：存储聚合查询与同步磁盘扫描（已完成）
 
-文件：[StorageQueryServiceImpl.java](../../api-service/src/main/java/com/comicatlas/api/storage/service/impl/StorageQueryServiceImpl.java)，`getStorageStats`、`directorySize`。
+现行实现：[StorageStatisticsService.java](../../api-service/src/main/java/com/comicatlas/api/storage/service/StorageStatisticsService.java) 与 [ThumbnailSnapshotService.java](../../api-service/src/main/java/com/comicatlas/api/storage/service/ThumbnailSnapshotService.java)。旧查询统计方法和同步扫描适配器已删除。
 
 - 证据：数据库统计请求同步递归遍历缩略图目录；读取异常直接按 0 计入结果，与空目录无法区分。
-- 拆分：容量统计适配器负责文件访问，查询服务组合统计结果；明确容量缓存刷新频率，必要时由后台采集提供快照。
+- 实现：GET 只读数据库；独立后台执行器扫描目录，持久化成功快照、刷新版本与状态。见 [管理端存储统计](storage-statistics.md)。
 - 约束：不得改变已有大小字段含义；错误应有可定位记录，并决定使用上次成功值还是明确失败，避免缓存“假零”。
 - 验证：空目录、部分文件不可读、扫描中删除文件、大目录及缓存失效。
 

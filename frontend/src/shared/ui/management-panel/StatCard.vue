@@ -6,13 +6,14 @@ withDefaults(
     description?: string
     unit?: string
     tone?: 'neutral' | 'primary' | 'success' | 'warning' | 'danger'
+    compact?: boolean
   }>(),
-  { description: undefined, unit: undefined, tone: 'neutral' },
+  { description: undefined, unit: undefined, tone: 'neutral', compact: false },
 )
 </script>
 
 <template>
-  <article class="stat-card" :class="`stat-card--${tone}`">
+  <article class="stat-card" :class="[`stat-card--${tone}`, { 'stat-card--compact': compact }]">
     <span v-if="$slots.icon" class="stat-card__icon" aria-hidden="true"><slot name="icon" /></span>
     <span class="stat-card__label">{{ label }}</span>
     <strong class="stat-card__value"
@@ -37,6 +38,13 @@ withDefaults(
 }
 .stat-card--primary {
   --stat-tone: var(--accent);
+}
+.stat-card--compact {
+  align-content: start;
+  padding: var(--space-4);
+}
+.stat-card--compact .stat-card__label {
+  color: var(--text-secondary);
 }
 .stat-card--success {
   --stat-tone: var(--success);

@@ -3,6 +3,7 @@ package com.comicatlas.api.storage.service;
 import com.baomidou.mybatisplus.core.MybatisConfiguration;
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.comicatlas.contract.common.enums.HqStatus;
+import com.comicatlas.contract.common.enums.ChapterLifecycleStatus;
 import com.comicatlas.contract.common.enums.LqStatus;
 import com.comicatlas.contract.common.enums.MediaLifecycleStatus;
 import com.comicatlas.persistence.comic.entity.Chapter;
@@ -63,13 +64,28 @@ class ComicStatsServiceTest {
         ArgumentCaptor<List<Chapter>> chaptersCaptor = ArgumentCaptor.forClass(List.class);
         verify(chapterMapper, times(1)).updatePageCountBatch(chaptersCaptor.capture());
         assertThat(chaptersCaptor.getValue()).extracting(Chapter::getPageCount).containsExactly(2, 0);
-        verify(comicMapper, times(1)).updateAllStats(1L, 2, 400L, 40L);
+        verify(comicMapper, times(1)).updateAllStats(1L, 2, 100L, 10L);
+    }
+
+    @Test
+    void recycledChapterAndMissingHqAndVideoLqDoNotIncreaseCapacity() {
+        Chapter activeChapter = chapter(11L);
+        Chapter recycledChapter = chapter(12L);
+        recycledChapter.setStatus(ChapterLifecycleStatus.TRASHED);
+        when(chapterMapper.selectByComicIdOrderByGlobalOrder(1L)).thenReturn(List.of(activeChapter, recycledChapter));
+        Media missingImage = media(11L, 900L, 0L, HqStatus.MISSING, LqStatus.FAILED, MediaLifecycleStatus.READY);
+        Media video = media(11L, 200L, 999L, HqStatus.READY, LqStatus.READY, MediaLifecycleStatus.READY);
+        video.setMediaType("VIDEO");
+        when(mediaMapper.selectByChapterIds(List.of(11L))).thenReturn(List.of(missingImage, video));
+        service.refreshByComic(1L);
+        verify(comicMapper).updateAllStats(1L, 2, 200L, 0L);
     }
 
     private static Chapter chapter(Long chapterId) {
         Chapter chapter = new Chapter();
         chapter.setId(chapterId);
         chapter.setComicId(1L);
+        chapter.setStatus(ChapterLifecycleStatus.READY);
         return chapter;
     }
 

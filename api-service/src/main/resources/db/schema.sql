@@ -362,3 +362,17 @@ CREATE TABLE IF NOT EXISTS trash_manifest (
     PRIMARY KEY (task_id),
     INDEX idx_target (target_type, target_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='TRASH 资产清单（API 写 DB，Worker 只读 DB + 操作文件）';
+
+-- 最近成功的缩略图目录容量；扫描失败或重启不丢失历史结果。
+CREATE TABLE IF NOT EXISTS storage_capacity_snapshot (
+    root_key VARCHAR(32) PRIMARY KEY,
+    root_fingerprint VARCHAR(64) NULL,
+    total_bytes BIGINT NOT NULL DEFAULT 0,
+    file_count BIGINT NOT NULL DEFAULT 0,
+    scanned_at DATETIME(6) NULL,
+    attempted_at DATETIME(6) NULL,
+    requested_at DATETIME(6) NOT NULL,
+    requested_version BIGINT NOT NULL DEFAULT 1,
+    completed_version BIGINT NOT NULL DEFAULT 0,
+    refresh_status VARCHAR(16) NOT NULL DEFAULT 'PENDING'
+);

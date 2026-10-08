@@ -1,14 +1,11 @@
 <template>
   <div class="comic-workspace-page">
-    <header class="workspace-header">
+    <div class="workspace-header">
       <router-link to="/manage/comics" class="back-link">← 漫画列表</router-link>
-      <div class="workspace-heading">
-        <p class="eyebrow">COMIC / WORKSPACE</p>
-        <h1>单本漫画工作区</h1>
-        <p>集中处理这一本漫画的信息、目录、媒体和存储。</p>
-      </div>
-      <span class="comic-id">ID {{ comicId }}</span>
-    </header>
+      <PageHeader title="单本漫画工作区" description="集中处理这一本漫画的信息、目录、媒体和存储。">
+        <span class="comic-id">ID {{ comicId }}</span>
+      </PageHeader>
+    </div>
 
     <el-tabs v-model="activeTab" class="workspace-tabs" @tab-change="handleTabChange">
       <el-tab-pane name="operations" label="概览与操作" lazy><ComicOperationsPage /></el-tab-pane>
@@ -22,6 +19,7 @@
 <script setup lang="ts">
 import { nextTick, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { PageHeader } from '@/shared/ui/page-header'
 import ComicOperationsPage from './ComicOperationsPage.vue'
 import ComicEditPage from './ComicEditPage.vue'
 import ComicContentWorkspacePage from './ComicContentWorkspacePage.vue'
@@ -69,11 +67,8 @@ watch(
 }
 .workspace-header {
   display: grid;
-  grid-template-columns: auto 1fr auto;
-  align-items: end;
-  gap: var(--space-6);
-  padding: var(--space-6) 0 var(--space-2);
-  border-bottom: 1px solid var(--border);
+  gap: var(--space-3);
+  min-width: 0;
 }
 .back-link {
   align-self: start;
@@ -84,37 +79,9 @@ watch(
 .back-link:hover {
   text-decoration: underline;
 }
-.workspace-heading {
-  display: grid;
-  gap: var(--space-2);
-}
-.eyebrow {
-  margin: 0;
-  color: var(--accent);
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.2em;
-}
-.workspace-heading h1 {
-  margin: 0;
-  color: var(--text-primary);
-  font-family: Georgia, 'Times New Roman', serif;
-  font-size: clamp(2rem, 4vw, 3rem);
-  letter-spacing: -0.04em;
-}
-.workspace-heading p:last-child {
-  margin: 0;
-  color: var(--text-muted);
-}
 .comic-id {
-  padding: 6px 9px;
-  border: 1px solid var(--border);
-  color: var(--text-muted);
-  font:
-    700 11px ui-monospace,
-    SFMono-Regular,
-    Consolas,
-    monospace;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
 }
 .workspace-tabs > :deep(.el-tabs__header) {
   margin-bottom: var(--space-6);
@@ -125,15 +92,7 @@ watch(
 @media (max-width: 640px) {
   .workspace-tabs > :deep(.el-tabs__header > .el-tabs__nav-wrap .el-tabs__item) {
     padding: 0 var(--space-2);
-    font-size: 12px;
-  }
-  .workspace-header {
-    grid-template-columns: 1fr auto;
-    gap: var(--space-3);
-  }
-  .workspace-heading {
-    grid-column: 1 / -1;
-    grid-row: 2;
+    font-size: var(--text-xs);
   }
 }
 </style>

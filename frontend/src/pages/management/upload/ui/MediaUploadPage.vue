@@ -378,8 +378,8 @@ onMounted(async () => {
 .upload-guide h2 {
   margin: 0;
   color: var(--text-primary);
-  font-family: Georgia, 'Times New Roman', serif;
-  font-size: 26px;
+  font-family: var(--heading);
+  font-size: var(--text-lg);
   letter-spacing: -0.035em;
 }
 .section-heading p {
@@ -474,7 +474,7 @@ onMounted(async () => {
 }
 .session-note {
   padding: 10px 12px;
-  background: var(--bg-elevated);
+  background: var(--surface-highlight);
 }
 .upload-guide {
   grid-template-columns: minmax(180px, 0.5fr) 1fr;

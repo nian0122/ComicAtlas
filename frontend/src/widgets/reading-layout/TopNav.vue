@@ -7,7 +7,7 @@
 
       <div class="mobile-header">
         <template v-if="mobileHeaderKind === 'detail'">
-          <AppButton type="button" class="mobile-header-action" aria-label="返回" @click="router.back()">
+          <AppButton type="button" class="mobile-header-action" aria-label="返回" @click="navigation.goToSource">
             <el-icon :size="22"><ArrowLeft /></el-icon>
           </AppButton>
           <router-link to="/" class="mobile-detail-brand"><ComicAtlasLogo size="sm" /></router-link>
@@ -52,11 +52,14 @@
         <router-link to="/" class="nav-link" exact-active-class="active">首页</router-link>
         <router-link to="/library" class="nav-link" active-class="active">漫画库</router-link>
         <router-link to="/history" class="nav-link" active-class="active">阅读历史</router-link>
-        <span class="nav-divider" aria-hidden="true" />
-        <router-link to="/manage" class="nav-link nav-link--management" active-class="active"> 仓库管理 </router-link>
+        <router-link to="/favorites" class="nav-link" active-class="active">喜欢</router-link>
+        <span v-if="!isPublicReading" class="nav-divider" aria-hidden="true" />
+        <router-link v-if="!isPublicReading" to="/manage" class="nav-link nav-link--management" active-class="active">
+          仓库管理
+        </router-link>
       </nav>
 
-      <div class="desktop-context">
+      <div v-if="!isPublicReading" class="desktop-context">
         <router-link to="/manage/import" class="import-btn desktop-action" aria-label="在桌面端导入漫画">
           <el-icon :size="18"><UploadFilled /></el-icon>
           <span>导入漫画</span>
@@ -81,14 +84,20 @@
       <MaterialSymbolIcon name="history" class="mobile-tab-icon" />
       <span>历史</span>
     </router-link>
+    <router-link to="/favorites" class="mobile-tab" active-class="active">
+      <MaterialSymbolIcon name="favorite" class="mobile-tab-icon" />
+      <span>喜欢</span>
+    </router-link>
   </nav>
 </template>
 
 <script setup lang="ts">
 import { AppButton } from '@/shared/ui/button'
+import { isPublicReading } from '@/shared/config/access'
 // TopNav 是应用级业务组合组件，保留导入状态协作；components 目录不因此整体成为业务层。
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute } from 'vue-router'
+import { useReadingNavigation } from '@/features/reading-navigation'
 import { ElMessage } from 'element-plus'
 import { ArrowLeft, Menu, Share, UploadFilled, User } from '@element-plus/icons-vue'
 import { MaterialSymbolIcon } from '@/shared/ui/icon'
@@ -97,13 +106,14 @@ import { useHistoryStore } from '@/entities/history'
 
 const isScrolled = ref(false)
 const route = useRoute()
-const router = useRouter()
+const navigation = useReadingNavigation()
 const historyStore = useHistoryStore()
 
 const mobileHeaderKind = computed(() => {
   if (route.name === 'comic-detail') return 'detail'
   if (route.name === 'library') return 'library'
   if (route.name === 'history') return 'history'
+  if (route.name === 'favorites') return 'favorites'
   return 'home'
 })
 
@@ -224,7 +234,7 @@ onBeforeUnmount(() => {
 .desktop-nav {
   display: flex;
   align-items: center;
-  gap: var(--space-10);
+  gap: var(--space-6);
 }
 
 .nav-link {
@@ -448,7 +458,7 @@ onBeforeUnmount(() => {
     left: 0;
     z-index: var(--z-nav);
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(4, 1fr);
     height: calc(var(--mobile-tabbar-height) + env(safe-area-inset-bottom));
     min-height: calc(var(--mobile-tabbar-height) + env(safe-area-inset-bottom));
     box-sizing: border-box;

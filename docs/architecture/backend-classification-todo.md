@@ -30,7 +30,7 @@
 - [x] **TODO PACKAGE-03：元数据刷新策略归 metadata。** `MetadataRefreshTaskPolicy` 已归 `metadata.policy` 并实现 task 定义的 `TaskLifecyclePolicy`，task 仅依赖通用策略接口；创建锁定、取消释放、重试准备保持原事务调用位置及 `attempt` 递增/重发语义。
 - [x] **TODO PACKAGE-04：装配器和结果对象离开 service。** `task/assembler/TaskResponseAssembler.java` 负责任务响应装配；`exporter/model/ExportDirectoryOpenResult.java` 作为内部目录打开结果保留。HTTP 响应 DTO 仍归 dto，响应字段和状态码未改变。
 - [x] **TODO PACKAGE-05：框架触发入口单独归类。** `upload/cleanup/UploadSessionCleanupTask.java` 保留原 `@Scheduled` 配置；`task/bootstrap/LegacyTaskBackfillRunner.java` 保留原启动触发、启用行为和顺序。清理与回填业务仍由 service 承担。
-- [x] **TODO PACKAGE-06：基础设施实现从 service 中辨识出来。** `dlq/adapter/RabbitDlqBrokerClient.java`、`task/adapter/RabbitManagementClient.java`、`storage/adapter/StorageCapacityAdapter.java` 已归入 adapter；`DlqBrokerClient` 接口仍保留在 service，超时、错误处理和容量读取语义未变。
+- [x] **TODO PACKAGE-06：基础设施实现从 service 中辨识出来。** `dlq/adapter/RabbitDlqBrokerClient.java`、`task/adapter/RabbitManagementClient.java` 已归入 adapter；存储扫描现由 `storage/adapter/ThumbnailCapacityScanner.java` 提供，旧同步容量适配器已删除。`DlqBrokerClient` 接口仍保留在 service。
 - [x] **TODO PACKAGE-07：结果业务路由与 MQ 接收区分。** `task/service/routing/ManagementResultRouter.java` 已与 `task/event/ManagementCommandResultHandler` 分离；`ManagementResultApplicationServiceImpl` 的 Inbox、事务、重复结果和迟到结果处理保持不变。
 
 ## Worker：消息入口、执行器与配置

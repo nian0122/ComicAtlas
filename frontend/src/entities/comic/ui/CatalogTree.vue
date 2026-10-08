@@ -267,7 +267,7 @@ const flatItems = computed<FlatItem[]>(() => {
 
 .node-header:hover .expand-btn {
   color: var(--accent);
-  background: color-mix(in srgb, var(--bg-elevated) 80%, transparent);
+  background: color-mix(in srgb, var(--surface-highlight) 80%, transparent);
 }
 
 .expand-btn.expanded {

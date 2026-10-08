@@ -209,6 +209,12 @@ onBeforeUnmount(() => {
   object-fit: cover;
 }
 
+.history-thumb :deep(> span) {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
 .history-copy {
   display: flex;
   flex: 1;
@@ -221,6 +227,15 @@ onBeforeUnmount(() => {
   background: transparent;
   color: inherit;
   text-align: left;
+}
+
+/* 公共按钮包装层需要跟随卡片宽度，才能截断长标题并约束进度条。 */
+.history-copy :deep(> span) {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  width: 100%;
+  min-width: 0;
 }
 
 .history-title {
