@@ -261,7 +261,8 @@ test.describe('桌面阅读工具栏覆盖层', () => {
       }, readingDirection)
       await page.goto('/reader/1')
       const viewport = page.locator(readingDirection === 'vertical' ? '.reader-viewport' : '.paged-viewport')
-      const image = viewport.locator('img').first()
+      // 虚拟列表会复用并重排节点，按媒体地址定位同一页，避免比较不同图片。
+      const image = viewport.locator('img[src$="/first.jpg"]')
       await expect(image).toBeVisible()
       const viewportBefore = (await viewport.boundingBox())!
       expect(viewportBefore.y).toBe(0)

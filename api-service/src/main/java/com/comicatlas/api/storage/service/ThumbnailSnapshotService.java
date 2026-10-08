@@ -13,17 +13,21 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.core.task.TaskExecutor;
+import org.springframework.dao.DataAccessException;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.TransactionException;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
+import java.io.IOException;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.RejectedExecutionException;
 
 /** 单实例后台刷新协调器；持久化刷新版本，扫描期间发生的变更在下一轮处理。 */
 @Service
@@ -80,13 +84,13 @@ public class ThumbnailSnapshotService {
             executor.execute(() -> {
                 try {
                     refreshIfNeeded();
-                } catch (RuntimeException exception) {
+                } catch (DataAccessException | IllegalArgumentException exception) {
                     log.warn("后台容量统计暂不可用，将在后续轮询重试", exception);
                 } finally {
                     scanSubmissionGuard.set(false);
                 }
             });
-        } catch (RuntimeException exception) {
+        } catch (RejectedExecutionException exception) {
             scanSubmissionGuard.set(false);
             log.warn("容量扫描任务投递失败，将在后续轮询重试", exception);
         }
@@ -113,7 +117,7 @@ public class ThumbnailSnapshotService {
                     snapshotMapper.initialize(now());
                     snapshotMapper.requestRefresh(now());
                 });
-            } catch (RuntimeException exception) {
+            } catch (DataAccessException | TransactionException exception) {
                 log.warn("文件变更容量刷新登记失败，定期校准将补偿", exception);
             }
         };
@@ -158,7 +162,7 @@ public class ThumbnailSnapshotService {
                     storageProperties.root(StorageRootKeys.THUMBS).getPath(), scanTimeout);
             snapshotMapper.completeScan(version, capacity.totalBytes(), capacity.fileCount(), now(), rootFingerprint());
             log.info("缩略图容量扫描完成: bytes={}, files={}", capacity.totalBytes(), capacity.fileCount());
-        } catch (Exception exception) {
+        } catch (IOException | DataAccessException | ArithmeticException | IllegalArgumentException exception) {
             snapshotMapper.failScan();
             log.warn("缩略图容量扫描失败，保留上次成功快照", exception);
         }
