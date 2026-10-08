@@ -80,6 +80,9 @@ public class ArchiveScanner {
                     try (InputStream ignored = session.readEntry(entry.name())) {
                         ignored.transferTo(java.io.OutputStream.nullOutputStream());
                     } catch (IOException e) {
+                        // 单个媒体损坏不阻止其余条目扫描，但必须保留条目和 cause 便于诊断。
+                        org.slf4j.LoggerFactory.getLogger(ArchiveScanner.class)
+                                .warn("归档媒体条目读取失败: {}", entry.name(), e);
                         damaged.add(entry.name());
                     }
                 }
@@ -87,6 +90,8 @@ public class ArchiveScanner {
             try {
                 session.testIntegrity();
             } catch (IOException e) {
+                org.slf4j.LoggerFactory.getLogger(ArchiveScanner.class)
+                        .warn("归档完整性校验失败: {}", archive.getFileName(), e);
                 integrityPassed = false;
             }
         }
@@ -113,7 +118,9 @@ public class ArchiveScanner {
     private static ArchiveFormat formatFallback(Path archive, ArchiveReader reader) {
         try {
             return reader.detectFormat(archive);
-        } catch (IOException | IllegalArgumentException ignored) {
+        } catch (IOException | IllegalArgumentException exception) {
+            org.slf4j.LoggerFactory.getLogger(ArchiveScanner.class)
+                    .debug("归档格式探测失败，使用扩展名回退: {}", archive.getFileName(), exception);
             String name = archive.getFileName().toString().toLowerCase(Locale.ROOT);
             if (name.endsWith(".zip") || name.endsWith(".cbz")) {
                 return ArchiveFormat.SPLIT_ZIP;

@@ -1,5 +1,4 @@
 package com.comicatlas.api.metadata.controller;
-
 import com.comicatlas.contract.comic.dto.CategoryDTO;
 import com.comicatlas.api.metadata.service.CategoryManagementService;
 import com.comicatlas.contract.common.Result;
@@ -27,6 +26,11 @@ public class CategoryManagementController {
 
     private final CategoryManagementService categoryManagementService;
 
+    /**
+     * 查询管理端可用的分类列表；该查询不改变分类或漫画状态。
+     *
+     * @return 分类列表
+     */
     @GetMapping
     public Result<java.util.List<CategoryDTO>> listCategories() {
         return Result.ok(categoryManagementService.listCategories());
@@ -44,8 +48,9 @@ public class CategoryManagementController {
     }
 
     /**
-     * 重命名分类，与其他分类重名时返回 400。
+     * 重命名分类；名称重复时请求失败，成功后影响后续漫画分类展示。
      *
+     * @param id 分类 ID
      * @param name 新分类名称
      * @return 更新后的分类
      */
@@ -55,8 +60,9 @@ public class CategoryManagementController {
     }
 
     /**
-     * 删除分类。
+     * 删除分类；分类删除不会删除漫画，只解除分类关联或使其不可用，具体关联处理由服务层完成。
      *
+     * @param id 分类 ID
      * @return 空结果
      */
     @DeleteMapping("/{id}")

@@ -1,0 +1,20 @@
+server:
+  port: ${AI_SERVER_PORT:8020}
+spring:
+  application.name: comic-ai-service
+  datasource:
+    url: jdbc:mysql://${AI_DB_HOST:localhost}:${AI_DB_PORT:3306}/${AI_DB_NAME:comic_atlas}?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+    username: ${AI_DB_USER:comicatlas_api}
+    password: ${AI_DB_PASSWORD:}
+    hikari.maximum-pool-size: ${AI_DB_POOL_SIZE:5}
+  sql.init.mode: always
+comic-ai:
+  manga-root: ${AI_MANGA_ROOT:/manga}
+  work-root: ${AI_WORK_ROOT:/var/lib/comic-ai/work}
+  sample-count: ${AI_SAMPLE_COUNT:10}
+  max-concurrent-tasks: ${AI_MAX_CONCURRENT_TASKS:1}
+  model:
+    api-key: ${AI_API_KEY:}
+    base-url: ${AI_BASE_URL:https://api.openai.com/v1}
+    model-name: ${AI_MODEL:}
+    timeout-seconds: ${AI_TIMEOUT_SECONDS:120}

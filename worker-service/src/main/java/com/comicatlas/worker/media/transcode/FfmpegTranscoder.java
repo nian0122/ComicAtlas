@@ -160,7 +160,11 @@ public class FfmpegTranscoder {
                 }
             }
             return null;
-        } catch (Exception e) {
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            log.debug("ffmpeg 硬件编码器探测被中断，回退 CPU", e);
+            return null;
+        } catch (RuntimeException e) {
             log.debug("ffmpeg 硬件编码器探测异常，回退 CPU", e);
             return null;
         }

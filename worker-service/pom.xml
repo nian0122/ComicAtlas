@@ -7,17 +7,12 @@
     <parent>
         <groupId>com.comicatlas</groupId>
         <artifactId>comic-atlas</artifactId>
-        <version>0.0.1-SNAPSHOT</version>
+        <version>2.2.0</version>
     </parent>
 
     <artifactId>worker-service</artifactId>
     <name>Worker Service</name>
     <description>动漫资源聚合平台 - 消息消费者服务</description>
-
-    <properties>
-        <!-- 覆盖 Spring Boot 管理的 Testcontainers 版本，修复 Docker Desktop 兼容性 -->
-        <testcontainers.version>1.21.4</testcontainers.version>
-    </properties>
 
     <dependencies>
         <!-- Comic Common -->
@@ -49,12 +44,6 @@
         <dependency>
             <groupId>com.alibaba.cloud</groupId>
             <artifactId>spring-cloud-starter-alibaba-nacos-discovery</artifactId>
-        </dependency>
-
-        <!-- Nacos 配置中心 -->
-        <dependency>
-            <groupId>com.alibaba.cloud</groupId>
-            <artifactId>spring-cloud-starter-alibaba-nacos-config</artifactId>
         </dependency>
 
         <!-- Jackson JSON -->
@@ -101,49 +90,14 @@
             <artifactId>commons-compress</artifactId>
         </dependency>
 
-        <!-- 测试 -->
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-test</artifactId>
-            <scope>test</scope>
-        </dependency>
 
-        <!-- Testcontainers 集成测试 -->
-        <dependency>
-            <groupId>org.testcontainers</groupId>
-            <artifactId>testcontainers</artifactId>
-            <version>${testcontainers.version}</version>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.testcontainers</groupId>
-            <artifactId>mysql</artifactId>
-            <version>${testcontainers.version}</version>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.testcontainers</groupId>
-            <artifactId>rabbitmq</artifactId>
-            <version>${testcontainers.version}</version>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.testcontainers</groupId>
-            <artifactId>junit-jupiter</artifactId>
-            <version>${testcontainers.version}</version>
-            <scope>test</scope>
-        </dependency>
+
+
     </dependencies>
 
     <build>
         <plugins>
-            <!--
-              worker-service 同时作为 api-service 的 test 依赖。
-              spring-boot repackage 默认把主构件替换为 BOOT-INF 布局的可执行 fat jar，
-              导致 api-service testCompile 无法在类路径上找到 worker 的类。
-              使用 -exec classifier：主构件保持普通 jar（可作为库使用），
-              可执行 fat jar 命名为 worker-service-*-exec.jar。
-            -->
+
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>

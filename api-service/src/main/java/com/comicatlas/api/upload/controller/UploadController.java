@@ -28,8 +28,7 @@ import java.io.IOException;
  * 分片以原始字节流接收（Content-Range + X-Sha256 头），服务端流式写入 STAGING，
  * 不缓冲到内存。STAGING 不经 Nginx 暴露，不可下载。
  * <p>
- * 预留接口能力：媒体上传/替换功能契约已实现且测试可用（见 MediaUploadManagementIT），
- * 但当前无前端页面入口，不属于漫画导入主流程。
+ * 媒体上传/替换管理接口；前端入口为 {@code /manage/upload}，不属于漫画导入主流程。
  */
 @RestController
 @RequestMapping("/api/manage/uploads")
@@ -42,7 +41,7 @@ public class UploadController {
      * 创建分块上传会话。
      * <p>
      * 校验目标漫画/章节、文件数与单文件/会话大小上限及磁盘剩余空间，
-     * 为每个文件生成服务端 storageName，后续分片均在该会话内上传。
+     * 校验并保留每个文件的原始文件名，后续分片均在该会话内上传。
      *
      * @param request 会话创建请求（目标章节、文件名列表、总大小等）
      * @return 会话信息（sessionId 与各文件 storageName）

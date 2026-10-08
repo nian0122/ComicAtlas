@@ -5,7 +5,6 @@ import com.comicatlas.api.catalog.dto.ChapterVO;
 import com.comicatlas.api.catalog.dto.ChapterCreateRequest;
 import com.comicatlas.api.catalog.dto.ChapterMoveRequest;
 import com.comicatlas.api.catalog.dto.ChapterRenameRequest;
-import com.comicatlas.api.catalog.dto.ChapterReorderRequest;
 import com.comicatlas.api.catalog.service.ChapterManagementService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -70,20 +69,6 @@ public class ChapterManagementController {
             @RequestBody(required = false) ChapterMoveRequest request) {
         Long catalogId = request != null ? request.getCatalogId() : null;
         return Result.ok(chapterManagementService.moveChapter(comicId, chapterId, catalogId));
-    }
-
-    /**
-     * 全书章节重排（globalOrder 两阶段写库，避免唯一键瞬时冲突）。
-     *
-     * @param request 目标 globalOrder（1 基）
-     * @return 重排后的章节
-     */
-    @PutMapping("/{chapterId}/reorder")
-    public Result<ChapterVO> reorder(
-            @PathVariable Long comicId,
-            @PathVariable Long chapterId,
-            @Valid @RequestBody ChapterReorderRequest request) {
-        return Result.ok(chapterManagementService.reorderChapter(comicId, chapterId, request.getTargetGlobalOrder()));
     }
 
     /**

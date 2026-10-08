@@ -1,7 +1,7 @@
 # 数据库 Schema 文档
 
-> 基于 `api-service/src/main/resources/db/schema.sql`（空库执行 Flyway V1..V20 后的最终结构）及 Java 实体/枚举生成。
-> 最后更新: 2026-08-12
+> 本文基于 `api-service/src/main/resources/db/schema.sql`、Flyway 迁移及 Java 实体/枚举整理。`schema.sql` 是测试容器的空库基线；已有数据库升级由 Flyway 执行。迁移范围以 `api-service/src/main/resources/db/flyway/` 和 Java 迁移源码为准。
+> 最后核对迁移目录：2026-09-29；表字段内容仍需随新增迁移逐项核对。
 
 ---
 
@@ -36,7 +36,6 @@ erDiagram
         text description
         varchar cover_path
         int total_pages
-        bigint hq_size
         bigint hq_size
         bigint lq_size
         varchar source_type
@@ -141,6 +140,7 @@ erDiagram
 |------|------|--------|------|
 | `id` | BIGINT | AUTO_INCREMENT | 主键 |
 | `title` | VARCHAR(255) | NOT NULL | 漫画标题 |
+| `title_sort_key` | VARBINARY(16384) | 由迁移回填 | ICU 中文数字自然排序键（V25–V27） |
 | `title_jpn` | VARCHAR(255) | NULL | 日文标题 |
 | `author` | VARCHAR(255) | NULL | 作者 |
 | `description` | TEXT | NULL | 简介 |
@@ -157,9 +157,11 @@ erDiagram
 | `category_id` | BIGINT | NULL | 分类，FK → category(id) |
 | `category` | VARCHAR(64) | NULL | 分类名称（旧字段保留） |
 | `deleted_at` | DATETIME | NULL | 软删除时间 |
-| `trashed_at` | DATETIME | NULL | 进入 TRASHED 的时间（7 天保留期起点） |
+| `trashed_at` | DATETIME | NULL | 进入 TRASHED 的时间（保留期起点，期限由 `trash.retention-days` 配置） |
 | `created_at` | DATETIME | `CURRENT_TIMESTAMP` | 创建时间 |
 | `updated_at` | DATETIME | `CURRENT_TIMESTAMP` ON UPDATE | 更新时间 |
+| `reaction` | VARCHAR(16) | `NONE` | 漫画反馈状态（V32） |
+| `reaction_at` | DATETIME | NULL | 漫画反馈时间（V32） |
 | `version` | INT | `1` | 乐观锁版本号 |
 
 **索引**:
@@ -167,6 +169,7 @@ erDiagram
 - `INDEX idx_status (status)`
 - `INDEX idx_category_id (category_id)`
 - `INDEX idx_created_at (created_at)`
+- `INDEX idx_comic_reaction_time (reaction, reaction_at)`
 
 ---
 
@@ -195,7 +198,7 @@ erDiagram
 
 ### chapter
 
-章节表。排序仅依赖 `global_order`，`chapter_no` 为原始编号不参与排序。
+章节表。`sort_order` 表示章节在同级目录／章节中的展示位置；`global_order` 是按目录树顺序派生的全书阅读位置。`chapter_no` 为原始编号，不参与排序。
 
 | 字段 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
@@ -205,11 +208,13 @@ erDiagram
 | `title` | VARCHAR(255) | NULL | 章节标题 |
 | `chapter_no` | VARCHAR(32) | `1` | 原始编号 (不参与排序) |
 | `page_count` | INT | `0` | 页数 |
-| `sort_order` | INT | `0` | 目录内排序 |
-| `global_order` | INT | `0` | 全书阅读顺序 |
+| `sort_order` | INT | `0` | 同级目录与章节共享的展示顺序 |
+| `global_order` | INT | `0` | 按目录树遍历派生的全书阅读顺序 |
 | `created_at` | DATETIME | `CURRENT_TIMESTAMP` | 创建时间 |
 | `status` | VARCHAR(16) | `READY` | 章节生命周期状态，见 [MediaLifecycleStatus](#medialifecyclestatus) |
-| `trashed_at` | DATETIME | NULL | 进入 TRASHED 的时间（7 天保留期起点） |
+| `trashed_at` | DATETIME | NULL | 进入 TRASHED 的时间（保留期起点，期限由 `trash.retention-days` 配置） |
+| `reaction` | VARCHAR(16) | `NONE` | 章节反馈状态（V32） |
+| `reaction_at` | DATETIME | NULL | 章节反馈时间（V32） |
 | `version` | INT | `1` | 乐观锁版本号 |
 
 **索引**:
@@ -217,6 +222,7 @@ erDiagram
 - `UNIQUE uk_catalog_chapter (comic_id, catalog_id, chapter_no)`
 - `UNIQUE uk_comic_global (comic_id, global_order)`
 - `INDEX idx_comic_global (comic_id, global_order)`
+- `INDEX idx_chapter_reaction_time (reaction, reaction_at)`
 
 **外键**:
 - `chapter_ibfk_1`: comic_id → comic(id) ON DELETE CASCADE
@@ -250,14 +256,17 @@ erDiagram
 | `container` | VARCHAR(32) | NULL | 视频容器格式 (mp4/webm/mkv 等) |
 | `video_codec` | VARCHAR(32) | NULL | 视频编码 |
 | `audio_codec` | VARCHAR(32) | NULL | 音频编码 |
+| `reaction` | VARCHAR(16) | `NONE` | 媒体反馈状态（V31） |
+| `reaction_at` | DATETIME | NULL | 媒体反馈时间（V31） |
 | `created_at` | DATETIME | `CURRENT_TIMESTAMP` | 创建时间 |
 | `status` | VARCHAR(16) | `READY` | 媒体生命周期状态，见 [MediaLifecycleStatus](#medialifecyclestatus) |
-| `trashed_at` | DATETIME | NULL | 进入 TRASHED 的时间（7 天保留期起点） |
+| `trashed_at` | DATETIME | NULL | 进入 TRASHED 的时间（保留期起点，期限由 `trash.retention-days` 配置） |
 | `version` | INT | `1` | 乐观锁版本号 |
 
 **索引**:
 - `UNIQUE uk_chapter_page (chapter_id, page_number)`
 - `INDEX idx_media_type (media_type)`
+- `INDEX idx_page_reaction_time (reaction, reaction_at)`
 
 **外键**:
 - `page_ibfk_1`: chapter_id → chapter(id) ON DELETE CASCADE
@@ -405,13 +414,14 @@ erDiagram
 
 ### export_task
 
-导出任务表。记录分卷 ZIP 导出任务。
+导出任务表。记录 ZIP、CBZ 或目录导出任务。
 
 | 字段 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
 | `id` | BIGINT | AUTO_INCREMENT | 主键 |
 | `management_task_id` | BIGINT | NULL | 关联 management_task.id 一对一扩展 |
 | `comic_id` | BIGINT | NOT NULL | 导出漫画 |
+| `format` | VARCHAR(16) | `ZIP` | 导出格式：`ZIP`、`CBZ` 或 `DIRECTORY`（V30 扩容） |
 | `status` | VARCHAR(20) | `PENDING` | 任务状态 |
 | `progress` | SMALLINT | `0` | 进度 0-100 |
 | `output_root` | VARCHAR(20) | NULL | 输出存储根键 |
@@ -589,7 +599,7 @@ erDiagram
 | `comic_id` | BIGINT | NOT NULL | 目标漫画 |
 | `chapter_id` | BIGINT | NOT NULL | 目标章节 |
 | `replace_media_id` | BIGINT | NULL | 替换目标媒体 ID（replace 流程） |
-| `status` | VARCHAR(16) | `ACTIVE` | ACTIVE/COMPLETED/CANCELLED/EXPIRED/FAILED |
+| `status` | VARCHAR(16) | `ACTIVE` | ACTIVE/VERIFYING/COMPLETED/CANCELLED/EXPIRED/FAILED |
 | `total_bytes` | BIGINT | `0` | 会话总字节数 |
 | `total_files` | INT | `0` | 文件数 |
 | `expires_at` | DATETIME | NOT NULL | 未完成过期时间 |
@@ -661,15 +671,21 @@ TRASH 资产清单（API 写 DB，Worker 只读 DB + 操作文件）。V20 新�
 
 | 值 | 说明 |
 |----|------|
+| `DRAFT` | 空漫画草稿 |
 | `IMPORTING` | 导入中 |
-| `READY` | 就绪 (导入完成) |
+| `IMPORT_FAILED` | 导入失败 |
+| `READY` | 就绪（导入完成） |
+| `RECOVERY_REQUIRED` | 需要恢复 |
 | `REFRESHING` | 元数据刷新中 |
-| `DELETING` | 删除中 |
-| `DELETED` | 已删除 |
-| `RESCANNING` | 重新扫描中 |
+| `DELETING` | 删除排队中 |
+| `TRASHING` | 回收中 |
+| `TRASHED` | 已回收，可恢复 |
+| `RESTORING` | 恢复中 |
+| `PURGING` | 永久清理中 |
+| `DELETED` | 已永久删除 |
 
 ```java
-public enum ComicStatus { IMPORTING, READY, REFRESHING, DELETING, DELETED, RESCANNING }
+public enum ComicStatus { DRAFT, IMPORTING, IMPORT_FAILED, READY, RECOVERY_REQUIRED, REFRESHING, DELETING, TRASHING, TRASHED, RESTORING, PURGING, DELETED }
 ```
 
 ---
@@ -701,13 +717,16 @@ HQ (高清) 图片状态。
 
 | 值 | 说明 |
 |----|------|
-| `PENDING` | 待处理 (文件复制前) |
-| `READY` | 就绪 (文件已就位) |
-| `MISSING` | 丢失 (文件缺失) |
-| `DELETED` | 已删除 (HQ 已被清理) |
+| `PENDING` | 待处理（文件复制前） |
+| `READY` | 就绪（文件已就位） |
+| `MISSING` | 丢失（文件缺失） |
+| `DELETE_QUEUED` | 已排队删除 |
+| `DELETING` | 删除中 |
+| `DELETED` | 已删除（HQ 已被清理） |
+| `FAILED` | 删除失败 |
 
 ```java
-public enum HqStatus { PENDING, READY, MISSING, DELETED }
+public enum HqStatus { PENDING, READY, MISSING, DELETE_QUEUED, DELETING, DELETED, FAILED }
 ```
 
 ---
@@ -722,10 +741,11 @@ LQ (低清/缩略图) 生成状态。不自动生成，需手动触发。
 | `QUEUED` | 已入队 |
 | `GENERATING` | 生成中 |
 | `READY` | 就绪 |
+| `MISSING` | 丢失（文件缺失） |
 | `FAILED` | 失败 |
 
 ```java
-public enum LqStatus { NOT_GENERATED, QUEUED, GENERATING, READY, FAILED }
+public enum LqStatus { NOT_GENERATED, QUEUED, GENERATING, READY, MISSING, FAILED }
 ```
 
 ---
@@ -737,13 +757,14 @@ public enum LqStatus { NOT_GENERATED, QUEUED, GENERATING, READY, FAILED }
 | 值 | 说明 |
 |----|------|
 | `NOT_NEEDED` | 无需转码 (默认) |
+| `REQUIRED` | 需要转码，等待手动触发 |
 | `QUEUED` | 已入队 |
 | `TRANSCODING` | 转码中 |
 | `READY` | 转码完成 |
 | `FAILED` | 转码失败 |
 
 ```java
-public enum TranscodeStatus { NOT_NEEDED, QUEUED, TRANSCODING, READY, FAILED }
+public enum TranscodeStatus { NOT_NEEDED, REQUIRED, QUEUED, TRANSCODING, READY, FAILED }
 ```
 
 ---
@@ -759,12 +780,13 @@ public enum TranscodeStatus { NOT_NEEDED, QUEUED, TRANSCODING, READY, FAILED }
 | `IMPORTING` | 导入中 |
 | `SUCCESS` | 成功 |
 | `FAILED` | 失败 |
+| `CANCELLED` | 已取消 |
 
 ```java
-public enum ImportTaskStatus { PENDING, PARSING, IMPORTING, SUCCESS, FAILED }
+public enum ImportTaskStatus { PENDING, PARSING, IMPORTING, SUCCESS, FAILED, CANCELLED }
 ```
 
-> **注意**: 代码中存在 `CANCELLED` 和 `DOWNLOADING` 两个字符串值，用于业务逻辑判断 (如取消任务、下载进度回调)，但它们 **未定义在 `ImportTaskStatus` 枚举中**，而是以字符串字面量形式出现在 `ImportServiceImpl` 和 `ImportEventHandler` 中。
+> `CANCELLED` 是导入任务的终态；`DOWNLOADING`、`EXTRACTING`、`PARSING` 是写入 `management_task.stage` 的导入阶段值，不属于 `ImportTaskStatus`。
 
 ---
 
@@ -775,9 +797,10 @@ public enum ImportTaskStatus { PENDING, PARSING, IMPORTING, SUCCESS, FAILED }
 | 值 | 说明 |
 |----|------|
 | `ZIP` | ZIP 压缩包 |
-| `REGISTER` | 本地目录注册 |
+| `CBZ` | CBZ 漫画压缩包 |
+| `DIRECTORY` | 本地目录 |
 | `EHENTAI` | E-Hentai 画廊 |
 
 ```java
-public enum SourceType { ZIP, REGISTER, EHENTAI }
+public enum SourceType { ZIP, CBZ, DIRECTORY, EHENTAI }
 ```

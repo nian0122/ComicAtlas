@@ -1,6 +1,7 @@
 package com.comicatlas.worker.importer.manifest;
 
 import com.comicatlas.worker.importer.model.ImportManifest;
+import com.comicatlas.worker.importer.model.ImportNormalizationManifest;
 import com.comicatlas.common.storage.ImportStagingPath;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -33,6 +34,7 @@ public class ImportManifestManager {
     private static final String MANIFEST_FILE_NAME = "manifest.json";
     /** 原子写清单临时文件名。 */
     private static final String MANIFEST_TMP_FILE_NAME = "manifest.json.tmp";
+    private static final String NORMALIZATION_FILE_NAME = "normalization.json";
 
     private final ObjectMapper objectMapper;
 
@@ -44,18 +46,48 @@ public class ImportManifestManager {
         return Files.exists(manifestPath(mangaRoot, taskId));
     }
 
+    public Path normalizationPath(Path mangaRoot, Long taskId) {
+        return manifestPath(mangaRoot, taskId).resolveSibling(NORMALIZATION_FILE_NAME);
+    }
+
+    public boolean normalizationExists(Path mangaRoot, Long taskId) {
+        return Files.exists(normalizationPath(mangaRoot, taskId));
+    }
+
+    public void writeNormalization(Path mangaRoot, Long taskId, ImportNormalizationManifest manifest)
+            throws IOException {
+        writeAtomically(manifest, normalizationPath(mangaRoot, taskId), "normalization.json.tmp");
+    }
+
+    public ImportNormalizationManifest readNormalization(Path mangaRoot, Long taskId) throws IOException {
+        Path path = normalizationPath(mangaRoot, taskId);
+        ImportNormalizationManifest manifest = objectMapper.readValue(path.toFile(), ImportNormalizationManifest.class);
+        if (manifest.version() != VERSION || manifest.taskId() != taskId) {
+            throw new IOException("整理恢复点版本或任务标识不兼容: taskId=" + taskId);
+        }
+        return manifest;
+    }
+
+    public void deleteNormalization(Path mangaRoot, Long taskId) throws IOException {
+        Files.deleteIfExists(normalizationPath(mangaRoot, taskId));
+    }
+
     public void write(Path mangaRoot, Long taskId, ImportManifest manifest) throws IOException {
         Path target = manifestPath(mangaRoot, taskId);
+        writeAtomically(manifest, target, MANIFEST_TMP_FILE_NAME);
+        log.info("清单已写入: taskId={}", taskId);
+    }
+
+    private void writeAtomically(Object value, Path target, String tempFileName) throws IOException {
         Files.createDirectories(target.getParent());
-        Path tempPath = target.resolveSibling(MANIFEST_TMP_FILE_NAME);
+        Path tempPath = target.resolveSibling(tempFileName);
         try {
-            objectMapper.writerWithDefaultPrettyPrinter().writeValue(tempPath.toFile(), manifest);
+            objectMapper.writerWithDefaultPrettyPrinter().writeValue(tempPath.toFile(), value);
             Files.move(tempPath, target, StandardCopyOption.REPLACE_EXISTING);
         } catch (IOException ex) {
             Files.deleteIfExists(tempPath);
             throw ex;
         }
-        log.info("清单已写入: {}", target);
     }
 
     public ImportManifest read(Path mangaRoot, Long taskId) throws IOException {

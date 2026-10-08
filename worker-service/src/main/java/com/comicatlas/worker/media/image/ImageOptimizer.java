@@ -2,6 +2,7 @@ package com.comicatlas.worker.media.image;
 
 import com.comicatlas.worker.config.WorkerConfig;
 import com.comicatlas.worker.shared.process.ExternalProcessRunner;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
@@ -37,7 +38,9 @@ public class ImageOptimizer {
      * @param force     是否强制重新生成（忽略已存在的 LQ 产物，对应 LQ_REGENERATE）
      * @return Go 工具返回的详细结果
      */
-    public RunResult generateLq(Long comicId, Long chapterId, Path hqDir, Path lqDir, boolean force) {
+    /** 仅处理数据库确认处于活动生命周期的候选文件。 */
+    public RunResult generateLq(Long comicId, Long chapterId, Path hqDir, Path lqDir, boolean force,
+                                List<String> includeFiles) {
         String hqDirStr = hqDir.toString();
         String lqDirStr = lqDir.toString();
 
@@ -46,7 +49,7 @@ public class ImageOptimizer {
         }
         try {
             Files.createDirectories(lqDir);
-        } catch (Exception e) {
+        } catch (java.io.IOException | RuntimeException e) {
             throw new RuntimeException("创建 LQ 目录失败: " + lqDirStr, e);
         }
 
@@ -65,18 +68,49 @@ public class ImageOptimizer {
                 "-chapter-no", chapterNo,
                 "-quality", String.valueOf(config.getLqQuality()),
                 "-workers", String.valueOf(workers),
+                "-max-long-edge", String.valueOf(config.getImage().getMaxLongEdge()),
                 "-max-inflight-pixels", String.valueOf(config.getImage().getMaxInflightPixels()),
                 "-json"
         ));
+        Path includeListPath = null;
+        if (includeFiles != null) {
+            try {
+                includeListPath = Files.createTempFile("comic-atlas-lq-include-", ".json");
+                objectMapper.writeValue(includeListPath.toFile(), includeFiles);
+            } catch (java.io.IOException e) {
+                if (includeListPath != null) {
+                    try {
+                        Files.deleteIfExists(includeListPath);
+                    } catch (java.io.IOException cleanupException) {
+                        e.addSuppressed(cleanupException);
+                    }
+                }
+                throw new RuntimeException("创建 LQ 候选文件清单失败: comicId=" + comicId
+                        + ", chapterId=" + chapterId, e);
+            }
+            cmd.add("-include-list");
+            cmd.add(includeListPath.toString());
+        }
         if (force) {
             cmd.add("-force");
         }
 
         log.info("启动图片优化: comicId={}, chapterId={}, hqDir={}, lqDir={}, workers={}, "
-                        + "maxInflightPixels={}, quality={}, force={}",
+                        + "maxLongEdge={}, maxInflightPixels={}, quality={}, force={}",
                 comicId, chapterId, hqDirStr, lqDirStr, workers,
-                config.getImage().getMaxInflightPixels(), config.getLqQuality(), force);
-        return runOptimizer(cmd, comicId, chapterId);
+                config.getImage().getMaxLongEdge(), config.getImage().getMaxInflightPixels(),
+                config.getLqQuality(), force);
+        try {
+            return runOptimizer(cmd, comicId, chapterId);
+        } finally {
+            if (includeListPath != null) {
+                try {
+                    Files.deleteIfExists(includeListPath);
+                } catch (java.io.IOException e) {
+                    log.warn("无法清理 LQ 候选文件清单: comicId={}, chapterId={}", comicId, chapterId);
+                }
+            }
+        }
     }
 
     private RunResult runOptimizer(List<String> cmd, Long comicId, Long chapterId) {
@@ -113,7 +147,7 @@ public class ImageOptimizer {
         RunResult parsed;
         try {
             parsed = objectMapper.readValue(stdout, RunResult.class);
-        } catch (Exception e) {
+        } catch (com.fasterxml.jackson.core.JsonProcessingException | RuntimeException e) {
             throw new RuntimeException(
                     "解析图片优化 JSON 失败: comicId=" + comicId + ", chapterId=" + chapterId
                             + ", exitCode=" + exitCode + ", stdout=" + stdout, e);
@@ -126,6 +160,7 @@ public class ImageOptimizer {
     }
 
     @Data
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public static class RunResult {
         private Long comicId;
         private Long chapterId;
@@ -142,12 +177,15 @@ public class ImageOptimizer {
     }
 
     @Data
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public static class PageResult {
         private Long pageNumber;
+        private String sourcePath;
         private String status;
         private Long inputSize;
         private Long outputSize;
         private Double ratio;
         private String reason;
+        private String outputPath;
     }
 }

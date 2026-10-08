@@ -1,6 +1,5 @@
 package com.comicatlas.api.metadata.service.impl;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.comicatlas.persistence.comic.assembler.ComicDetailAssembler;
 import com.comicatlas.api.catalog.cache.CatalogCacheInvalidator;
 import com.comicatlas.api.metadata.service.ComicManagementService;
@@ -10,10 +9,11 @@ import com.comicatlas.contract.common.exception.BusinessException;
 import com.comicatlas.api.shared.exception.ConflictException;
 import com.comicatlas.api.task.dto.ManagementTaskResponse;
 import com.comicatlas.api.task.service.ManagementTaskService;
-import com.comicatlas.api.recovery.trash.TrashLifecycleService;
+import com.comicatlas.api.trash.service.TrashLifecycleService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.dao.DataAccessException;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
@@ -21,12 +21,12 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
-import com.comicatlas.api.task.dto.BatchComicUpdateRequest;
+import com.comicatlas.api.task.batch.dto.BatchComicUpdateRequest;
 import com.comicatlas.api.metadata.dto.ComicMetadataUpdateRequest;
 import com.comicatlas.api.metadata.dto.ComicTagUpdateRequest;
 import com.comicatlas.api.metadata.dto.CreateComicRequest;
 import com.comicatlas.api.metadata.dto.UpdateComicRequest;
-import com.comicatlas.api.task.dto.BatchUpdateResultVO;
+import com.comicatlas.api.task.batch.dto.BatchUpdateResultVO;
 import com.comicatlas.contract.comic.dto.ComicDetailVO;
 import com.comicatlas.contract.comic.dto.ComicMetadataDTO;
 import com.comicatlas.persistence.comic.entity.Comic;
@@ -190,8 +190,7 @@ public class ComicManagementServiceImpl implements ComicManagementService {
             }
         }
 
-        comicTagMapper.delete(
-                new LambdaQueryWrapper<ComicTag>().eq(ComicTag::getComicId, comicId));
+        comicTagMapper.deleteByComicId(comicId);
 
         if (tagIds != null) {
             for (Long tagId : tagIds) {
@@ -252,10 +251,7 @@ public class ComicManagementServiceImpl implements ComicManagementService {
                     }
 
                     // Query existing comic tags
-                    List<Long> existingComicTagIds = comicTagMapper.selectList(
-                                    new LambdaQueryWrapper<ComicTag>()
-                                            .eq(ComicTag::getComicId, comicId))
-                            .stream().map(ComicTag::getTagId).toList();
+                    List<Long> existingComicTagIds = comicTagMapper.selectTagIdsByComicId(comicId);
 
                     // Insert only non-existing tag associations
                     for (Long tagId : validTagIds) {
@@ -269,13 +265,13 @@ public class ComicManagementServiceImpl implements ComicManagementService {
                 }
 
                 succeeded++;
-            } catch (Exception e) {
+            } catch (BusinessException | DataAccessException e) {
                 log.error("批量更新漫画 {} 失败", comicId, e);
                 String title = null;
                 try {
                     Comic comic = comicMapper.selectById(comicId);
                     if (comic != null) { title = comic.getTitle(); }
-                } catch (Exception ex) {
+                } catch (DataAccessException ex) {
                     log.warn("批量更新时查询漫画标题失败: comicId={}", comicId, ex);
                 }
                 failed.add(new BatchUpdateResultVO.FailedItem(comicId, title, "系统错误"));
@@ -287,7 +283,6 @@ public class ComicManagementServiceImpl implements ComicManagementService {
         result.setSucceeded(succeeded);
         result.setFailed(failed.isEmpty() ? List.of() : failed);
         if (succeeded > 0) {
-            catalogCacheInvalidator.evictComicList();
         }
         return result;
     }

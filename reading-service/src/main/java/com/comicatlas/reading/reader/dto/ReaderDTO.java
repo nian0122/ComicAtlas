@@ -19,6 +19,8 @@ public class ReaderDTO {
     private int total;
     private Long prevChapterId;
     private Long nextChapterId;
+    private String reaction;
+    private java.time.Instant reactionAt;
 
     /** 阅读页面条目（图片/视频混排） */
     @Data
@@ -41,5 +43,7 @@ public class ReaderDTO {
         private String container;
         private String videoCodec;
         private String audioCodec;
+        private String reaction;
+        private java.time.Instant reactionAt;
     }
 }

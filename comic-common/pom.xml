@@ -7,16 +7,11 @@
     <parent>
         <groupId>com.comicatlas</groupId>
         <artifactId>comic-atlas</artifactId>
-        <version>0.0.1-SNAPSHOT</version>
+        <version>2.2.0</version>
     </parent>
 
     <artifactId>comic-common</artifactId>
     <packaging>jar</packaging>
-
-    <properties>
-        <!-- 上游 -Dtest 指定 api-service 测试时，comic-common 无匹配测试不视为失败 -->
-        <surefire.failIfNoSpecifiedTests>false</surefire.failIfNoSpecifiedTests>
-    </properties>
 
     <dependencies>
         <dependency>
@@ -28,27 +23,12 @@
             <artifactId>jackson-databind</artifactId>
         </dependency>
         <dependency>
-            <groupId>com.fasterxml.jackson.datatype</groupId>
-            <artifactId>jackson-datatype-jsr310</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
             <groupId>com.rabbitmq</groupId>
             <artifactId>amqp-client</artifactId>
         </dependency>
         <dependency>
             <groupId>org.springframework</groupId>
             <artifactId>spring-context</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.mockito</groupId>
-            <artifactId>mockito-core</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.junit.jupiter</groupId>
-            <artifactId>junit-jupiter</artifactId>
-            <scope>test</scope>
         </dependency>
     </dependencies>
 

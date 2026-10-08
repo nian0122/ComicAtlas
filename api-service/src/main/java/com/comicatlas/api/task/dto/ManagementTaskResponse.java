@@ -5,7 +5,7 @@ import com.comicatlas.api.task.enums.TaskType;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 /**
  * 管理任务响应。
@@ -33,8 +33,8 @@ public class ManagementTaskResponse {
     private String errorMessage;
     private Integer attempt;
     private Integer version;
-    private LocalDateTime createdAt;
-    private LocalDateTime updatedAt;
-    private LocalDateTime startedAt;
-    private LocalDateTime completedAt;
+    private Instant createdAt;
+    private Instant updatedAt;
+    private Instant startedAt;
+    private Instant completedAt;
 }

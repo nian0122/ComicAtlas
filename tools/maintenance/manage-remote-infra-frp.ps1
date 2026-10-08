@@ -2,8 +2,7 @@
 param(
     [ValidateSet("Initialize", "Install", "PrepareServer", "Verify", "Start", "Stop", "Status", "InstallTask", "RemoveTask")]
     [string]$Action = "Start",
-    [string]$Version = "0.70.1",
-    [switch]$ReplaceSshTunnel
+    [string]$Version = "0.70.1"
 )
 
 Set-StrictMode -Version Latest
@@ -18,7 +17,6 @@ $clientLogPath = Join-Path $runtimeDirectory "frpc-visitor.log"
 $vendorDirectory = Join-Path $repositoryRoot "tools\vendor\frp\$Version\windows-amd64"
 $frpcPath = Join-Path $vendorDirectory "frpc.exe"
 $taskName = "ComicAtlas Remote Infra FRP"
-$legacyTaskName = "ComicAtlas Remote Infra Tunnel"
 $visitorUser = "comicatlas-local"
 $heartbeatIntervalSeconds = 30
 $serviceDefinitions = @(
@@ -39,6 +37,19 @@ function Get-ProjectEnvironment {
     Get-Content -LiteralPath $environmentFile | ForEach-Object {
         if ($_ -match '^\s*([^#][^=]*?)\s*=\s*(.*)\s*$') {
             $settings[$Matches[1].Trim()] = $Matches[2].Trim()
+        }
+    }
+    $defaultPorts = @{
+        REMOTE_MYSQL_PORT = '3306'
+        REMOTE_REDIS_PORT = '6379'
+        REMOTE_RABBITMQ_PORT = '5672'
+        REMOTE_RABBITMQ_MANAGEMENT_PORT = '15672'
+        REMOTE_NACOS_HTTP_PORT = '8848'
+        REMOTE_NACOS_GRPC_PORT = '9848'
+    }
+    foreach ($port in $defaultPorts.GetEnumerator()) {
+        if (-not $settings.ContainsKey($port.Key)) {
+            $settings[$port.Key] = $port.Value
         }
     }
     return $settings
@@ -357,19 +368,6 @@ function Get-ClientProcess {
         Select-Object -First 1
 }
 
-function Stop-LegacyTunnel {
-    if (-not $ReplaceSshTunnel) {
-        return
-    }
-    $legacyTask = Get-ScheduledTask -TaskName $legacyTaskName -ErrorAction SilentlyContinue
-    if ($legacyTask) {
-        if ($legacyTask.State -eq "Running") {
-            Stop-ScheduledTask -TaskName $legacyTaskName
-        }
-        Disable-ScheduledTask -TaskName $legacyTaskName | Out-Null
-    }
-}
-
 function Get-ListeningServiceMappings {
     param([System.Collections.IEnumerable]$Mappings)
     return @($Mappings | Where-Object {
@@ -394,7 +392,6 @@ function Test-LocalTcpPort {
 }
 
 function Start-Client {
-    Stop-LegacyTunnel
     $serviceMappings = @(Get-ServiceMappings (Get-ProjectEnvironment))
     $existingProcess = Get-ClientProcess
     if ($existingProcess) {
@@ -407,7 +404,7 @@ function Start-Client {
         }
     }
     if ($occupiedPorts) {
-        throw "以下端口已被占用：$($occupiedPorts -join ', ')。如由旧 SSH 隧道占用，请使用 -ReplaceSshTunnel"
+        throw "以下端口已被占用：$($occupiedPorts -join ', ')"
     }
     $process = Start-Process -FilePath $frpcPath -ArgumentList @("-c", $visitorConfigPath) -PassThru -WindowStyle Hidden
     $deadline = [DateTime]::UtcNow.AddSeconds(20)
@@ -468,7 +465,6 @@ function Install-ClientTask {
         -Settings $settings `
         -Description "ComicAtlas 远端基础设施 FRP STCP visitor" `
         -Force | Out-Null
-    Stop-LegacyTunnel
     Start-ScheduledTask -TaskName $taskName
     Write-Output "FRP 登录自启动任务已安装：$taskName"
 }

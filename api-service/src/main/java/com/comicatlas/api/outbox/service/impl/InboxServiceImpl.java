@@ -1,7 +1,7 @@
 package com.comicatlas.api.outbox.service.impl;
 
-import com.comicatlas.api.outbox.entity.InboxReceipt;
-import com.comicatlas.api.outbox.mapper.InboxReceiptMapper;
+import com.comicatlas.api.outbox.persistence.entity.InboxReceipt;
+import com.comicatlas.api.outbox.persistence.mapper.InboxReceiptMapper;
 import com.comicatlas.api.outbox.service.InboxService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

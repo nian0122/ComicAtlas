@@ -1,9 +1,10 @@
 package com.comicatlas.api.task.policy;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.comicatlas.contract.common.enums.ComicStatus;
+import com.comicatlas.contract.common.enums.ChapterLifecycleStatus;
 import com.comicatlas.contract.common.enums.HqStatus;
 import com.comicatlas.contract.common.enums.LqStatus;
+import com.comicatlas.contract.common.enums.MediaLifecycleStatus;
 import com.comicatlas.persistence.comic.entity.Chapter;
 import com.comicatlas.persistence.comic.entity.Comic;
 import com.comicatlas.persistence.comic.entity.Media;
@@ -11,7 +12,7 @@ import com.comicatlas.persistence.comic.mapper.ChapterMapper;
 import com.comicatlas.persistence.comic.mapper.ComicMapper;
 import com.comicatlas.persistence.comic.mapper.MediaMapper;
 import com.comicatlas.contract.common.enums.TranscodeStatus;
-import com.comicatlas.common.util.VideoPlayability;
+import com.comicatlas.common.media.video.VideoPlayability;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -20,6 +21,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * 媒体操作资格服务 — 依据真实 DB 资产状态返回可查询的 allowedOperations。
@@ -38,6 +40,20 @@ public class MediaOperationEligibilityService {
     public AllowedOperations forComic(Long comicId) {
         Set<String> allowed = new LinkedHashSet<>();
         Map<String, String> blocked = new LinkedHashMap<>();
+        Comic comic = comicMapper.selectById(comicId);
+        if (comic == null) {
+            return AllowedOperations.none("漫画不存在");
+        }
+
+        // 生命周期权限与媒体资产权限共用一个接口，避免操作台漏掉回收/恢复/永久清理入口。
+        AllowedOperations lifecycleOperations = policyService.forComic(comic.getStatus().name());
+        mergeLifecycleOperation(lifecycleOperations, OperationPolicyService.OP_DELETE, allowed, blocked);
+        mergeLifecycleOperation(lifecycleOperations, OperationPolicyService.OP_RECOVER, allowed, blocked);
+        mergeLifecycleOperation(lifecycleOperations, OperationPolicyService.OP_PURGE, allowed, blocked);
+
+        if (comic.getStatus() != ComicStatus.READY) {
+            return buildComicOperations(comic, allowed, blocked, false, false, false, false, false);
+        }
 
         boolean anyLqWork = false;
         boolean anyLqReady = false;
@@ -45,10 +61,19 @@ public class MediaOperationEligibilityService {
         boolean hqPreconditionBlocked = false;
         boolean anyTranscode = false;
 
-        List<Chapter> chapters = chapterMapper.selectList(
-                new LambdaQueryWrapper<Chapter>().eq(Chapter::getComicId, comicId));
-        for (Chapter chapter : chapters) {
-            ChapterOps ops = collectChapterAssetOps(chapter.getId());
+        List<Chapter> chapters = chapterMapper.selectByComicIdOrderByGlobalOrder(comicId).stream()
+                .filter(chapter -> chapter.getStatus() == ChapterLifecycleStatus.READY)
+                .toList();
+        if (chapters.isEmpty()) {
+            return buildComicOperations(comic, allowed, blocked, false, false, false, false, false);
+        }
+
+        List<Long> chapterIds = chapters.stream().map(Chapter::getId).toList();
+        Map<Long, List<Media>> mediaByChapterId = mediaMapper.selectByChapterIds(chapterIds)
+                .stream()
+                .collect(Collectors.groupingBy(Media::getChapterId));
+        for (Long chapterId : chapterIds) {
+            ChapterOps ops = collectChapterAssetOps(mediaByChapterId.getOrDefault(chapterId, List.of()));
             anyLqWork |= ops.lqGenerateAllowed;
             anyLqReady |= ops.lqRegenerateAllowed;
             anyHqWork |= ops.hqDeleteAllowed;
@@ -56,6 +81,15 @@ public class MediaOperationEligibilityService {
             anyTranscode |= ops.transcodeAllowed;
         }
 
+        return buildComicOperations(comic, allowed, blocked, anyLqWork, anyLqReady, anyHqWork,
+                hqPreconditionBlocked, anyTranscode);
+    }
+
+    private AllowedOperations buildComicOperations(Comic comic, Set<String> allowed,
+                                                    Map<String, String> blocked,
+                                                    boolean anyLqWork, boolean anyLqReady,
+                                                    boolean anyHqWork, boolean hqPreconditionBlocked,
+                                                    boolean anyTranscode) {
         if (anyLqWork) {
             allowed.add(OperationPolicyService.OP_LQ_GENERATE);
         } else {
@@ -78,8 +112,7 @@ public class MediaOperationEligibilityService {
         } else {
             blocked.put(OperationPolicyService.OP_TRANSCODE, "没有需要转码的视频页");
         }
-        Comic comic = comicMapper.selectById(comicId);
-        if (comic != null && comic.getStatus() == ComicStatus.READY) {
+        if (comic.getStatus() == ComicStatus.READY) {
             allowed.add(OperationPolicyService.OP_METADATA_REFRESH);
         } else {
             blocked.put(OperationPolicyService.OP_METADATA_REFRESH,
@@ -89,7 +122,25 @@ public class MediaOperationEligibilityService {
         return AllowedOperations.of(allowed, blocked);
     }
 
+    private static void mergeLifecycleOperation(AllowedOperations lifecycleOperations, String operation,
+                                                Set<String> allowed, Map<String, String> blocked) {
+        if (lifecycleOperations.isAllowed(operation)) {
+            allowed.add(operation);
+            blocked.remove(operation);
+        } else if (lifecycleOperations.blockedReasons().containsKey(operation)) {
+            blocked.put(operation, lifecycleOperations.blockedReasons().get(operation));
+        }
+    }
+
     public AllowedOperations forChapter(Long chapterId) {
+        Chapter chapter = chapterMapper.selectById(chapterId);
+        if (chapter == null || chapter.getStatus() != ChapterLifecycleStatus.READY) {
+            return AllowedOperations.none("章节不存在或生命周期状态不是 READY");
+        }
+        Comic comic = comicMapper.selectById(chapter.getComicId());
+        if (comic == null || comic.getStatus() != ComicStatus.READY) {
+            return AllowedOperations.none("所属漫画生命周期状态不是 READY");
+        }
         ChapterOps ops = collectChapterAssetOps(chapterId);
         Set<String> allowed = new LinkedHashSet<>();
         Map<String, String> blocked = new LinkedHashMap<>();
@@ -141,11 +192,10 @@ public class MediaOperationEligibilityService {
         return AllowedOperations.of(allowed, blocked);
     }
 
-    private ChapterOps collectChapterAssetOps(Long chapterId) {
-        List<Media> mediaItems = mediaMapper.selectList(
-                new LambdaQueryWrapper<Media>().eq(Media::getChapterId, chapterId));
+    private ChapterOps collectChapterAssetOps(List<Media> mediaItems) {
         List<Media> imagePages = mediaItems.stream()
-                .filter(p -> "IMAGE".equals(p.getMediaType()))
+                .filter(p -> "IMAGE".equals(p.getMediaType())
+                        && p.getStatus() == MediaLifecycleStatus.READY)
                 .toList();
         List<Media> deletableHq = imagePages.stream()
                 .filter(p -> p.getHqStatus() == HqStatus.READY || p.getHqStatus() == HqStatus.MISSING)
@@ -159,7 +209,8 @@ public class MediaOperationEligibilityService {
         ops.hqDeleteBlocked = deletableHq.stream().anyMatch(p -> p.getLqStatus() != LqStatus.READY);
         ops.hqDeleteAllowed = !deletableHq.isEmpty() && !ops.hqDeleteBlocked;
         ops.transcodeAllowed = mediaItems.stream().anyMatch(p ->
-                "VIDEO".equals(p.getMediaType())
+                p.getStatus() == MediaLifecycleStatus.READY
+                        && "VIDEO".equals(p.getMediaType())
                         && p.getHqStatus() != HqStatus.DELETED
                         && p.getTranscodeStatus() != TranscodeStatus.READY
                         && p.getTranscodeStatus() != TranscodeStatus.QUEUED
@@ -167,6 +218,11 @@ public class MediaOperationEligibilityService {
                         && VideoPlayability.isTranscodable(p.getWidth(), p.getHeight())
                         && !VideoPlayability.isBrowserPlayable(p.getVideoCodec(), p.getContainer()));
         return ops;
+    }
+
+    private ChapterOps collectChapterAssetOps(Long chapterId) {
+        List<Media> mediaItems = mediaMapper.selectByChapterId(chapterId);
+        return collectChapterAssetOps(mediaItems);
     }
 
     private static final class ChapterOps {

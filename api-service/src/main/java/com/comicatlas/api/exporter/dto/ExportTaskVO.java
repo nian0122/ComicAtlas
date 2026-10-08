@@ -3,11 +3,13 @@ package com.comicatlas.api.exporter.dto;
 import lombok.Data;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 public class ExportTaskVO {
     private Long id;
     private Long comicId;
+    private List<Long> comicIds;
     private String format;
     private String status;
     private Integer progress;

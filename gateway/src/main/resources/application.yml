@@ -18,10 +18,16 @@ spring:
         server-addr: ${NACOS_ADDR}
         username: ${NACOS_USER}
         password: ${NACOS_PASS}
-      config:
-        import-check:
-          enabled: false
     gateway:
+      # 统一由网关处理跨域；生产环境可通过 CORS_ALLOWED_ORIGINS 覆盖允许的前端来源。
+      globalcors:
+        add-to-simple-url-handler-mapping: true
+        cors-configurations:
+          '[/**]':
+            allowed-origin-patterns: ${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://127.0.0.1:5173}
+            allowed-methods: '*'
+            allowed-headers: '*'
+            allow-credentials: true
       discovery:
         locator:
           enabled: true
@@ -32,6 +38,11 @@ spring:
           uri: lb://comic-api-service
           predicates:
             - Path=/api/manage/**
+        # AI 分析路由：/api/ai/** → AI 单体
+        - id: ai-service
+          uri: http://comic-ai-service:8020
+          predicates:
+            - Path=/api/ai/**
         # 阅读端路由：/api/** → 阅读服务（只读为主 + 阅读进度保存）
         - id: reading-service
           uri: lb://comic-reading-service

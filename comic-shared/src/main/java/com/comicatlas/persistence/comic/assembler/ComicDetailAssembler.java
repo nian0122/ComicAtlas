@@ -1,7 +1,5 @@
 package com.comicatlas.persistence.comic.assembler;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.comicatlas.contract.common.enums.ChapterLifecycleStatus;
 import com.comicatlas.contract.comic.dto.ComicDetailVO;
 import com.comicatlas.persistence.comic.entity.Category;
 import com.comicatlas.persistence.comic.entity.Chapter;
@@ -21,6 +19,7 @@ import org.springframework.stereotype.Component;
 import java.util.List;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import java.time.ZoneOffset;
 
 /**
  * 漫画详情 VO 装配器（共享层）。
@@ -64,6 +63,8 @@ public class ComicDetailAssembler {
         detailVO.setVersion(comic.getVersion());
         detailVO.setCreatedAt(comic.getCreatedAt());
         detailVO.setUpdatedAt(comic.getUpdatedAt());
+        detailVO.setReaction(comic.getReaction());
+        detailVO.setReactionAt(comic.getReactionAt() == null ? null : comic.getReactionAt().toInstant(ZoneOffset.UTC));
 
         List<ComicDetailVO.ChapterVO> chapters = resolveChapters(comic.getId());
         List<ComicDetailVO.TagRef> tags = resolveTags(comic.getId());
@@ -71,8 +72,7 @@ public class ComicDetailAssembler {
         detailVO.setTags(tags);
         detailVO.setComicInfo(toComicInfo(comic, chapters, tags));
 
-        ReadingHistory history = readingHistoryMapper.selectOne(
-            new LambdaQueryWrapper<ReadingHistory>().eq(ReadingHistory::getComicId, comic.getId()));
+        ReadingHistory history = readingHistoryMapper.selectByComicId(comic.getId());
         if (history != null && comic.getTotalPages() != null && comic.getTotalPages() > 0) {
             detailVO.setLastReadChapterId(history.getChapterId());
             detailVO.setLastReadPage(history.getPageNumber());
@@ -82,17 +82,12 @@ public class ComicDetailAssembler {
     }
 
     private List<ComicDetailVO.ChapterVO> resolveChapters(Long comicId) {
-        List<Chapter> chapters = chapterMapper.selectList(
-            new LambdaQueryWrapper<Chapter>()
-                .eq(Chapter::getComicId, comicId)
-                .eq(Chapter::getStatus, ChapterLifecycleStatus.READY.name())
-                .orderByAsc(Chapter::getChapterNo));
+        List<Chapter> chapters = chapterMapper.selectReadyByComicIdOrderByChapterNo(comicId);
         return chapters.stream().map(this::toChapterVO).collect(Collectors.toList());
     }
 
     private List<ComicDetailVO.TagRef> resolveTags(Long comicId) {
-        List<ComicTag> comicTags = comicTagMapper.selectList(
-            new LambdaQueryWrapper<ComicTag>().eq(ComicTag::getComicId, comicId));
+        List<ComicTag> comicTags = comicTagMapper.selectByComicId(comicId);
         if (comicTags.isEmpty()) {
             return List.of();
         }
@@ -107,6 +102,8 @@ public class ComicDetailAssembler {
         chapterVO.setChapterNo(parseChapterNo(chapter.getChapterNo()));
         chapterVO.setTitle(chapter.getTitle());
         chapterVO.setPageCount(chapter.getPageCount());
+        chapterVO.setReaction(chapter.getReaction());
+        chapterVO.setReactionAt(chapter.getReactionAt() == null ? null : chapter.getReactionAt().toInstant(ZoneOffset.UTC));
         return chapterVO;
     }
 

@@ -1,7 +1,6 @@
 package com.comicatlas.api.catalog.service.impl;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+// 条件更新由事务业务服务维护状态机与并发边界，Mapper 执行参数化更新。
 import com.comicatlas.api.catalog.cache.CatalogCacheInvalidator;
 import com.comicatlas.api.catalog.dto.ChapterCreateRequest;
 import com.comicatlas.api.catalog.dto.ChapterRenameRequest;
@@ -14,7 +13,7 @@ import com.comicatlas.persistence.comic.mapper.ChapterMapper;
 import com.comicatlas.persistence.comic.mapper.ComicMapper;
 import com.comicatlas.api.catalog.service.ChapterManagementService;
 import com.comicatlas.api.task.state.ManagementStateMachine;
-import com.comicatlas.api.recovery.trash.TrashLifecycleService;
+import com.comicatlas.api.trash.service.TrashLifecycleService;
 import com.comicatlas.contract.common.enums.ChapterLifecycleStatus;
 import com.comicatlas.contract.common.constant.HttpStatusCodes;
 import com.comicatlas.contract.common.exception.BusinessException;
@@ -25,21 +24,13 @@ import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 
 /**
  * 章节管理实现。
  *
- * <p>全局重排采用事务内两阶段更新：
- * <ol>
- *   <li>先将全书章节 {@code global_order} 统一置为 {@code -id}（唯一负值，绝不与正序值冲突）</li>
- *   <li>再按新顺序逐个写回 1..N（每次更新带乐观锁版本校验）</li>
- * </ol>
- * 任一阶段失败整体回滚，不会留下部分顺序更新。
+ * <p>创建、改名、移动与回收章节；目录树统一顺序由 {@link StructureOrderingServiceImpl} 管理。
  */
 @Slf4j
 @Service
@@ -133,45 +124,6 @@ public class ChapterManagementServiceImpl implements ChapterManagementService {
         return toChapterVO(chapter);
     }
 
-    // ======================== 全局重排（两阶段） ========================
-
-    @Override
-    @Transactional
-    public ChapterVO reorderChapter(Long comicId, Long chapterId, int targetGlobalOrder) {
-        Chapter target = requireChapterInComic(comicId, chapterId);
-        List<Chapter> all = chapterMapper.selectList(
-                new LambdaQueryWrapper<Chapter>()
-                        .eq(Chapter::getComicId, comicId)
-                        .orderByAsc(Chapter::getGlobalOrder));
-
-        // 计算新顺序：移除目标章节，按目标位置插入
-        List<Chapter> reordered = new ArrayList<>(all.size());
-        for (Chapter chapter : all) {
-            if (!chapter.getId().equals(chapterId)) {
-                reordered.add(chapter);
-            }
-        }
-        int pos = Math.max(0, Math.min(targetGlobalOrder - 1, reordered.size()));
-        reordered.add(pos, target);
-
-        // 阶段一：临时偏移，全部置为唯一负值，避免阶段二唯一键瞬时冲突
-        chapterMapper.update(null, new LambdaUpdateWrapper<Chapter>()
-                .eq(Chapter::getComicId, comicId)
-                .setSql("global_order = -id"));
-
-        // 阶段二：按新顺序写回 1..N，并重算各目录内 sort_order
-        Map<Long, Integer> sortCounter = new HashMap<>();
-        for (int i = 0; i < reordered.size(); i++) {
-            Chapter chapter = reordered.get(i);
-            chapter.setGlobalOrder(i + 1);
-            chapter.setSortOrder(sortCounter.merge(chapter.getCatalogId(), 1, Integer::sum));
-            checkedUpdate(chapter);
-        }
-        catalogCacheInvalidator.evict(comicId);
-        log.info("重排章节: comicId={}, chapterId={}, targetGlobalOrder={}", comicId, chapterId, targetGlobalOrder);
-        return toChapterVO(target);
-    }
-
     // ======================== 回收（软删除） ========================
 
     @Override
@@ -244,39 +196,23 @@ public class ChapterManagementServiceImpl implements ChapterManagementService {
     }
 
     private int maxGlobalOrder(Long comicId) {
-        List<Chapter> list = chapterMapper.selectList(
-                new LambdaQueryWrapper<Chapter>()
-                        .eq(Chapter::getComicId, comicId)
-                        .orderByDesc(Chapter::getGlobalOrder)
-                        .last("LIMIT 1"));
-        return list.isEmpty() ? 0 : list.get(0).getGlobalOrder();
+        Chapter chapter = chapterMapper.selectLastByComicId(comicId);
+        return chapter == null ? 0 : chapter.getGlobalOrder();
     }
 
     private int nextChapterSortOrder(Long comicId, Long catalogId) {
-        LambdaQueryWrapper<Chapter> wrapper = new LambdaQueryWrapper<Chapter>()
-                .eq(Chapter::getComicId, comicId)
-                .orderByDesc(Chapter::getSortOrder)
-                .last("LIMIT 1");
-        if (catalogId == null) {
-            wrapper.isNull(Chapter::getCatalogId);
-        } else {
-            wrapper.eq(Chapter::getCatalogId, catalogId);
-        }
-        List<Chapter> list = chapterMapper.selectList(wrapper);
-        return list.isEmpty() ? 1 : list.get(0).getSortOrder() + 1;
+        Chapter chapter = catalogId == null
+                ? chapterMapper.selectLastByComicIdWithoutCatalog(comicId)
+                : chapterMapper.selectLastByComicIdAndCatalogId(comicId, catalogId);
+        return chapter == null ? 1 : chapter.getSortOrder() + 1;
     }
 
     private void recompactChapterSortOrder(Long comicId, Long catalogId, Long excludedId) {
-        LambdaQueryWrapper<Chapter> wrapper = new LambdaQueryWrapper<Chapter>()
-                .eq(Chapter::getComicId, comicId)
-                .orderByAsc(Chapter::getSortOrder, Chapter::getId);
-        if (catalogId == null) {
-            wrapper.isNull(Chapter::getCatalogId);
-        } else {
-            wrapper.eq(Chapter::getCatalogId, catalogId);
-        }
+        List<Chapter> chapters = catalogId == null
+                ? chapterMapper.selectByComicIdWithoutCatalog(comicId)
+                : chapterMapper.selectByComicIdAndCatalogId(comicId, catalogId);
         int order = 1;
-        for (Chapter chapter : chapterMapper.selectList(wrapper)) {
+        for (Chapter chapter : chapters) {
             if (chapter.getId().equals(excludedId)) {
                 continue;
             }

@@ -1,5 +1,5 @@
-# Vue 3 + TypeScript + Vite
+# ComicAtlas 前端
 
-This template should help get you started developing with Vue 3 and TypeScript in Vite. The template uses Vue 3 `<script setup>` SFCs, check out the [script setup docs](https://v3.vuejs.org/api/sfc-script-setup.html#sfc-script-setup) to learn more.
+此目录提供正式站点的生产构建源码；用户安装请从[项目首页](../README.md)按 Docker 步骤操作。
 
-Learn more about the recommended Project Setup and IDE Support in the [Vue Docs TypeScript Guide](https://vuejs.org/guide/typescript/overview.html#project-setup).
+Docker 构建安装锁定依赖并执行 pnpm build，生成静态文件交给 Nginx。FSD、公共 UI 与样式检查器属于构建门禁，保留在发行树。单元测试、浏览器测试、夹具、测试框架配置和开发服务器命令仅保留在研发分支。

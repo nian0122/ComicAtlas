@@ -3,6 +3,7 @@ package com.comicatlas.persistence.comic.entity;
 import com.comicatlas.contract.common.enums.HqStatus;
 import com.comicatlas.contract.common.enums.LqStatus;
 import com.comicatlas.contract.common.enums.MediaLifecycleStatus;
+import com.comicatlas.contract.common.enums.MediaReaction;
 import com.comicatlas.contract.common.enums.TranscodeStatus;
 import lombok.Data;
 import java.math.BigDecimal;
@@ -73,6 +74,12 @@ public class Media {
     private String videoCodec;
     /** 音频编码（如 aac），仅 VIDEO 有意义 */
     private String audioCodec;
+
+    /** 管理端偏好标记：NONE、LIKE 或 DISLIKE。 */
+    private MediaReaction reaction;
+
+    /** 最近一次有效标记时间；取消标记后为空。 */
+    private LocalDateTime reactionAt;
 
     /** 乐观锁版本号 */
     @Version

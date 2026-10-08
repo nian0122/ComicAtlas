@@ -3,6 +3,7 @@ package com.comicatlas.api.storage;
 import lombok.Data;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.io.IOException;
 
 /**
  * API 侧存储根 — 对应 application.yml 中 storage.roots 下的每个 key。
@@ -46,7 +47,7 @@ public class ApiStorageRoot {
         if (path == null || other == null) { return false; }
         try {
             return Files.getFileStore(path).equals(Files.getFileStore(other));
-        } catch (Exception e) {
+        } catch (IOException e) {
             return false;
         }
     }

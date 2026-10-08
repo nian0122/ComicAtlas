@@ -80,11 +80,16 @@ public class ManagementCommandPublisher {
     }
 
     public void failed(ManagementCommandRequestedEvent cmd, String errorMessage) {
+        failed(cmd, errorMessage, null);
+    }
+
+    /** 发布失败结果，并保留 LQ 命令中已经成功生成或确认存在的页面结果。 */
+    public void failed(ManagementCommandRequestedEvent cmd, String errorMessage, List<LqSizeResult> lqSizes) {
         rabbitTemplate.convertAndSend(EXCHANGE, MqRoutingKeys.COMMAND_FAILED,
                 new ManagementCommandFailedEvent(UUID.randomUUID(), Instant.now(), 1,
                         cmd.taskId(), cmd.itemId(), cmd.attempt(),
                         cmd.operationType(), cmd.targetType(), cmd.targetId(),
-                        truncateErrorMessage(errorMessage)));
+                        truncateErrorMessage(errorMessage), lqSizes));
     }
 
     /**

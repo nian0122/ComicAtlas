@@ -10,15 +10,11 @@ import com.comicatlas.common.event.payload.FinalizeMediaMapping;
 import com.comicatlas.common.mq.MqConsumerSupport;
 import com.comicatlas.common.storage.ImportStagingPath;
 import com.comicatlas.worker.config.WorkerConfig;
-import com.comicatlas.worker.importer.model.ImportManifest;
-import com.comicatlas.worker.importer.manifest.ImportManifestManager;
 import com.comicatlas.worker.persistence.mapper.ChapterReadMapper;
 import com.comicatlas.worker.storage.StorageProperties;
-import com.comicatlas.worker.storage.StorageRef;
 import com.comicatlas.worker.storage.StorageRoot;
 import com.comicatlas.worker.storage.StorageRootResolver;
 import com.comicatlas.worker.storage.StorageService;
-import com.comicatlas.worker.storage.TransferMode;
 import com.rabbitmq.client.Channel;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
@@ -44,12 +40,12 @@ import java.util.stream.Stream;
  * 把 API 在落库阶段生成的不可变 chapterId 作为最终目录键，逐章把
  * {@code hq/.staging/{taskId}/{comicId}/{globalOrder}} 暂存目录（globalOrder 是 DB ID 生成前 Worker 使用的
  * 漫画内暂存键）移动到 {@code hq/{comicId}/{chapterId}}。
- * 移动前对事件中的全部相对路径做规范化并校验均位于 HQ 根内（防御路径穿越），校验全部通过后才执行搬运。
+ * 移动前对事件中的全部相对路径做规范化并校验均位于 HQ 根内（防御路径穿越），校验全部通过后按章节目录整体搬运。
  * <p>
  * 幂等规则（尺寸以 {@code imports/{taskId}/manifest.json} 清单为基准）：
  * <ul>
- *   <li>源存在且目标不存在 → 移动；</li>
- *   <li>目标存在且与清单尺寸匹配 → 视为已完成，不重复移动；</li>
+ *   <li>章节源目录存在且目标目录不存在 → 整体移动；</li>
+ *   <li>源目录不存在、目标目录存在且清单媒体尺寸匹配 → 视为已完成，不重复移动；</li>
  *   <li>源/目标冲突、尺寸不符或源与目标均缺失 → 发布 {@link ImportStorageFinalizeFailedEvent}，
  *       保留 manifest 与 staging 供重试。</li>
  * </ul>
@@ -70,7 +66,6 @@ public class ImportStorageFinalizeHandler {
     private static final ConcurrentHashMap<Long, Object> TASK_LOCKS = new ConcurrentHashMap<>();
 
     private final WorkerConfig config;
-    private final StorageService storageService;
     private final StorageProperties storageProperties;
     private final ImportManifestManager manifestManager;
     private final ChapterReadMapper exportChapterMapper;
@@ -83,7 +78,6 @@ public class ImportStorageFinalizeHandler {
             ChapterReadMapper exportChapterMapper, ImportStorageFinalizeEventPublisher eventPublisher,
             MqConsumerSupport mqConsumerSupport) {
         this.config = config;
-        this.storageService = storageService;
         this.storageProperties = storageProperties;
         this.manifestManager = manifestManager;
         this.exportChapterMapper = exportChapterMapper;
@@ -106,7 +100,7 @@ public class ImportStorageFinalizeHandler {
     }
 
     /**
-     * 幂等最终化：先校验全部相对路径位于 HQ 根内，再逐文件按清单尺寸执行移动。
+     * 幂等最终化：先校验全部相对路径位于 HQ 根内，再按章目录整体移动并按清单核验媒体。
      * 每章移动/校验成功后立即发布 Completed（不再等待全部章完成）；随后从清单移除本章条目，
      * 清单清空才删除，否则重写（失败延后清理，不阻断结果）。
      */
@@ -130,36 +124,36 @@ public class ImportStorageFinalizeHandler {
         }
     }
 
-    private void finalizeStorageLocked(ImportStorageFinalizeRequestedEvent event, FinalizeContext ctx)
+    private void finalizeStorageLocked(ImportStorageFinalizeRequestedEvent event, FinalizeContext finalizeContext)
             throws IOException {
         // 陈旧事件保护：重试已删除旧章节结构，旧 attempt 的最终化事件不得再移动文件
         //（避免把 staging 文件搬入重试后已不存在的孤儿 chapterId 目录，导致新尝试源缺失）
         if (!isChapterStillActive(event.chapterId(), event.comicId())) {
             log.info("最终化陈旧事件跳过（章节已不存在）: taskId={}, comicId={}, chapterId={}",
                     event.taskId(), event.comicId(), event.chapterId());
-            deleteIfEmpty(ctx.sourceDir());
+            deleteIfEmpty(finalizeContext.sourceDir());
             return;
         }
 
         // 2) 读取清单获取预期尺寸；清单缺失说明该任务清单已清理（全部章此前已最终化）
-        ImportManifest manifest = readManifestOrNull(event.taskId(), ctx.mangaRoot());
+        ImportManifest manifest = readManifestOrNull(event.taskId(), finalizeContext.mangaRoot());
         if (manifest == null) {
             // 幂等：清单已清理 → 目标齐全即视为已最终化，静默 ACK 不重复发布 Completed
-            verifyManifestCleared(event, ctx);
+            verifyManifestCleared(event, finalizeContext);
             return;
         }
 
-        // 3) 幂等移动：目标存在且尺寸匹配视为已完成，冲突/不完整则失败保留现场
-        moveFilesForChapter(event, ctx, manifest);
+        // 3) 幂等移动：章节目录整体移动；目标已存在时核验完整性，冲突/不完整则失败保留现场
+        moveFilesForChapter(event, finalizeContext, manifest);
 
         // 4) 清理空暂存目录
-        deleteIfEmpty(ctx.sourceDir());
+        deleteIfEmpty(finalizeContext.sourceDir());
 
         // 5) 每章独立确认：本章移动/校验成功即发布 Completed（API 按章节累加确认）
-        publishCompleted(event, ctx.moves().size());
+        publishCompleted(event, finalizeContext.moves().size());
 
         // 6) 逐章移除清单条目：清空才删除，否则重写；清理失败延后处理（下次事件可再清理）
-        cleanupManifestAfterChapter(event, ctx.mangaRoot());
+        cleanupManifestAfterChapter(event, finalizeContext.mangaRoot());
     }
 
     /** 读取任务清单；不存在返回 null（该任务清单已清理）。 */
@@ -168,14 +162,15 @@ public class ImportStorageFinalizeHandler {
     }
 
     /** 清单已清理时的幂等校验：所有目标必须齐全，否则视为数据缺失。 */
-    private void verifyManifestCleared(ImportStorageFinalizeRequestedEvent event, FinalizeContext ctx) {
-        for (MediaMove move : ctx.moves()) {
-            if (!Files.exists(move.target())) {
+    private void verifyManifestCleared(ImportStorageFinalizeRequestedEvent event, FinalizeContext finalizeContext) {
+        for (MediaMove move : finalizeContext.moves()) {
+            if (!Files.isRegularFile(move.target())) {
                 throw new ImportStorageFinalizeException(StorageFinalizeErrorCode.MANIFEST_MISSING,
                         "清单缺失且目标不完整: " + relativeRef(event, move));
             }
         }
-        deleteIfEmpty(ctx.sourceDir());
+        verifyChapterDirectory(finalizeContext.targetDir(), finalizeContext.moves(), Map.of(), event);
+        deleteIfEmpty(finalizeContext.sourceDir());
         log.info("清单已清理，章节此前已最终化，幂等跳过: taskId={}, chapterId={}",
                 event.taskId(), event.chapterId());
     }
@@ -185,35 +180,128 @@ public class ImportStorageFinalizeHandler {
      * 源目录与目标目录相同（chapterId == globalOrder 时暂存即最终位置）时无需移动，
      * 文件已在最终位置，仅校验存在与尺寸匹配。
      */
-    private void moveFilesForChapter(ImportStorageFinalizeRequestedEvent event, FinalizeContext ctx,
+    private void moveFilesForChapter(ImportStorageFinalizeRequestedEvent event, FinalizeContext finalizeContext,
                                      ImportManifest manifest) throws IOException {
-        boolean isSameDir = ctx.sourceDir().equals(ctx.targetDir());
+        boolean isSameDir = finalizeContext.sourceDir().equals(finalizeContext.targetDir());
         Map<String, Long> expectedSizes = expectedSizesForChapter(
                 manifest, event.taskId(), event.comicId(), event.globalOrder());
-        for (MediaMove move : ctx.moves()) {
-            boolean isSourceExists = Files.exists(move.source());
-            boolean isTargetExists = Files.exists(move.target());
-            if (isTargetExists) {
+        boolean sourceExists = Files.exists(finalizeContext.sourceDir());
+        boolean targetExists = Files.exists(finalizeContext.targetDir());
+
+        if (isSameDir) {
+            verifyChapterDirectory(finalizeContext.targetDir(), finalizeContext.moves(), expectedSizes, event);
+            return;
+        }
+        if (targetExists) {
+            if (sourceExists) {
+                mergeLegacyPartialChapter(finalizeContext, expectedSizes, event);
+                verifyChapterDirectory(finalizeContext.targetDir(), finalizeContext.moves(), expectedSizes, event);
+                return;
+            }
+            // 目录移动成功后若 MQ ACK 丢失，重投时按清单校验目标目录并幂等完成。
+            verifyChapterDirectory(finalizeContext.targetDir(), finalizeContext.moves(), expectedSizes, event);
+            return;
+        }
+        if (!sourceExists) {
+            throw new ImportStorageFinalizeException(StorageFinalizeErrorCode.SOURCE_MISSING,
+                    "章节源目录和目标目录均不存在: " + event.globalOrder());
+        }
+
+        // 暂存和 HQ 均按章节平铺目录布局，同卷时一次目录 move 替代逐媒体文件 move。
+        Files.createDirectories(finalizeContext.targetDir().getParent());
+        try {
+            Files.move(finalizeContext.sourceDir(), finalizeContext.targetDir());
+        } catch (IOException exception) {
+            throw new ImportStorageFinalizeException(StorageFinalizeErrorCode.UNEXPECTED,
+                    "章节目录移动失败: globalOrder=" + event.globalOrder(), exception);
+        }
+        verifyChapterDirectory(finalizeContext.targetDir(), finalizeContext.moves(), expectedSizes, event);
+    }
+
+    /** 兼容旧版逐文件最终化留下的部分目标目录；新流程正常路径仍是单次目录移动。 */
+    private void mergeLegacyPartialChapter(FinalizeContext finalizeContext, Map<String, Long> expectedSizes,
+                                           ImportStorageFinalizeRequestedEvent event) throws IOException {
+        for (MediaMove move : finalizeContext.moves()) {
+            boolean isSourceExists = Files.isRegularFile(move.source());
+            boolean isTargetExists = Files.isRegularFile(move.target());
+            if (isSourceExists && isTargetExists) {
                 Long expectedSize = expectedSizes.get(move.fileName());
-                long actualSize = Files.size(move.target());
-                // 清单中无该文件尺寸预期（本章条目已被清理后的重投）→ 目标存在即视为已完成
+                long targetSize = Files.size(move.target());
+                if (expectedSize != null && targetSize != expectedSize) {
+                    throw new ImportStorageFinalizeException(StorageFinalizeErrorCode.SIZE_CONFLICT,
+                            "部分最终化目标媒体尺寸不匹配: globalOrder=" + event.globalOrder()
+                                    + ", file=" + move.fileName());
+                }
+                throw new ImportStorageFinalizeException(StorageFinalizeErrorCode.CONFLICT,
+                        "源和目标同时存在同名媒体: " + move.fileName());
+            }
+            if (!isSourceExists && !isTargetExists) {
+                throw new ImportStorageFinalizeException(StorageFinalizeErrorCode.SOURCE_MISSING,
+                        "源和目标均缺少媒体: " + move.fileName());
+            }
+            Path mediaFile = isSourceExists ? move.source() : move.target();
+            Long expectedSize = expectedSizes.get(move.fileName());
+            long actualSize = Files.size(mediaFile);
+            if (expectedSize != null && actualSize != expectedSize) {
+                throw new ImportStorageFinalizeException(StorageFinalizeErrorCode.SIZE_CONFLICT,
+                        "部分最终化媒体尺寸不匹配: globalOrder=" + event.globalOrder()
+                                + ", file=" + move.fileName());
+            }
+            if (isSourceExists) {
+                Files.createDirectories(move.target().getParent());
+                Files.move(move.source(), move.target());
+            }
+        }
+        try (Stream<Path> remaining = Files.list(finalizeContext.sourceDir())) {
+            if (remaining.findAny().isPresent()) {
+                throw new ImportStorageFinalizeException(StorageFinalizeErrorCode.CONFLICT,
+                        "旧版部分最终化源目录包含未列入清单的文件: " + event.globalOrder());
+            }
+        }
+        Files.deleteIfExists(finalizeContext.sourceDir());
+    }
+
+    /** 按最终化事件映射与导入清单核对整章目录；拒绝缺失或尺寸冲突。 */
+    private void verifyChapterDirectory(Path chapterDirectory, List<MediaMove> moves,
+                                        Map<String, Long> expectedSizes,
+                                        ImportStorageFinalizeRequestedEvent event) {
+        java.util.Set<String> expectedNames = new java.util.HashSet<>(moves.size());
+        for (MediaMove move : moves) {
+            expectedNames.add(move.fileName());
+            Path target = chapterDirectory.resolve(move.target().getFileName()).normalize();
+            if (!target.startsWith(chapterDirectory) || Files.isSymbolicLink(target)
+                    || !Files.isRegularFile(target)) {
+                throw new ImportStorageFinalizeException(StorageFinalizeErrorCode.SOURCE_MISSING,
+                        "最终章节目录缺少媒体: globalOrder=" + event.globalOrder()
+                                + ", file=" + move.fileName());
+            }
+            Long expectedSize = expectedSizes.get(move.fileName());
+            try {
+                long actualSize = Files.size(target);
                 if (expectedSize != null && actualSize != expectedSize) {
                     throw new ImportStorageFinalizeException(StorageFinalizeErrorCode.SIZE_CONFLICT,
-                            "目标存在但尺寸不匹配: " + relativeRef(event, move)
+                            "最终章节媒体尺寸不匹配: globalOrder=" + event.globalOrder()
+                                    + ", file=" + move.fileName()
                                     + ", expected=" + expectedSize + ", actual=" + actualSize);
                 }
-                if (isSourceExists && !isSameDir) {
-                    throw new ImportStorageFinalizeException(StorageFinalizeErrorCode.CONFLICT,
-                            "源与目标同时存在: " + relativeRef(event, move));
-                }
-                log.debug("跳过已最终化文件: {}", relativeRef(event, move));
-                continue;
+            } catch (IOException exception) {
+                throw new ImportStorageFinalizeException(StorageFinalizeErrorCode.UNEXPECTED,
+                        "读取最终章节媒体失败: globalOrder=" + event.globalOrder()
+                                + ", file=" + move.fileName(), exception);
             }
-            if (!isSourceExists) {
-                throw new ImportStorageFinalizeException(StorageFinalizeErrorCode.SOURCE_MISSING,
-                        "源与目标均不存在: " + relativeRef(event, move));
+        }
+        try (Stream<Path> entries = Files.list(chapterDirectory)) {
+            List<Path> actualEntries = entries.toList();
+            if (actualEntries.size() != expectedNames.size()
+                    || actualEntries.stream().anyMatch(path -> Files.isSymbolicLink(path)
+                    || !Files.isRegularFile(path)
+                    || !expectedNames.contains(path.getFileName().toString()))) {
+                throw new ImportStorageFinalizeException(StorageFinalizeErrorCode.CONFLICT,
+                        "最终章节目录包含清单外的文件或目录: globalOrder=" + event.globalOrder());
             }
-            moveFile(move, ctx.hqRoot());
+        } catch (IOException exception) {
+            throw new ImportStorageFinalizeException(StorageFinalizeErrorCode.UNEXPECTED,
+                    "读取最终章节目录失败: globalOrder=" + event.globalOrder(), exception);
         }
     }
 
@@ -234,7 +322,7 @@ public class ImportStorageFinalizeHandler {
         }
         try {
             return exportChapterMapper.countByIdAndComicId(chapterId, comicId) > 0;
-        } catch (Exception ex) {
+        } catch (RuntimeException ex) {
             // 只读查询异常：保守跳过移动，避免陈旧事件把文件搬入孤儿目录
             log.warn("章节有效性校验失败，跳过最终化: chapterId={}, comicId={}", chapterId, comicId, ex);
             return false;
@@ -299,11 +387,6 @@ public class ImportStorageFinalizeHandler {
         return sizes;
     }
 
-    private void moveFile(MediaMove move, Path hqRoot) {
-        String targetRelative = hqRoot.relativize(move.target()).toString().replace('\\', '/');
-        storageService.transfer(move.source(), new StorageRef(StorageRootKeys.HQ, targetRelative), TransferMode.MOVE);
-    }
-
     private void deleteIfEmpty(Path dir) {
         if (dir == null || !Files.isDirectory(dir)) {
             return;
@@ -359,12 +442,44 @@ public class ImportStorageFinalizeHandler {
     }
 
     /** 最终化上下文：解析校验后的根路径、源/目标目录与媒体搬运对。 */
-    private record FinalizeContext(Path mangaRoot, Path hqRoot, Path sourceDir, Path targetDir,
-                                   List<MediaMove> moves) {
+    private static final class FinalizeContext {
+        private final Path mangaRoot;
+        private final Path hqRoot;
+        private final Path sourceDir;
+        private final Path targetDir;
+        private final List<MediaMove> moves;
+
+        private FinalizeContext(Path mangaRoot, Path hqRoot, Path sourceDir, Path targetDir,
+                                List<MediaMove> moves) {
+            this.mangaRoot = mangaRoot;
+            this.hqRoot = hqRoot;
+            this.sourceDir = sourceDir;
+            this.targetDir = targetDir;
+            this.moves = moves;
+        }
+
+        private Path mangaRoot() { return mangaRoot; }
+        private Path hqRoot() { return hqRoot; }
+        private Path sourceDir() { return sourceDir; }
+        private Path targetDir() { return targetDir; }
+        private List<MediaMove> moves() { return moves; }
     }
 
     /** 媒体搬运对：解析并校验后的源/目标绝对路径 + 用于清单尺寸核对的源文件名。 */
-    private record MediaMove(Path source, Path target, String fileName) {
+    private static final class MediaMove {
+        private final Path source;
+        private final Path target;
+        private final String fileName;
+
+        private MediaMove(Path source, Path target, String fileName) {
+            this.source = source;
+            this.target = target;
+            this.fileName = fileName;
+        }
+
+        private Path source() { return source; }
+        private Path target() { return target; }
+        private String fileName() { return fileName; }
     }
 
     /** 业务失败异常：携带冻结错误码，消息只含相对引用（已脱敏）。 */
@@ -373,6 +488,11 @@ public class ImportStorageFinalizeHandler {
 
         ImportStorageFinalizeException(String errorCode, String message) {
             super(message);
+            this.errorCode = errorCode;
+        }
+
+        ImportStorageFinalizeException(String errorCode, String message, Throwable cause) {
+            super(message, cause);
             this.errorCode = errorCode;
         }
 

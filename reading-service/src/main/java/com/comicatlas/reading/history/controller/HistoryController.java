@@ -28,16 +28,6 @@ public class HistoryController {
     private final HistoryService historyService;
 
     /**
-     * 查询全部阅读历史（按最近阅读排序）。
-     *
-     * @return 阅读历史列表
-     */
-    @GetMapping
-    public Result<?> listHistory() {
-        return Result.ok(historyService.listHistory());
-    }
-
-    /**
      * 分页查询阅读历史，供历史页滚动加载使用。
      */
     @GetMapping("/page")

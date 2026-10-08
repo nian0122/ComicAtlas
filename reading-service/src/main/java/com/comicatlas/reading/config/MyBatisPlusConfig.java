@@ -11,9 +11,11 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 @Configuration
+// Mapper 扫描范围按阅读应用边界集中声明，仅注册阅读端需要的共享 Mapper。
 @MapperScan({
         "com.comicatlas.persistence.comic.mapper",
-        "com.comicatlas.persistence.reader.mapper"
+        "com.comicatlas.persistence.reader.mapper",
+        "com.comicatlas.reading.favorites.persistence.mapper"
 })
 public class MyBatisPlusConfig {
 

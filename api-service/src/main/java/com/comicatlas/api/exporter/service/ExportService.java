@@ -10,6 +10,8 @@ public interface ExportService {
 
     ExportTaskVO createExportTask(Long comicId, String format);
 
+    ExportTaskVO createBatchDirectoryExportTask(List<Long> comicIds);
+
     List<ExportTaskVO> listExports(Long comicId);
 
     /** 全局导出任务列表（跨漫画，按创建时间倒序），供任务中心展示全部导出记录。 */

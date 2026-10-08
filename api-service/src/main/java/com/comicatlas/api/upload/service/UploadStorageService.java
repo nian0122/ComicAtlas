@@ -2,12 +2,13 @@ package com.comicatlas.api.upload.service;
 import com.comicatlas.api.upload.domain.RangeTracker;
 import com.comicatlas.api.upload.domain.UploadSessionStatus;
 import com.comicatlas.api.upload.support.DiskSpaceChecker;
-import com.comicatlas.api.upload.support.UploadProperties;
+import com.comicatlas.api.upload.config.UploadProperties;
 
-import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+// 条件更新由上传业务服务维护会话状态机与并发边界，Mapper 执行参数化更新。
+// 架构说明：Service 直接构造 LambdaUpdateWrapper 更新上传文件；条件更新应收口到 UploadFileMapper。
 import com.comicatlas.contract.common.constant.HttpStatusCodes;
 import com.comicatlas.contract.common.exception.BusinessException;
-import com.comicatlas.api.storage.ApiStorageProperties;
+import com.comicatlas.api.storage.config.ApiStorageProperties;
 import com.comicatlas.api.storage.ApiStorageRoot;
 import com.comicatlas.api.upload.persistence.entity.UploadFile;
 import com.comicatlas.api.upload.persistence.entity.UploadSession;
@@ -34,7 +35,7 @@ import java.util.stream.Stream;
 /**
  * 分片上传存储服务 — 流式写入 STAGING/{sessionId}/{fileId}.part。
  * <p>
- * 不跟随客户端文件名拼路径（storageName 服务端生成）；乱序/重复分片通过
+ * 仅使用服务端校验过的原始文件基名拼接会话内路径；乱序/重复分片通过
  * 区间合并处理；每个文件独立锁避免并发丢失区间更新。
  */
 @Slf4j
@@ -104,7 +105,7 @@ public class UploadStorageService {
      * 流式写入一个分片。返回合并后的已接收区间串。
      *
      * @param session     会话
-     * @param file        目标文件（storageName 服务端生成）
+     * @param file        目标文件（storageName 为校验后的原始文件名）
      * @param start       分片起始偏移（含）
      * @param end         分片结束偏移（含）
      * @param total       文件声明总大小
@@ -142,10 +143,7 @@ public class UploadStorageService {
             }
             String merged = RangeTracker.merge(file.getReceivedRanges(), start, end);
             long received = maxEnd(merged) + 1;
-            uploadFileMapper.update(null, new LambdaUpdateWrapper<UploadFile>()
-                    .eq(UploadFile::getId, file.getId())
-                    .set(UploadFile::getReceivedBytes, received)
-                    .set(UploadFile::getReceivedRanges, merged));
+            uploadFileMapper.updateReceivedRange(file.getId(), received, merged);
             file.setReceivedBytes(received);
             file.setReceivedRanges(merged);
             return merged;

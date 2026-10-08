@@ -25,6 +25,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
@@ -39,8 +42,7 @@ import java.util.List;
  * replace 流程额外将旧 HQ 文件移入 TRASH；完成后回传每媒体分析结果，
  * 由 API 将 STAGING 更新为 READY。Worker 不写数据库。
  * <p>
- * 预留接口能力：媒体上传/替换功能契约已实现且测试可用（见 MediaUploadManagementIT），
- * 但当前无前端页面入口，不属于漫画导入主流程。
+ * 媒体上传/替换命令处理器；前端入口为 {@code /manage/upload}，不属于漫画导入主流程。
  */
 @Slf4j
 @Component
@@ -96,7 +98,15 @@ public class MediaUploadCommandHandler {
                         + uploadFile.getStorageName() + ".part");
                 Path hqTarget = hqRoot.resolve(targetPath);
 
-                Path sourceToAnalyze = ensureMoved(staging, hqTarget, targetPath, uploadFile.getSizeBytes());
+                Path sourceToAnalyze;
+                MediaRecord previousMedia = replace ? mediaMapper.selectById(mediaId) : null;
+                boolean sameTargetReplacement = replace && previousMedia != null
+                        && targetPath.equals(previousMedia.getHqPath());
+                if (sameTargetReplacement) {
+                    sourceToAnalyze = replaceSameTarget(cmd, staging, hqTarget, targetPath, uploadFile);
+                } else {
+                    sourceToAnalyze = ensureMoved(staging, hqTarget, targetPath, uploadFile);
+                }
                 ComicMetadata.MediaInfo info = mediaAnalyzer.analyze(sourceToAnalyze);
                 results.add(new MediaAnalysisResult(mediaId,
                         info.mediaType() != null ? info.mediaType() : MediaTypes.IMAGE,
@@ -114,7 +124,7 @@ public class MediaUploadCommandHandler {
             publisher.uploadCompleted(cmd, results);
             log.info("媒体上传/替换命令完成: op={}, session={}, files={}",
                     cmd.operationType(), sessionDbId, files.size());
-        } catch (Exception e) {
+        } catch (IOException | RuntimeException e) {
             log.error("媒体上传/替换命令失败: session={}", sessionDbId, e);
             publisher.failed(cmd, e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName());
         }
@@ -125,11 +135,15 @@ public class MediaUploadCommandHandler {
      *
      * @return 用于分析的文件路径（搬入后的 HQ 文件或未搬入的暂存文件）
      */
-    private Path ensureMoved(Path staging, Path hqTarget, String targetPath, long size) throws IOException {
+    private Path ensureMoved(Path staging, Path hqTarget, String targetPath, UploadFileRecord uploadFile) throws IOException {
+        long size = uploadFile.getSizeBytes();
         if (Files.exists(staging)) {
+            if (!matchesUploadedFile(staging, uploadFile)) {
+                throw new IOException("暂存文件大小或 SHA-256 不匹配: " + staging);
+            }
             if (Files.exists(hqTarget)) {
-                if (Files.size(hqTarget) != size) {
-                    throw new IOException("目标已存在但大小不匹配: " + hqTarget);
+                if (!matchesUploadedFile(hqTarget, uploadFile)) {
+                    throw new IOException("目标文件名已被其他内容占用: " + hqTarget);
                 }
                 Files.deleteIfExists(staging);
                 return hqTarget;
@@ -137,10 +151,66 @@ public class MediaUploadCommandHandler {
             storageService.transfer(staging, new StorageRef("HQ", targetPath), TransferMode.MOVE);
             return hqTarget;
         }
-        if (Files.exists(hqTarget) && Files.size(hqTarget) == size) {
+        if (Files.exists(hqTarget) && matchesUploadedFile(hqTarget, uploadFile)) {
             return hqTarget;
         }
         throw new IOException("暂存文件缺失且目标不存在: " + staging);
+    }
+
+    /** 同路径替换先暂存新内容，再回收旧内容，最后原子发布新文件。 */
+    private Path replaceSameTarget(ManagementCommandRequestedEvent cmd, Path staging, Path target,
+                                   String targetPath, UploadFileRecord uploadFile) throws IOException {
+        Path replacement = target.resolveSibling("." + cmd.taskId() + ".replace.tmp");
+        if (!Files.exists(staging)) {
+            if (Files.exists(target) && matchesUploadedFile(target, uploadFile)) {
+                return target;
+            }
+            if (!Files.exists(replacement) || !matchesUploadedFile(replacement, uploadFile)) {
+                throw new IOException("替换暂存文件缺失且目标内容不匹配: " + staging);
+            }
+        }
+        if (Files.exists(replacement) && !matchesUploadedFile(replacement, uploadFile)) {
+            throw new IOException("替换临时文件已被其他内容占用: " + replacement);
+        }
+        if (!Files.exists(replacement)) {
+            if (!matchesUploadedFile(staging, uploadFile)) {
+                throw new IOException("替换暂存文件大小或 SHA-256 不匹配: " + staging);
+            }
+            storageService.transfer(staging, new StorageRef("HQ", targetPath.substring(0,
+                    targetPath.lastIndexOf('/') + 1) + replacement.getFileName()), TransferMode.MOVE);
+        } else {
+            Files.deleteIfExists(staging);
+        }
+        if (Files.exists(target)) {
+            moveOldToTrash(cmd, target);
+        }
+        try {
+            Files.move(replacement, target);
+        } catch (IOException exception) {
+            throw new IOException("发布替换文件失败: " + target, exception);
+        }
+        return target;
+    }
+
+    private boolean matchesUploadedFile(Path path, UploadFileRecord uploadFile) throws IOException {
+        return Files.isRegularFile(path) && Files.size(path) == uploadFile.getSizeBytes()
+                && sha256(path).equalsIgnoreCase(uploadFile.getSha256());
+    }
+
+    private String sha256(Path path) throws IOException {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            try (InputStream inputStream = Files.newInputStream(path)) {
+                byte[] buffer = new byte[64 * 1024];
+                int read;
+                while ((read = inputStream.read(buffer)) != -1) {
+                    digest.update(buffer, 0, read);
+                }
+            }
+            return java.util.HexFormat.of().formatHex(digest.digest());
+        } catch (NoSuchAlgorithmException exception) {
+            throw new IllegalStateException("SHA-256 不可用", exception);
+        }
     }
 
     /**
@@ -175,5 +245,19 @@ public class MediaUploadCommandHandler {
         } catch (IOException e) {
             log.warn("替换旧文件移入 TRASH 失败（新文件已就位，非致命）: mediaId={}", mediaId, e);
         }
+    }
+
+    private void moveOldToTrash(ManagementCommandRequestedEvent cmd, Path oldFile) throws IOException {
+        StorageRoot trashRoot = StorageRootResolver.optional(storageProperties, StorageRootKeys.TRASH);
+        if (trashRoot == null) {
+            throw new IOException("同名替换需要配置 TRASH 存储根");
+        }
+        Path trashTarget = trashRoot.resolve(cmd.taskId() + "/" + oldFile.getFileName());
+        Files.createDirectories(trashTarget.getParent());
+        if (Files.exists(trashTarget)) {
+            throw new IOException("回收目标已存在，拒绝覆盖: " + trashTarget);
+        }
+        storageService.transfer(oldFile, new StorageRef("TRASH", cmd.taskId() + "/" + oldFile.getFileName()),
+                TransferMode.MOVE);
     }
 }

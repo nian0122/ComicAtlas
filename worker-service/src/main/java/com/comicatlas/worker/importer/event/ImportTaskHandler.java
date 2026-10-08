@@ -2,6 +2,7 @@ package com.comicatlas.worker.importer.event;
 
 import com.comicatlas.worker.importer.model.ImportContext;
 import com.comicatlas.worker.importer.model.ImportManifest;
+import com.comicatlas.worker.importer.model.ImportNormalizationManifest;
 import com.comicatlas.worker.importer.model.ImportSourceType;
 import com.comicatlas.worker.importer.handler.DirectoryImportHandler;
 import com.comicatlas.worker.importer.handler.ZipImportHandler;
@@ -86,6 +87,14 @@ public class ImportTaskHandler {
     }
 
     private void routeToHandler(ImportSourceType sourceType, String sourcePath, Long taskId, Long comicId, Path mangaRoot) throws Exception {
+        if (directoryHandler.hasRecoveryPoint(mangaRoot, taskId)) {
+            if (sourceType == ImportSourceType.ZIP || sourceType == ImportSourceType.CBZ) {
+                zipHandler.resumeExisting(taskId, comicId, mangaRoot);
+            } else {
+                directoryHandler.resumeExisting(taskId, comicId, mangaRoot);
+            }
+            return;
+        }
         switch (sourceType) {
             case ZIP, CBZ -> zipHandler.importZip(
                     new ImportContext(sourceType.name(), requireSourcePath(sourcePath), false, false), taskId, comicId, mangaRoot);
@@ -124,8 +133,10 @@ public class ImportTaskHandler {
     private static void acknowledge(Channel channel, long tag) {
         try {
             channel.basicAck(tag, false);
-        } catch (Exception exception) {
+        } catch (java.io.IOException exception) {
             log.warn("消息 ack 失败: tag={}", tag, exception);
+        } catch (RuntimeException exception) {
+            log.warn("消息 ack 因客户端运行时异常失败: tag={}", tag, exception);
         }
     }
 
@@ -142,6 +153,11 @@ public class ImportTaskHandler {
                 log.info("EHENTAI 重试命中恢复点，跳过重新下载: taskId={}, sourceRoot={}", taskId, sourceRoot);
                 return Path.of(sourceRoot);
             }
+        }
+        if (manifestManager.normalizationExists(mangaRoot, taskId)) {
+            ImportNormalizationManifest normalization = manifestManager.readNormalization(mangaRoot, taskId);
+            // 整理阶段已持久化计划；即使来源目录部分被搬空，也从该检查点续做而不重新下载。
+            return Path.of(normalization.sourceRoot());
         }
         return ehentaiDownloadService.downloadToSourceDir(taskId, sourcePath);
     }

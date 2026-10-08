@@ -13,7 +13,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 
-/** 元数据刷新快照的原子文件写入器。 */
+/** 元数据类扫描快照的原子文件写入器。 */
 public final class MetadataSnapshotWriter {
 
     private final StorageProperties storageProperties;

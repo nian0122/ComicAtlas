@@ -18,8 +18,7 @@ import java.util.stream.Collectors;
 
 /**
  * worker entity(Export*) → MetadataV3 通用模型映射。
- * media 的 hqPath 原样传递 DB 中的真实相对路径（{comicId}/{chapterId}/{fileName}），
- * 不依赖 globalOrder/chapterNo/fileName 重建；HQ 已删除（hq_path 清空）时 hqPath 为 null，
+ * 普通元数据导出保留 DB 中的 HQ 相对路径。
  * 非法路径由 MetadataV3 校验。
  */
 @Component

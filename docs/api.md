@@ -1,10 +1,10 @@
-# ComicAtlas API 文档 v2.0
+# ComicAtlas API 文档 v2.1
 
 ## 当前功能范围
 
-当前对外维护的文件处理能力为：漫画导入、漫画导出、HQ 删除、LQ 生成、视频转码、按漫画刷新元数据、扫盘恢复。上述操作均由管理端创建任务，Worker 处理本地文件，结果通过消息队列回写管理端数据库。
+当前对外维护的文件处理能力为：ZIP/CBZ/目录导入、ZIP/CBZ 导出、HQ 删除、LQ 生成、视频转码、按漫画刷新元数据、扫盘恢复。上述操作均由管理端创建任务，Worker 处理本地文件，结果通过消息队列回写管理端数据库。
 
-导入和导出只传输本地路径、任务状态及分卷元数据，漫画文件字节不经过 HTTP。媒体上传/替换、回收站及其他历史接口不属于当前主流程，相关章节仅保留兼容说明。
+导入和导出只传输本地路径、任务状态及分卷元数据，漫画文件字节不经过 HTTP；媒体上传/替换通过管理端分块接口传输文件字节，并由 Worker 异步入库。
 
 基础业务接口还包括漫画库查询、漫画详情与元数据编辑、分类/标签、封面、目录与章节管理、阅读器、阅读历史、任务中心、存储统计和死信队列管理。
 
@@ -29,7 +29,7 @@ GET /api/comics?keyword=&tag=&status=&category=&sourceType=&sort=createdAt&page=
 | tag | 精确标签名筛选 |
 | status | IMPORTING / READY / REFRESHING / DELETING / DELETED / RESCANNING |
 | category | 分类 |
-| sourceType | ZIP / REGISTER / EHENTAI |
+| sourceType | ZIP / CBZ / DIRECTORY / EHENTAI |
 | sort | createdAt / updatedAt / title / pageCount / lastReadTime |
 
 ### 详情
@@ -74,7 +74,7 @@ GET /api/comics/{id}/catalog
 ```
 DELETE /api/manage/comics/{id}
 ```
-**v1.0 行为变更**：删除不再硬删，而是创建回收任务（`COMIC_DELETE`）把漫画移入回收站，响应体为 `ManagementTaskResponse`。永久删除需走 `POST /api/manage/trash/comics/{id}/purge`（只接受 `TRASHED` 状态 + 二次确认 token + 7 天保留期）。支持可选 `Idempotency-Key` 请求头。
+**v1.0 行为变更**：删除不再硬删，而是创建回收任务（`COMIC_DELETE`）把漫画移入回收站，响应体为 `ManagementTaskResponse`。永久删除需走 `POST /api/manage/trash/comics/{id}/purge`（只接受 `TRASHED` 状态 + 二次确认 token + `trash.retention-days` 配置的保留期）。支持可选 `Idempotency-Key` 请求头。
 
 > 兼容说明：`DELETE /api/manage/admin/comics/{id}?mode=DATABASE_ONLY|DELETE_FILES` 同样重定向到回收站，不再绕过回收站；该旧入口保留用于兼容旧调用方，永久清理统一走 `/api/trash`。
 
@@ -112,7 +112,8 @@ PUT    /api/history/{comicId}    # 更新进度 { chapterId, pageNumber }
 ```
 POST /api/manage/tasks/import
 { "sourceType": "ZIP", "sourcePath": "D:/downloads/comic.zip" }
-{ "sourceType": "REGISTER", "sourcePath": "D:/manga/temp/ComicA" }
+{ "sourceType": "CBZ", "sourcePath": "D:/downloads/comic.cbz" }
+{ "sourceType": "DIRECTORY", "sourcePath": "D:/manga/temp/ComicA" }
 { "sourceType": "EHENTAI", "sourcePath": "https://e-hentai.org/g/123456/abc123" }
 ```
 
@@ -158,7 +159,7 @@ SUCCESS
 | `SUCCESS` | 导入完成，metadata.json 已写入，API 侧已落库 |
 | `FAILED` | 导入失败，可通过 retry 重置回 PENDING |
 
-> v1.0 起任务状态统一收敛到 `ManagementTaskStatus`（QUEUED/RUNNING/.../SUCCEEDED/FAILED）与 `TaskStage`（DOWNLOADING/EXTRACTING/PARSING 子阶段）。`ImportTaskStatus` 枚举保留为导入进度状态（`PENDING/PARSING/IMPORTING/SUCCESS/FAILED`），终态为 SUCCESS/FAILED。
+> 任务状态统一收敛到 `ManagementTaskStatus`（QUEUED/RUNNING/.../SUCCEEDED/FAILED）与 `TaskStage`（DOWNLOADING/EXTRACTING/PARSING 子阶段）。`ImportTaskStatus` 保留导入进度状态（`PENDING/PARSING/IMPORTING/SUCCESS/FAILED/CANCELLED`），其中 `CANCELLED` 与 SUCCESS/FAILED 一样是终态。
 
 > 完整导入流水线设计见 [`docs/architecture/02-import-pipeline.md`](architecture/02-import-pipeline.md)。
 
@@ -209,7 +210,7 @@ GET  /api/manage/tasks/directory-scan/{id}
 
 批量导入支持一次提交多个来源。目录扫描为「漫画集根目录批量发现」异步任务：`parentPath` 作为漫画集根目录，其直接子目录各是一本候选漫画，Worker 对每个候选内部递归预览所有层级的媒体与警告；前端轮询 `GET /api/manage/tasks/directory-scan/{id}` 直到 `status` 为 `SUCCESS`/`FAILED` 后读取 `result`。
 
-> v1.0 新增 `POST /api/manage/tasks/import` 支持可选 `Idempotency-Key` 头，同键同 payload 重放不重复建任务；`POST /api/manage/tasks/import` 请求体字段为 `sourceType`（EHENTAI/ZIP/DIRECTORY）、`sourcePath`（ZIP 文件或目录路径）、`sourceRef`（EHENTAI 画廊 URL）。跨页批量元数据操作请使用新领域接口 `POST /api/manage/batch`（见 13.6）。
+> `POST /api/manage/tasks/import` 支持可选 `Idempotency-Key` 头，同键同 payload 重放不重复建任务；请求体字段为 `sourceType`（ZIP/CBZ/DIRECTORY/EHENTAI）、`sourcePath`（ZIP/CBZ 文件或目录路径）、`sourceRef`（EHENTAI 画廊 URL）。跨页批量元数据操作请使用 `POST /api/manage/batch`（见 13.6）。
 
 ---
 
@@ -455,7 +456,7 @@ PENDING ──► RUNNING ──► SUCCESS
 
 ## 13. 管理控制台
 
-管理端使用独立的显式边界客户端 `frontend/src/services/management/http.ts`，响应解析在 `frontend/src/types/management/`。所有枚举字段在前端经 `parseEnum` 边界解析，未知枚举值降级为“未知状态”而不崩溃。
+管理端与阅读端共用 `frontend/src/shared/api/http.ts` 中的 HTTP 客户端；管理请求由 `features/*/api.ts` 与 `entities/*/api/` 按业务域封装，协议类型位于对应切片及 `shared/api/types.ts`。管理接口仍统一使用 `/api/manage/**`。
 
 ### 13.1 漫画工作区（列表 / 详情 / 更新 / 回收）
 
@@ -482,7 +483,6 @@ GET    /api/comics/{id}/catalog                   # 目录树（只读）
 POST   /api/manage/comics/{comicId}/catalogs             # 创建 { title, parentId?, sortOrder? }
 PATCH  /api/manage/comics/{comicId}/catalogs/{catalogId} # 重命名 { title }
 PUT    /api/manage/comics/{comicId}/catalogs/{catalogId}/move    # 移动 { parentId? }（body 可空）
-PUT    /api/manage/comics/{comicId}/catalogs/{catalogId}/reorder # 排序 { sortOrder }
 DELETE /api/manage/comics/{comicId}/catalogs/{catalogId}?reparentTo={catalogId}  # 删除（可重挂子级）
 ```
 
@@ -492,8 +492,22 @@ DELETE /api/manage/comics/{comicId}/catalogs/{catalogId}?reparentTo={catalogId} 
 POST   /api/manage/comics/{comicId}/chapters             # 创建 { title, chapterNo?, catalogId? }
 PATCH  /api/manage/comics/{comicId}/chapters/{chapterId} # 重命名 { title?, chapterNo? }
 PUT    /api/manage/comics/{comicId}/chapters/{chapterId}/move    # 移动 { catalogId? }（body 可空）
-PUT    /api/manage/comics/{comicId}/chapters/{chapterId}/reorder # 排序 { targetGlobalOrder }
 DELETE /api/manage/comics/{comicId}/chapters/{chapterId} # 回收章节（创建 CHAPTER_TRASH 任务）
+```
+
+目录和章节的同级展示顺序使用同一个接口。请求必须提交该父目录下完整的目录／可阅读章节顺序；`parentCatalogId: null` 表示漫画根层。服务更新节点的 `sort_order`，并按目录树遍历结果重算章节 `global_order`，阅读器上一章／下一章据此导航。
+
+```http
+PUT /api/manage/comics/{comicId}/structure/reorder
+Content-Type: application/json
+
+{
+  "parentCatalogId": 12,
+  "items": [
+    { "type": "CATALOG", "id": 21 },
+    { "type": "CHAPTER", "id": 34 }
+  ]
+}
 ```
 
 ### 13.4 允许操作查询（按钮权限唯一来源）
@@ -519,6 +533,7 @@ GET /api/manage/operations/media/{mediaId}
 
 ```
 GET    /api/manage/tasks                     # 分页列表
+GET    /api/manage/tasks/status-counts        # 按任务状态返回全量数量（不分页、不受 status 参数影响）
 GET    /api/manage/tasks/{id}                # 详情
 GET    /api/manage/tasks/{id}/items          # 逐目标项
 POST   /api/manage/tasks                     # 创建异步命令（需 Idempotency-Key）
@@ -526,7 +541,7 @@ POST   /api/manage/tasks/{id}/cancel         # 取消
 POST   /api/manage/tasks/{id}/retry          # 重试（仅终态）
 ```
 
-列表查询参数：`page`（默认 1）、`size`（默认 20）、`type`、`status`、`batchId`、`targetType`、`targetId`。
+列表查询参数：`page`（默认 1）、`size`（默认 20）、`type`、`status`、`batchId`、`targetType`、`targetId`。状态统计接口接受 `type`、`batchId`、`targetType`、`targetId`，返回这些筛选条件下各状态的任务总数；统计忽略 `status` 筛选，供状态卡片同时展示完整分布。
 
 创建请求 `CreateManagementTaskRequest`：
 
@@ -594,13 +609,13 @@ GET   /api/manage/trash/{targetType}/{targetId}/reconcile          # 对账（�
 POST  /api/manage/trash/{targetType}/{targetId}/reconcile          # 对账并修复可安全恢复的 DB 状态
 ```
 
-`purge` 请求体：`{ "token": "..." }`。永久清理前置条件：目标必须处于 `TRASHED` 状态、距 `trashed_at` 超过 7 天保留期（`RETENTION_DAYS = 7`）、token 二次确认。回收站列表通过 `GET /api/comics?status=TRASHED` 获取。
+`purge` 请求体：`{ "token": "..." }`。永久清理前置条件：目标必须处于 `TRASHED` 状态、已达到 `trash.retention-days` 配置的保留期（默认 `0`，表示不等待）、token 二次确认。回收站列表通过 `GET /api/comics?status=TRASHED` 获取。
 
 ### 13.8 分块上传（Upload Session）
 
 原始字节流上传（**非 multipart**），无 `spring.servlet.multipart` 配置。限制见 `storage.upload.*`。
 
-> **预留接口能力**：媒体上传/替换（`MEDIA_UPLOAD` / `MEDIA_REPLACE`）后端接口已实现且测试可用，但当前无前端页面入口，不属于漫画导入主流程。接入需自行实现前端上传页面。
+> **管理端能力**：媒体上传/替换（`MEDIA_UPLOAD` / `MEDIA_REPLACE`）后端接口已实现，前端入口位于单本漫画工作区的“目录与存储”章节媒体操作中。
 
 ```
 POST   /api/manage/uploads/sessions                     # 创建会话
@@ -696,7 +711,7 @@ GET /api/manage/outbox/stats
 ```
 IMPORT, RECOVERY, EXPORT, DIRECTORY_SCAN,
 LQ_GENERATE, LQ_REGENERATE, HQ_DELETE, TRANSCODE,
-METADATA_REFRESH, METADATA_UPDATE,
+ METADATA_REFRESH, METADATA_UPDATE,
 COMIC_DELETE, MEDIA_UPLOAD, MEDIA_REPLACE, MEDIA_TRASH, CHAPTER_TRASH,
 COMIC_RESTORE, CHAPTER_RESTORE, MEDIA_RESTORE,
 COMIC_PURGE, CHAPTER_PURGE, MEDIA_PURGE
@@ -714,7 +729,7 @@ COMIC_PURGE, CHAPTER_PURGE, MEDIA_PURGE
 
 **HqStatus**：`PENDING / READY / MISSING / DELETE_QUEUED / DELETING / DELETED / FAILED`
 **LqStatus**：`NOT_GENERATED / QUEUED / GENERATING / READY / MISSING / FAILED`
-**TranscodeStatus**：`NOT_NEEDED / QUEUED / TRANSCODING / READY / FAILED`
+**TranscodeStatus**：`NOT_NEEDED / REQUIRED / QUEUED / TRANSCODING / READY / FAILED`
 **UploadSessionStatus**：`ACTIVE / COMPLETED / CANCELLED / EXPIRED / FAILED`
 **TrashManifestStatus**：`TRASHED / COMPENSATED / PARTIAL / RESTORED / PURGED`
 
@@ -914,7 +929,8 @@ OP_NOT_ALLOWED, COMIC_NOT_FOUND
 | 生成 LQ | `POST /api/manage/storage/lq/comics/{id}`、`/lq/chapters/{id}` |
 | 视频转码 | `POST /api/manage/storage/transcode/comics/{id}`、`/transcode/chapters/{id}` |
 | 删除 HQ 保留 LQ | `POST /api/manage/storage/delete-hq/comics/{id}`、`/delete-hq/chapters/{id}` |
-| 导出漫画 | `POST /api/manage/storage/export/comics/{id}` |
+| 单本 ZIP/CBZ 导出 | `POST /api/manage/storage/export/comics/{id}?format=ZIP`（或 `CBZ`）|
+| 批量文件夹导出 | `POST /api/manage/storage/export/comics/batch-directory` |
 | 导出任务查询 | `GET /api/manage/storage/export/comics/{id}/tasks`、`GET /api/manage/storage/export/tasks/{taskId}` |
 | 导出分卷清单 | `GET /api/manage/storage/export/tasks/{taskId}/artifacts` |
 | 导出打开目录 | `POST /api/manage/storage/export/tasks/{taskId}/open` |
@@ -923,14 +939,17 @@ OP_NOT_ALLOWED, COMIC_NOT_FOUND
 
 > 旧端点（`/comics/{id}/lq`、`/admin/storage/comics/{id}/transcode-videos` 等）已随接口收敛全部移除，存储操作统一使用上表 `/api/manage/storage/*` 形态。
 >
-> **导出为本地路径交互**：导出产物落在宿主机 `EXPORT/{taskId}/{base}.z01..zNN + {base}.zip`（标准分卷，主 `.zip` 为最后卷）。`GET /api/manage/storage/export/tasks/{taskId}/artifacts` 返回有序分卷**元数据**（1-based index、文件名、字节大小、是否最后 `.zip`、本地物理路径），**不提供任何文件字节下载**；`POST /api/manage/storage/export/tasks/{taskId}/open` 仅在宿主机打开文件管理器。HTTP 全程只传输任务/路径/状态/卷元数据，文件字节不经过 HTTP——把最后 `.zip` 的本地路径作为 `sourcePath` 即可重新导入该分卷（缺任一卷会失败，`.z01` 不可作为入口）。
+> **导出为本地路径交互**：ZIP/CBZ 产物落在宿主机 `EXPORT/{taskId}/`，标准分卷归档由 artifacts 接口返回分卷元数据。批量文件夹导出结果目录为 `EXPORT/{taskId}/`，下含以漫画名命名的子目录，仅放媒体文件及目录结构；冲突名称追加漫画 ID。导出不提供 HTTP 文件字节下载，`POST /api/manage/storage/export/tasks/{taskId}/open` 在宿主机打开结果目录。批量文件夹导出成功后，所选漫画从系统脱管。
+
+批量文件夹导出请求体为 `{ "comicIds": [101, 205, 319] }`。任务创建前会锁定并校验全部漫画；任务失败时漫画状态恢复为可管理状态。目录移动中断则保留检查点并重试，不会把部分移动误报为普通失败。
 >
 > **METADATA_REFRESH（刷新元数据，异步任务）**：`POST /api/manage/storage/refresh-metadata/comics/{id}` 走统一命令管线，同一事务 CAS 漫画 `READY → REFRESHING`、创建 COMIC 级管理任务并发布命令到 Outbox。漫画不存在返回 `404`；非 `READY` 或并发被占用返回 `409`；成功返回 `202 Accepted` 与 `OperationSubmitResultDTO`（含 `taskId`）。
+
 >
 > 执行链路（全程无 HTTP 文件传输，HTTP 只传任务信息、快照引用与 SHA-256 校验值）：
 > 1. Worker 只读 DB 基线（章节/媒体 + 版本），按 `HQ/{comicId}/{chapterId}` **逐章扫描**目录，识别图片/视频媒体，记录缺失文件；
 > 2. 组装 **STAGING 快照**（schemaVersion=1，含确定性 SHA-256 结构摘要 `databaseRevision`），原子落盘后回传 `snapshotRef` + `snapshotSha256` + 字节数；
-> 3. API 校验快照（SHA/schema/comicId/章节版本漂移）后在同一事务内执行**差异合并**：匹配行刷新 HQ 尺寸/媒体类型与视频字段；磁盘新增文件插入 READY 媒体；DB 有记录但磁盘缺失的行标记 `HQ MISSING` 且 `fileSize=0`（保留 LQ/视频/转码状态）；
+> 3. API 校验快照（SHA/schema/comicId/章节版本漂移）后在同一事务内执行**差异合并**：匹配行刷新 HQ 尺寸/媒体类型与视频字段；磁盘新增文件只记录为“已发现”，不在刷新流程创建媒体行；DB 有记录但磁盘缺失的行标记 `HQ MISSING` 且 `fileSize=0`（保留 LQ/视频/转码状态）；
 > 4. **成功点** = 合并提交 + CAS 释放 `REFRESHING → READY` + Outbox 重导出 `metadata.json`（`MetadataRefreshEvent`，安全 DB→JSON 链）；业务失败则任务 FAILED、释放锁并保留快照供排查。
 >
 > 批量 `METADATA_REFRESH` 资格与单项一致（仅 READY 漫画可执行）。

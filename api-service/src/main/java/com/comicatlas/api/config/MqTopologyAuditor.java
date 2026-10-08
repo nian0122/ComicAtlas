@@ -1,13 +1,14 @@
 package com.comicatlas.api.config;
 
-import com.comicatlas.api.task.service.RabbitManagementClient;
-import com.comicatlas.api.task.service.RabbitManagementClient.QueueSnapshot;
+import com.comicatlas.api.task.adapter.RabbitManagementClient;
+import com.comicatlas.api.task.adapter.RabbitManagementClient.QueueSnapshot;
 import com.comicatlas.common.constant.MqQueues;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.RestClientException;
 
 import java.util.Comparator;
 import java.util.List;
@@ -28,6 +29,7 @@ import java.util.stream.Collectors;
 @Slf4j
 @Component
 @RequiredArgsConstructor
+@lombok.Getter
 public class MqTopologyAuditor {
 
     private static final String RESIDUE_HINT =
@@ -36,7 +38,27 @@ public class MqTopologyAuditor {
     private final RabbitManagementClient managementClient;
 
     /** 启动对账结果。 */
-    public record AuditResult(List<QueueSnapshot> zombieQueues, Set<String> missingQueues) {
+    @lombok.Getter
+    public static class AuditResult {
+        private final List<QueueSnapshot> zombieQueues;
+        private final Set<String> missingQueues;
+        public AuditResult(List<QueueSnapshot> zombieQueues, Set<String> missingQueues) {
+            this.zombieQueues = zombieQueues;
+            this.missingQueues = missingQueues;
+        }
+        public List<QueueSnapshot> zombieQueues() { return zombieQueues; }
+        public Set<String> missingQueues() { return missingQueues; }
+        @Override
+        public boolean equals(Object other) {
+            if (this == other) { return true; }
+            if (!(other instanceof AuditResult)) { return false; }
+            AuditResult that = (AuditResult) other;
+            return java.util.Objects.equals(zombieQueues, that.zombieQueues) && java.util.Objects.equals(missingQueues, that.missingQueues);
+        }
+        @Override
+        public int hashCode() { return java.util.Objects.hash(zombieQueues, missingQueues); }
+        @Override
+        public String toString() { return "AuditResult[" + "zombieQueues=" + zombieQueues + ", " + "missingQueues=" + missingQueues + "]"; }
         public boolean healthy() {
             return zombieQueues.isEmpty() && missingQueues.isEmpty();
         }
@@ -50,8 +72,8 @@ public class MqTopologyAuditor {
         AuditResult result;
         try {
             result = audit();
-        } catch (Exception e) {
-            log.warn("MQ 拓扑对账跳过: Management API 不可用, error={}", e.getMessage());
+        } catch (RestClientException e) {
+            log.warn("MQ 拓扑对账跳过: Management API 不可用, error={}", e.getMessage(), e);
             return;
         }
         result.zombieQueues().forEach(snapshot -> log.warn(

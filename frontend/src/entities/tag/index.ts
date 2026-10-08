@@ -1,0 +1,5 @@
+// entities/tag 的稳定 public API。
+export * from './api'
+export * from './model/types'
+
+export { useTagStore } from './model/store'

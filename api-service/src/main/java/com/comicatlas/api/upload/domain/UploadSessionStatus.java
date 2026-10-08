@@ -6,6 +6,8 @@ package com.comicatlas.api.upload.domain;
 public enum UploadSessionStatus {
     /** 分片上传进行中 */
     ACTIVE,
+    /** 正在执行文件完整性校验，禁止继续写入分片。 */
+    VERIFYING,
     /** complete 已调用，命令已派发（STAGING 文件仍保留等待 Worker 搬移） */
     COMPLETED,
     /** 用户取消 */

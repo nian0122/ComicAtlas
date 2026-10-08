@@ -1,6 +1,5 @@
 package com.comicatlas.worker.storage;
 
-import com.comicatlas.worker.importer.handler.DirectoryImportHandler;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;

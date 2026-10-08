@@ -1,6 +1,5 @@
 package com.comicatlas.api.catalog.cache;
 
-import com.comicatlas.contract.comic.cache.ComicReferenceCache;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.Cache;
@@ -33,7 +32,7 @@ public class CacheEvictor {
                 try {
                     cache.evict(cacheKey);
                     log.debug("缓存失效: cache={}, key={}", cacheName, cacheKey);
-                } catch (RuntimeException e) {
+                } catch (IllegalStateException e) {
                     log.warn("缓存失效失败，继续使用数据库结果: cache={}, key={}", cacheName, cacheKey, e);
                 }
             }
@@ -53,26 +52,17 @@ public class CacheEvictor {
         eviction.run();
     }
 
-    /**
-     * 清空阅读服务的漫画列表缓存。
-     * <p>
-     * 列表缓存的 key 包含全部筛选条件，分类或标签变更可能影响多个 key，
-     * 因而使用整缓存失效保证跨服务可见的一致性。
-     */
-    public void evictComicList() {
-        clearCache(ComicReferenceCache.COMIC_LIST);
-    }
-
-    private void clearCache(String cacheName) {
+    /** 事务提交后清空指定缓存，适用于查询条件组合较多的分页缓存。 */
+    public void clear(String cacheName) {
         Runnable eviction = () -> {
             Cache cache = cacheManager.getCache(cacheName);
-            if (cache == null) {
-                return;
-            }
-            try {
-                cache.clear();
-            } catch (RuntimeException e) {
-                log.warn("缓存清空失败，继续使用数据库结果: cache={}", cacheName, e);
+            if (cache != null) {
+                try {
+                    cache.clear();
+                    log.debug("缓存清空: cache={}", cacheName);
+                } catch (IllegalStateException e) {
+                    log.warn("缓存清空失败，继续使用数据库结果: cache={}", cacheName, e);
+                }
             }
         };
 
@@ -89,4 +79,5 @@ public class CacheEvictor {
 
         eviction.run();
     }
+
 }

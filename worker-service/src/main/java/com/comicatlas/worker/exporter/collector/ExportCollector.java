@@ -40,7 +40,7 @@ public class ExportCollector {
             throw new IllegalArgumentException("漫画不存在：" + comicId);
         }
 
-        List<ChapterRecord> chapters = chapterMapper.selectByComicIdOrderByGlobalOrder(comicId);
+        List<ChapterRecord> chapters = chapterMapper.selectReadyByComicIdOrderByGlobalOrder(comicId);
         List<CatalogRecord> catalogs = catalogMapper.selectByComicId(comicId);
 
         List<Long> chapterIds = chapters.stream().map(ChapterRecord::getId).toList();

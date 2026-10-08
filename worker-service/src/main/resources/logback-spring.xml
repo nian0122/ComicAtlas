@@ -25,12 +25,12 @@
         </encoder>
     </appender>
 
-    <!-- 自定义包 DEBUG: MQ 消息收发、下载流程、文件处理 -->
-    <logger name="com.comicatlas.worker" level="DEBUG" />
+    <!-- 应用运行日志: MQ 消息收发、下载流程、文件处理 -->
+    <logger name="com.comicatlas.worker" level="INFO" />
 
     <!-- RabbitMQ 连接/消费详情 -->
     <logger name="org.springframework.amqp" level="INFO" />
-    <logger name="org.springframework.amqp.rabbit.listener" level="DEBUG" />
+    <logger name="org.springframework.amqp.rabbit.listener" level="INFO" />
 
     <!-- HTTP 请求详情（e-hentai API 调用） -->
     <logger name="jdk.internal.net.http" level="INFO" />

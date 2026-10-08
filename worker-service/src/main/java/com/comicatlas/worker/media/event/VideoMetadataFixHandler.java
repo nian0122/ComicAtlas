@@ -1,5 +1,4 @@
 package com.comicatlas.worker.media.event;
-
 import com.comicatlas.common.constant.MqQueues;
 import com.comicatlas.common.event.VideoMetadataFixRequestedEvent;
 import com.comicatlas.common.event.payload.VideoMetadataFixResult;
@@ -27,6 +26,11 @@ import java.util.Optional;
 @Slf4j
 @Component
 @RequiredArgsConstructor
+/**
+ * 消费视频元数据修复请求的 Worker 处理器。
+ * <p>查询指定漫画中缺失元数据的视频，读取 HQ 文件并分析；成功结果通过完成事件回传 API。
+ * 单个文件不存在或分析失败时跳过该文件，消息确认策略由消费支持组件统一处理。</p>
+ */
 public class VideoMetadataFixHandler {
 
     private final MediaReadMapper exportMediaMapper;
@@ -35,6 +39,13 @@ public class VideoMetadataFixHandler {
     private final MqConsumerSupport mqConsumerSupport;
     private final WorkerConfig workerConfig;
 
+    /**
+     * 处理视频元数据修复消息。
+     *
+     * @param event 指定待扫描漫画的请求事件
+     * @param channel 当前 RabbitMQ 通道
+     * @param tag 当前消息投递标签
+     */
     @RabbitListener(queues = MqQueues.VIDEO_METADATA_FIX)
     public void handle(VideoMetadataFixRequestedEvent event,
             Channel channel, @Header(AmqpHeaders.DELIVERY_TAG) long tag) {
@@ -95,9 +106,9 @@ public class VideoMetadataFixHandler {
 
                     log.debug("视频分析成功: pageId={}, {}x{}, duration={}s",
                             video.getId(), info.width(), info.height(), info.duration());
-                } catch (Exception e) {
+                } catch (RuntimeException e) {
                     log.warn("视频分析失败: pageId={}, path={} — {}",
-                            video.getId(), video.getHqPath(), e.getMessage());
+                            video.getId(), video.getHqPath(), e.getMessage(), e);
                 }
             }
 

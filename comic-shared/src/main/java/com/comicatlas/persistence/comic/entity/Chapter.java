@@ -7,6 +7,7 @@ import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.Version;
 import com.comicatlas.contract.common.enums.ChapterLifecycleStatus;
+import com.comicatlas.contract.common.enums.MediaReaction;
 
 /**
  * 章节实体。
@@ -39,6 +40,8 @@ public class Chapter {
 
     /** 进入 TRASHED 的时间（7 天保留期起点） */
     private LocalDateTime trashedAt;
+    private MediaReaction reaction;
+    private LocalDateTime reactionAt;
 
     /** 乐观锁版本号 */
     @Version

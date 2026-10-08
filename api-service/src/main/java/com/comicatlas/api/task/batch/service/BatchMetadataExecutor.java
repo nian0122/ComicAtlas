@@ -1,6 +1,5 @@
 package com.comicatlas.api.task.batch.service;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.comicatlas.persistence.comic.entity.Category;
 import com.comicatlas.persistence.comic.entity.Comic;
 import com.comicatlas.persistence.comic.entity.ComicTag;
@@ -15,7 +14,9 @@ import com.comicatlas.api.task.enums.ManagementTaskStatus;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
+import org.springframework.dao.DataAccessException;
 import org.springframework.transaction.annotation.Transactional;
+import com.comicatlas.contract.common.exception.BusinessException;
 
 import java.util.List;
 
@@ -44,7 +45,7 @@ public class BatchMetadataExecutor {
             apply(comicId, payload);
             managementTaskService.updateItemStatus(itemId, ManagementTaskStatus.SUCCEEDED,
                     null, null, null);
-        } catch (Exception e) {
+        } catch (BusinessException | DataAccessException e) {
             log.warn("批量元数据更新失败: itemId={}, comicId={}", itemId, comicId, e);
             managementTaskService.updateItemStatus(itemId, ManagementTaskStatus.FAILED,
                     e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName(),
@@ -85,9 +86,7 @@ public class BatchMetadataExecutor {
             if (tags.size() != payload.getAddTagIds().size()) {
                 throw new IllegalArgumentException("部分标签不存在");
             }
-            List<Long> existing = comicTagMapper.selectList(
-                            new LambdaQueryWrapper<ComicTag>().eq(ComicTag::getComicId, comicId))
-                    .stream().map(ComicTag::getTagId).toList();
+            List<Long> existing = comicTagMapper.selectTagIdsByComicId(comicId);
             for (Long tagId : payload.getAddTagIds()) {
                 if (!existing.contains(tagId)) {
                     ComicTag comicTag = new ComicTag();

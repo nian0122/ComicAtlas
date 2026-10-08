@@ -1,6 +1,5 @@
 package com.comicatlas.api.catalog.service.impl;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.comicatlas.api.catalog.cache.CatalogCacheInvalidator;
 import com.comicatlas.api.catalog.dto.CatalogCreateRequest;
 import com.comicatlas.api.catalog.dto.CatalogRenameRequest;
@@ -15,13 +14,13 @@ import com.comicatlas.api.catalog.service.CatalogManagementService;
 import com.comicatlas.contract.common.constant.HttpStatusCodes;
 import com.comicatlas.contract.common.exception.BusinessException;
 import com.comicatlas.api.shared.exception.ConflictException;
+import com.comicatlas.contract.common.enums.ChapterLifecycleStatus;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
@@ -115,43 +114,15 @@ public class CatalogManagementServiceImpl implements CatalogManagementService {
         return toCatalogVO(cat);
     }
 
-    // ======================== 重排 ========================
-
-    @Override
-    @Transactional
-    public void reorderCatalog(Long comicId, Long catalogId, int newSortOrder) {
-        Catalog cat = requireCatalogInComic(comicId, catalogId);
-        List<Catalog> siblings = selectSiblings(comicId, cat.getParentId());
-        List<Catalog> reordered = new ArrayList<>(siblings.size());
-        for (Catalog sib : siblings) {
-            if (!sib.getId().equals(catalogId)) {
-                reordered.add(sib);
-            }
-        }
-        int pos = Math.max(0, Math.min(newSortOrder - 1, reordered.size()));
-        reordered.add(pos, cat);
-        for (int i = 0; i < reordered.size(); i++) {
-            Catalog sib = reordered.get(i);
-            sib.setSortOrder(i + 1);
-            catalogMapper.updateById(sib);
-        }
-        catalogCacheInvalidator.evict(comicId);
-    }
-
     // ======================== 删除 ========================
 
     @Override
     @Transactional
     public void deleteCatalog(Long comicId, Long catalogId, Long reparentTo) {
         Catalog cat = requireCatalogInComic(comicId, catalogId);
-        List<Catalog> children = catalogMapper.selectList(
-                new LambdaQueryWrapper<Catalog>()
-                        .eq(Catalog::getComicId, comicId)
-                        .eq(Catalog::getParentId, catalogId));
-        List<Chapter> chapters = chapterMapper.selectList(
-                new LambdaQueryWrapper<Chapter>()
-                        .eq(Chapter::getComicId, comicId)
-                        .eq(Chapter::getCatalogId, catalogId));
+        List<Catalog> children = catalogMapper.selectChildrenByComicIdAndParentId(comicId, catalogId);
+        List<Chapter> chapters = chapterMapper.selectByComicIdAndCatalogId(comicId, catalogId);
+        chapters.removeIf(chapter -> chapter.getStatus() == ChapterLifecycleStatus.DELETED);
 
         if (children.isEmpty() && chapters.isEmpty()) {
             catalogMapper.deleteById(catalogId);
@@ -252,15 +223,8 @@ public class CatalogManagementServiceImpl implements CatalogManagementService {
     }
 
     private List<Catalog> selectSiblings(Long comicId, Long parentId) {
-        LambdaQueryWrapper<Catalog> wrapper = new LambdaQueryWrapper<Catalog>()
-                .eq(Catalog::getComicId, comicId)
-                .orderByAsc(Catalog::getSortOrder, Catalog::getId);
-        if (parentId == null) {
-            wrapper.isNull(Catalog::getParentId);
-        } else {
-            wrapper.eq(Catalog::getParentId, parentId);
-        }
-        return catalogMapper.selectList(wrapper);
+        return parentId == null ? catalogMapper.selectRootByComicId(comicId)
+                : catalogMapper.selectChildrenByComicIdAndParentId(comicId, parentId);
     }
 
     private int nextSiblingSortOrder(Long comicId, Long parentId) {
@@ -283,16 +247,9 @@ public class CatalogManagementServiceImpl implements CatalogManagementService {
     }
 
     private int nextChapterSortOrder(Long comicId, Long catalogId) {
-        LambdaQueryWrapper<Chapter> wrapper = new LambdaQueryWrapper<Chapter>()
-                .eq(Chapter::getComicId, comicId)
-                .orderByDesc(Chapter::getSortOrder)
-                .last("LIMIT 1");
-        if (catalogId == null) {
-            wrapper.isNull(Chapter::getCatalogId);
-        } else {
-            wrapper.eq(Chapter::getCatalogId, catalogId);
-        }
-        List<Chapter> list = chapterMapper.selectList(wrapper);
-        return list.isEmpty() ? 1 : list.get(0).getSortOrder() + 1;
+        Chapter chapter = catalogId == null
+                ? chapterMapper.selectLastByComicIdWithoutCatalog(comicId)
+                : chapterMapper.selectLastByComicIdAndCatalogId(comicId, catalogId);
+        return chapter == null ? 1 : chapter.getSortOrder() + 1;
     }
 }

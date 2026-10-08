@@ -62,9 +62,29 @@ public class MetadataMediaMatcher {
         return null;
     }
 
-    public record HqIndex(Map<String, MediaRecord> byBasename, Set<String> directoryKeys) {
+    public static final class HqIndex {
+        private final Map<String, MediaRecord> byBasename;
+        private final Set<String> directoryKeys;
+
+        public HqIndex(Map<String, MediaRecord> byBasename, Set<String> directoryKeys) {
+            this.byBasename = byBasename;
+            this.directoryKeys = directoryKeys;
+        }
+
+        public Map<String, MediaRecord> byBasename() { return byBasename; }
+        public Set<String> directoryKeys() { return directoryKeys; }
     }
 
-    public record LqIndex(Map<String, MediaRecord> byBasename, Set<String> directoryKeys) {
+    public static final class LqIndex {
+        private final Map<String, MediaRecord> byBasename;
+        private final Set<String> directoryKeys;
+
+        public LqIndex(Map<String, MediaRecord> byBasename, Set<String> directoryKeys) {
+            this.byBasename = byBasename;
+            this.directoryKeys = directoryKeys;
+        }
+
+        public Map<String, MediaRecord> byBasename() { return byBasename; }
+        public Set<String> directoryKeys() { return directoryKeys; }
     }
 }

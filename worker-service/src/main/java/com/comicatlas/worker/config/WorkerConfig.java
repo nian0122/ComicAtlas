@@ -8,6 +8,7 @@ import org.springframework.context.annotation.Configuration;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.zip.Deflater;
 
 /** Worker 服务的统一外部配置模型。 */
 @Data
@@ -61,9 +62,9 @@ public class WorkerConfig {
     /** 工具相对路径的解析基准目录；未配置时回退到 JVM 工作目录 */
     private String toolsBaseDir;
     /** LQ 图片质量参数。 */
-    private int lqQuality = 15;
+    private int lqQuality = 70;
     /** LQ 图片处理并发数。 */
-    private int lqWorkers = 4;
+    private int lqWorkers = 8;
     /** HQ 删除超时时间（秒）。 */
     private int hqDeleteTimeoutSeconds = 60;
     /** 是否启用 ffprobe 视频元数据分析。 */
@@ -172,6 +173,7 @@ public class WorkerConfig {
     @Data
     public static class Cover {
         private int quality = 25;
+        private int maxLongEdge = 400;
         private long timeoutSeconds = 600;
         private long frameTimeoutSeconds = 120;
         private int workers = 1;
@@ -198,9 +200,11 @@ public class WorkerConfig {
     /** LQ 图片处理配置。 */
     @Data
     public static class Image {
-        private long lqTimeoutSeconds = 600;
+        private long lqTimeoutSeconds = 3600;
+        /** LQ 输出图片的最大长边，保持宽高比且不放大。 */
+        private int maxLongEdge = 3840;
         /** 所有图片 worker 同时处于解码/编码阶段的总像素预算。 */
-        private long maxInflightPixels = 80_000_000L;
+        private long maxInflightPixels = 160_000_000L;
     }
 
     /** 媒体分析配置。 */
@@ -231,6 +235,10 @@ public class WorkerConfig {
     /** ZIP 安全限制配置。 */
     @Data
     public static class Zip {
+        /** 普通条目与元数据的压缩级别（0..9），默认快速压缩。 */
+        private int compressionLevel = Deflater.BEST_SPEED;
+        /** 已压缩媒体的压缩级别（0..9），默认 0 使用 STORE 直接打包，不预扫描 CRC。 */
+        private int mediaCompressionLevel = Deflater.NO_COMPRESSION;
         private int maxEntries = 100_000;
         private int maxDepth = 200;
         /** 分卷导出单卷最大大小（字节），默认 2 GiB，须落在 Commons Compress 分卷支持范围（64 KiB..4 GiB）。 */
@@ -252,6 +260,12 @@ public class WorkerConfig {
         Zip zipConfig = zip;
         if (zipConfig == null) {
             throw new IllegalArgumentException("worker.zip 配置不能为空");
+        }
+        if (zipConfig.getCompressionLevel() < Deflater.NO_COMPRESSION
+                || zipConfig.getCompressionLevel() > Deflater.BEST_COMPRESSION
+                || zipConfig.getMediaCompressionLevel() < Deflater.NO_COMPRESSION
+                || zipConfig.getMediaCompressionLevel() > Deflater.BEST_COMPRESSION) {
+            throw new IllegalArgumentException("worker.zip.compressionLevel 和 mediaCompressionLevel 必须位于 0..9");
         }
         if (zipConfig.getMaxEntries() <= 0) {
             throw new IllegalArgumentException("worker.zip.maxEntries 必须大于 0，当前值："
@@ -279,6 +293,9 @@ public class WorkerConfig {
     }
 
     private void validateRuntimeConfig() {
+        if (lqQuality < 1 || lqQuality > 100 || lqWorkers <= 0) {
+            throw new IllegalArgumentException("worker LQ 质量必须位于 1..100 且并发数必须为正数");
+        }
         if (executor == null || executor.getProcessIoThreads() <= 0
                 || executor.getProcessIoQueueCapacity() <= 0
                 || executor.getShutdownTimeoutSeconds() <= 0) {
@@ -288,8 +305,9 @@ public class WorkerConfig {
                 || transcode.getEncoderProbeTimeoutSeconds() <= 0) {
             throw new IllegalArgumentException("worker.transcode 超时时间必须为正数");
         }
-        if (image == null || image.getLqTimeoutSeconds() <= 0 || image.getMaxInflightPixels() <= 0) {
-            throw new IllegalArgumentException("worker.image LQ 超时与在途像素预算必须为正数");
+        if (image == null || image.getLqTimeoutSeconds() <= 0 || image.getMaxInflightPixels() <= 0
+                || image.getMaxLongEdge() <= 0 || image.getMaxLongEdge() > 16_383) {
+            throw new IllegalArgumentException("worker.image LQ 超时、最大长边与在途像素预算范围无效");
         }
         if (media == null || media.getFfprobeTimeoutSeconds() <= 0) {
             throw new IllegalArgumentException("worker.media.ffprobeTimeoutSeconds 必须为正数");
