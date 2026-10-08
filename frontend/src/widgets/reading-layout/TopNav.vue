@@ -53,13 +53,11 @@
         <router-link to="/library" class="nav-link" active-class="active">漫画库</router-link>
         <router-link to="/history" class="nav-link" active-class="active">阅读历史</router-link>
         <router-link to="/favorites" class="nav-link" active-class="active">喜欢</router-link>
-        <span v-if="!isPublicReading" class="nav-divider" aria-hidden="true" />
-        <router-link v-if="!isPublicReading" to="/manage" class="nav-link nav-link--management" active-class="active">
-          仓库管理
-        </router-link>
+        <span class="nav-divider" aria-hidden="true" />
+        <router-link to="/manage" class="nav-link nav-link--management" active-class="active"> 仓库管理 </router-link>
       </nav>
 
-      <div v-if="!isPublicReading" class="desktop-context">
+      <div class="desktop-context">
         <router-link to="/manage/import" class="import-btn desktop-action" aria-label="在桌面端导入漫画">
           <el-icon :size="18"><UploadFilled /></el-icon>
           <span>导入漫画</span>
@@ -93,7 +91,6 @@
 
 <script setup lang="ts">
 import { AppButton } from '@/shared/ui/button'
-import { isPublicReading } from '@/shared/config/access'
 // TopNav 是应用级业务组合组件，保留导入状态协作；components 目录不因此整体成为业务层。
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'

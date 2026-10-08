@@ -16,7 +16,15 @@ $forbiddenPaths = @(
     'frontend/test-fixtures',
     'scripts/dev',
     'scripts/qa',
-    'tools/migration'
+    'tools/migration',
+    'tools/maintenance/manage-remote-infra-frp.ps1',
+    'tools/maintenance/manage-public-reading.ps1',
+    'tools/maintenance/public-reading-nginx.conf.template',
+    'tools/maintenance/backup-remote-mysql.ps1',
+    'docs/operations/frp-infrastructure.md',
+    'docs/operations/public-reading.md',
+    'site/personal-blog',
+    'frontend/src/shared/config/access.ts'
 )
 
 if ($Ref) {

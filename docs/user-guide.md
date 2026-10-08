@@ -1,6 +1,6 @@
 # ComicAtlas 用户指南
 
-本文面向第一次部署和使用 ComicAtlas 的用户，覆盖当前版本的常用流程。2.2.0 首次安装与升级请优先按[项目首页](../README.md)操作，本机应用需加载 docker-compose.local.yml 并预先建立 Worker 只读账号。
+本文面向第一次部署和使用 ComicAtlas 的用户，覆盖当前版本的常用流程。首次安装与升级请按[项目首页](../README.md)操作，使用单一 docker-compose.yml，并预先建立 Worker 只读账号。
 
 > 当前已实现的存储维护功能包括：导入、导出、HQ 删除、LQ 生成、视频转码、刷新元数据、媒体上传/替换、扫盘恢复、回收站和批量操作；部署与数据库账号等运维细节见[部署运维](operations/management.md)。
 
@@ -33,100 +33,43 @@
 - **死信管理**：查看消息积压、重放可恢复消息或清理确认无用的死信。
 - **回收站与批量操作**：恢复、永久清理和跨页批量维护。
 
-## 一、部署前准备
+## 一、Docker 本地部署与配置
 
-ComicAtlas 由前端、Gateway、阅读服务、管理服务、Worker、MySQL、Redis、RabbitMQ、Nacos 和 Nginx 组成。漫画文件由 Worker 写入本地存储，Nginx 以只读方式向浏览器提供文件。
+首次安装、配置环境变量、创建 Worker 只读账号和启动步骤统一以[项目首页](../README.md)为准。
 
-准备以下环境：
+用户只需安装 Docker Desktop 或 Docker Engine 与 Compose 插件。MySQL、Redis、RabbitMQ、Nacos、应用服务与 Nginx 都在本机运行；应用通过容器网络连接基础设施。
 
-- Docker Desktop（Windows）或 Docker Engine（Linux）
-- MySQL 8
-- Redis
-- RabbitMQ
-- Nacos 2.x
-- 可写的漫画存储目录，例如 `F:/manga`
+1. 将 .env.example 复制为 .env，填写 MANGA_ROOT、MySQL、Redis 和 RabbitMQ 密码。
+2. 创建存储目录并启动本地基础设施：
 
-Windows 用户建议使用正斜杠书写路径，例如 `F:/manga`，并确认 Docker Desktop 已共享该磁盘。
+       docker compose up -d --wait mysql redis rabbitmq nacos
 
-## 二、配置存储和基础设施
+3. 按首页步骤创建 Worker 仅有 SELECT 权限的数据库账号，再启动应用：
 
-将项目根目录的 `.env.example` 复制为 `.env`，再按分组填写实际值：
+       docker compose up -d --build --wait
+       docker compose ps
 
-```dotenv
-MANGA_ROOT=F:/manga
-REMOTE_INFRA_HOST=host.docker.internal
-MYSQL_ROOT_PASSWORD=请设置强密码
-API_MYSQL_USER=comicatlas_api
-API_MYSQL_PASSWORD=请设置强密码
-WORKER_MYSQL_USER=comicatlas_ro
-WORKER_MYSQL_PASSWORD=请设置另一组强密码
-REMOTE_NACOS_USER=nacos
-REMOTE_NACOS_PASSWORD=nacos
-REMOTE_REDIS_PASSWORD=请设置强密码
-REMOTE_RABBITMQ_USER=comicatlas
-REMOTE_RABBITMQ_PASSWORD=请设置强密码
-FRP_SERVER_ADDR=远端服务器公网地址
-FRP_SERVER_PORT=7000
-FRP_DASHBOARD_PORT=7500
-```
+4. 打开 [漫画库](http://localhost) 或 [管理后台](http://localhost/manage)。导入源必须位于 MANGA_ROOT 内。
 
-基础设施默认使用 MySQL 3306、Redis 6379、RabbitMQ 5672/15672、Nacos 8848/9848；端口不同时再设置对应的 `REMOTE_*_PORT`。
-
-创建目录：
-
-```text
-F:/manga/hq
-F:/manga/lq
-F:/manga/thumbs
-F:/manga/metadata
-F:/manga/staging
-F:/manga/trash
-F:/manga/export
-```
-
-> `staging` 为上传临时目录（由 API 写入、不经 Nginx 暴露）；`trash` 为回收站文件卷（存放软删除后移入的文件，保留期由 `trash.retention-days` 配置，默认 `0` 表示可立即清理）。
-
-基础服务与项目服务使用不同的 Compose 文件。需要在当前主机运行基础服务时执行：
-
-```bash
-docker compose -f docker-compose.infra.yml up -d
-docker compose -f docker-compose.infra.yml ps
-```
-
-基础服务准备好后，再启动项目服务：
-
-```bash
-docker compose -f docker-compose.infra.yml -f docker-compose.yml -f docker-compose.local.yml up -d --build --wait
-docker compose -f docker-compose.yml ps
-```
-
-访问地址：
-
-- 用户端：`http://localhost`
-- 管理后台：`http://localhost/manage`
-- Gateway（统一 API 入口）：`http://localhost:8000`
-
-Gateway 会把阅读端 `/api/**` 请求转给阅读服务，把管理端 `/api/manage/**` 请求优先转给管理服务；浏览器和前端只需访问 Gateway，不直接访问两个服务端口。
-
-`docker-compose.infra.yml` 包含 MySQL、Redis、RabbitMQ 和 Nacos。远端宿主映射端口全部来自 `.env` 的 `REMOTE_*_PORT`，并只绑定主机回环地址；项目服务与 FRP 读取同一组端口变量。如果基础设施运行在远程主机，本地不启动该文件；使用 `tools/maintenance/manage-remote-infra-frp.ps1` 建立 FRP STCP 连接，让项目容器通过 `REMOTE_INFRA_HOST` 访问宿主机映射端口。完整配置见 [FRP 基础设施连接](operations/frp-infrastructure.md)。
+所有应用及基础设施的宿主端口均绑定 127.0.0.1。修改宿主端口不改变容器内部的服务地址。停止应用可用 docker compose stop；不要使用 down -v 删除数据库等持久化数据卷。
 
 ### 可信本机部署
 
 管理端接口（回收站、永久清理、批量操作、DLQ）默认不开启业务鉴权，因此 ComicAtlas 只适合部署在**可信本机**：
 
 - 只在本机或受控内网使用，不要把 Gateway 或 `.env` 中的数据库、管理台、注册中心端口直接暴露到公网。
-- 基础设施容器只绑定回环地址（见 `docker-compose.infra.yml`），远程访问通过带 token、STCP secret 和 TLS 的 FRP visitor。
+- 基础设施仅绑定本机回环地址，应用服务通过容器内部网络连接。
 - 管理后台 `/manage` 建议配合宿主机防火墙或反向代理做访问限制。
 - 生产使用前先阅读[部署运维](operations/management.md)中的账号、备份与升级说明。
 
-## 三、导入漫画
+## 二、导入漫画
 
 ### 1. ZIP 导入
 
 打开管理后台的“导入”，选择 ZIP 来源并填写宿主机路径，例如：
 
 ```text
-D:/downloads/comic.zip
+F:/manga/import/comic.zip
 ```
 
 提交后，任务会进入任务中心。Worker 会解压、解析目录、分析媒体并把文件搬入 MANAGED 存储。
@@ -134,9 +77,9 @@ D:/downloads/comic.zip
 **标准分卷 ZIP（`.z01`/`.z02`/… + `.zip`）**：分卷文件必须**同目录、同 basename**，`sourcePath` 一律填**最后一个 `.zip`（主文件）**，例如：
 
 ```text
-D:/downloads/comic.z01
-D:/downloads/comic.z02
-D:/downloads/comic.zip   ← sourcePath 填这个
+F:/manga/import/comic.z01
+F:/manga/import/comic.z02
+F:/manga/import/comic.zip   ← sourcePath 填这个
 ```
 
 - 缺任一卷（如存在 `.z01`/`.z03` 但缺 `.z02`）导入会直接失败；把卷补回同目录同 basename 后重试即可。
@@ -153,7 +96,7 @@ CBZ 是以 ZIP 容器保存的漫画格式。选择 CBZ 来源并填写 `.cbz` �
 选择本地目录来源，填写漫画目录，例如：
 
 ```text
-D:/downloads/ComicA
+F:/manga/import/ComicA
 ```
 
 目录中可以包含章节目录，也可以直接包含图片或视频。章节顺序以解析后的全局顺序为准。
@@ -193,7 +136,7 @@ PENDING → PARSING → IMPORTING → SUCCESS
 
 失败任务可查看错误信息并重试。导入中不建议直接移动或删除源文件及 `MANGA_ROOT/staging` 下的临时文件。
 
-## 四、浏览和阅读
+## 三、浏览和阅读
 
 ### 漫画库
 
@@ -215,7 +158,7 @@ PENDING → PARSING → IMPORTING → SUCCESS
 
 图片和视频页面会按照章节中的顺序混排显示。离开阅读器后，章节和页码会保存到阅读历史；从“阅读历史”点击“继续阅读”即可恢复。
 
-## 五、存储管理
+## 四、存储管理
 
 管理后台的“存储管理”用于查看漫画、章节、HQ/LQ 大小和文件状态。
 
@@ -356,7 +299,7 @@ MANGA_ROOT/export/{taskId}/{书名}_{id}_{时间戳}.zip   ← 主文件（最�
 
 
 
-## 六、管理后台工作流
+## 五、管理后台工作流
 
 管理后台位于 `/manage`，桌面浏览器建议宽度 768px 以上。
 
@@ -384,7 +327,7 @@ MANGA_ROOT/export/{taskId}/{书名}_{id}_{时间戳}.zip   ← 主文件（最�
 
 移动设备默认只开放阅读端；访问 `/manage` 会显示拦截提示页。管理后台请使用桌面浏览器。
 
-## 七、常见问题
+## 六、常见问题
 
 ### 页面能打开，但导入任务不动
 
@@ -432,7 +375,7 @@ MANGA_ROOT/export/{taskId}/{书名}_{id}_{时间戳}.zip   ← 主文件（最�
 
 刷新元数据是异步任务，提交时漫画必须处于 `READY` 状态。按钮在以下情况禁用：漫画处于 `REFRESHING`（刷新进行中）、其他非 `READY` 状态（如导入、回收），或本次刷新已提交待完成。服务端对非 `READY` 或并发占用会返回 `409` 并附带原因说明。
 
-## 八、数据安全建议
+## 七、数据安全建议
 
 - 定期备份 MySQL 数据库和 `MANGA_ROOT` 目录。
 - 永久清理（purge）不可恢复，执行前请确认备份状态；进入回收站的对象在配置的保留期内仍可恢复。

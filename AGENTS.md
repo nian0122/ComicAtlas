@@ -23,8 +23,7 @@ comic-atlas/
 ├── tools/                   # migration/maintenance/vendor 迁移、维护与第三方二进制
 ├── docs/                    # 文档中心（入口 docs/README.md：api/user-guide/development-guide + architecture/operations/releases 等专题）
 ├── nginx.conf               # /files/{root}/{path} → alias /storage/{root}/
-├── docker-compose.yml       # 项目服务：Gateway + API + Reading + Nginx
-└── docker-compose.infra.yml # 基础设施：MySQL + Redis + RabbitMQ + Nacos
+└── docker-compose.yml       # 用户本地部署：全部应用 + MySQL + Redis + RabbitMQ + Nacos + Nginx
 ```
 
 ## 后端代码分类与解耦标记
@@ -381,6 +380,7 @@ git merge --no-ff feature/<功能名称> -m "合入 <功能名称>"
 
 - `develop` 是研发完整工作区；允许保留 Maven Wrapper、开发启动脚本、QA 配置、E2E/测试夹具和迁移工具。
 - `main` 是部署树，禁止跟踪以下研发路径：`.mvn/`、`mvnw`、`mvnw.cmd`、`docker-compose.test.yml`、`e2e/`、`frontend/e2e/`、`frontend/e2e-legacy/`、`frontend/test-fixtures/`、`scripts/dev/`、`scripts/qa/`、`tools/migration/`。
+- `main` 仅支持用户 Docker 本地部署；FRP、远端基础设施连接/备份脚本、公网阅读代理、个人站点及前端公网专用开关只保留在 `develop`，禁止进入正式发布树。应用和基础设施通过容器服务名互通，宿主端口仅绑定 `127.0.0.1`。
 - 禁止直接将 `develop` 整体合并到 `main`。发布负责人必须从 `main` 创建 `release/<版本>` 或 `hotfix/<名称>`，只拣选已验证的运行、部署、文档和发布门禁变更；研发文件继续留在 `develop`。
 - 候选发布分支合入 `main` 前，以及合入 `main` 后、打标签与推送前，均必须执行 `pwsh -NoProfile -File scripts/release/verify-release-tree.ps1`。任何命中均阻断发布，删除或移回 `develop` 后才可继续。
 - 热修复合入 `main` 后，回流 `develop` 时不得以“同步 main”为由删除开发工具；只回流运行代码、文档和对应修复。

@@ -2,21 +2,21 @@
 
 个人漫画仓库：导入 ZIP、CBZ、本地目录，管理漫画与章节，阅读图片和视频，记录进度与喜欢，维护存储和回收站。
 
-main 是面向用户的稳定部署分支，只包含应用源码、生产构建配置、部署文件和文档。测试、演示页面、开发启动脚本和迁移工具保留在 develop / feature 分支。用户只需安装 Docker，无需安装 Java、Node.js、Maven 或启动开发服务器。
+main 是面向用户的 Docker 本地部署分支，只包含应用源码、生产构建配置、部署文件和文档。测试、演示页面、开发启动脚本和迁移工具保留在 develop / feature 分支。用户只需安装 Docker，无需安装 Java、Node.js、Maven 或启动开发服务器。
 
 ## 首次安装（本机基础设施）
 
 1. 安装并启动 Docker Desktop（Windows）或 Docker Engine 与 Compose 插件（Linux）。
-2. 下载本版本源码包并解压，或检出 v2.2.0。进入项目目录，将 .env.example 复制为 .env。
-3. 设置 MANGA_ROOT 为实际存储绝对路径（Windows 示例 F:/manga，Linux 示例 /data/manga），填写 MYSQL_ROOT_PASSWORD、API_MYSQL_PASSWORD、WORKER_MYSQL_PASSWORD、REMOTE_REDIS_PASSWORD、REMOTE_RABBITMQ_USER / PASSWORD、REMOTE_NACOS_USER / PASSWORD。首次本机安装无需填写 FRP 和公网入口参数。
+2. 下载 main 分支的部署源码包并解压，或检出 main。进入项目目录，将 .env.example 复制为 .env。
+3. 设置 MANGA_ROOT 为实际存储绝对路径（Windows 示例 F:/manga，Linux 示例 /data/manga），填写 MYSQL_ROOT_PASSWORD、API_MYSQL_PASSWORD、WORKER_MYSQL_PASSWORD、REDIS_PASSWORD、RABBITMQ_USER / RABBITMQ_PASSWORD。全部基础设施在本机 Docker 内运行，无需服务器、隧道或注册中心账号。
 4. 在存储根下创建 hq、lq、thumbs、metadata、staging、trash、export、import 目录。待导入漫画放入 import；Worker 容器只看得到 MANGA_ROOT 内的文件。
 5. 启动基础设施：
 
-       docker compose -f docker-compose.infra.yml up -d --wait
+       docker compose up -d --wait mysql redis rabbitmq nacos
 
 6. 创建 Worker 只读数据库账号。执行下列命令并输入 .env 中的 MySQL root 密码：
 
-       docker compose -f docker-compose.infra.yml exec mysql mysql -uroot -p
+       docker compose exec mysql mysql -uroot -p
 
    在 MySQL 中执行以下 SQL，将账号和密码替换为 .env 中 WORKER_MYSQL_USER / WORKER_MYSQL_PASSWORD 的实际值；密码含单引号时需按 SQL 规则转义：
 
@@ -28,12 +28,12 @@ main 是面向用户的稳定部署分支，只包含应用源码、生产构建
 
 7. 构建并启动应用：
 
-       docker compose -f docker-compose.infra.yml -f docker-compose.yml -f docker-compose.local.yml up -d --build --wait
+       docker compose up -d --build --wait
 
 8. 打开 [漫画库](http://localhost) 或 [管理后台](http://localhost/manage)。首次构建会下载镜像和依赖，需要网络连接。查看状态与故障：
 
-       docker compose -f docker-compose.infra.yml -f docker-compose.yml -f docker-compose.local.yml ps
-       docker compose -f docker-compose.infra.yml -f docker-compose.yml -f docker-compose.local.yml logs --tail=100 api-service worker-service gateway reading-service
+       docker compose ps
+       docker compose logs --tail=100 api-service worker-service gateway reading-service
 
 基础设施只绑定宿主机回环地址，本机应用通过容器服务名连接。管理端面向可信个人环境，默认无业务鉴权；不要直接将管理后台或 Gateway 暴露到公网。
 
@@ -47,13 +47,11 @@ main 是面向用户的稳定部署分支，只包含应用源码、生产构建
 
 ## 可选配置
 
-- 使用已有远端基础设施：填写 .env 的 REMOTE_* 参数，按[FRP 基础设施连接](docs/operations/frp-infrastructure.md)配置连接，仅执行 docker compose -f docker-compose.yml up -d --build --wait，不加载本机覆盖文件。
 - AI 分析默认连接 AI_BASE_URL；本地模型需另备兼容 NVIDIA GPU、驱动和模型文件，使用 local-ai profile。普通漫画导入和阅读不依赖本地模型。
-- 公网只读入口默认关闭；按[公网阅读部署](docs/operations/public-reading.md)配置独立过滤入口，不能直接映射管理站。
 
 ## 升级与备份
 
-升级前暂停任务并备份数据库和整个 MANGA_ROOT。保留 .env，替换为新版本文件后重复应用启动命令。API 启动时执行 Flyway 迁移；先确认 API 健康，再检查阅读和任务功能。数据库升级后的回退必须配套恢复升级前数据库备份。不要使用 docker compose down -v 删除数据卷。
+升级前暂停任务并备份数据库和整个 MANGA_ROOT。保留实际账号密码，按新版 .env.example 核对变量后重复应用启动命令。旧版 REMOTE_REDIS_PASSWORD、REMOTE_RABBITMQ_USER、REMOTE_RABBITMQ_PASSWORD 分别改为 REDIS_PASSWORD、RABBITMQ_USER、RABBITMQ_PASSWORD；存量 Docker 数据卷继续使用原账号密码，配置文件不会自动修改它们。API 启动时执行 Flyway 迁移；先确认 API 健康，再检查阅读和任务功能。数据库升级后的回退必须配套恢复升级前数据库备份。不要使用 docker compose down -v 删除数据卷。
 
 ## 文档
 

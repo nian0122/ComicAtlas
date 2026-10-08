@@ -14,7 +14,6 @@
 | [后端三层架构检查](architecture/backend-layer-audit.md) | 接口层越界、持久化框架类型泄漏和处理约束 |
 | [后端实现问题标记](architecture/backend-implementation-issues.md) | 状态并发、事务、计算与异常处理问题 |
 | [部署运维](operations/management.md) | 部署、升级与故障处理 |
-| [公网阅读](operations/public-reading.md) | FRP 阅读入口、访问白名单与进度保存 |
 | [发布说明](releases/v2.2.0.md) | 当前稳定版 v2.2.0；旧版本见 `releases/` |
 | [Java 命名规范](development/java-naming.md) | 开发约定 |
 | [`development/export-performance.md`](development/export-performance.md) | 导出压缩策略、完整性校验与性能基准 |

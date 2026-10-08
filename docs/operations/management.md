@@ -4,7 +4,7 @@
 **状态：** 生效
 **维护者：** ComicAtlas 运维组
 
-> 适用版本：v2.1。配套文档：[用户指南](../user-guide.md)、[API 文档](../api.md)。所有命令示例均可在 `develop` 分支的 `scripts/qa/verify-management-docs.ps1` 中校验。
+> 适用范围：main 分支的 Docker 本地部署。配套文档：[用户指南](../user-guide.md)、[API 文档](../api.md)。所有命令示例均可在 `develop` 分支的 `scripts/qa/verify-management-docs.ps1` 中校验。
 
 本手册覆盖管理控制台（回收站、批量操作、媒体上传、任务中心）上线后所需的运维知识：数据库账号、存储卷、保留期、磁盘阈值、备份、升级与回滚。
 
@@ -19,7 +19,7 @@ ComicAtlas 分为阅读服务、管理服务与 Worker 三类进程。阅读服�
 | API 写账号 | 全部 DDL/DML（库级） | 管理服务读写业务表、outbox/inbox、管理任务；阅读服务写 `reading_history` | 由管理服务执行 Flyway 迁移，`GRANT ALL` |
 | Worker 只读账号（`comicatlas_ro`，生产默认） | 仅 `SELECT` | Worker 文件处理侧只读查询（导出、扫描、转码状态读取） | HikariCP `read-only=true` + `GRANT SELECT` 双层兜底 |
 
-仓库级 `.env` 按服务角色命名：管理服务与阅读服务共用 `API_MYSQL_USER` / `API_MYSQL_PASSWORD`，Worker 使用 `WORKER_MYSQL_USER` / `WORKER_MYSQL_PASSWORD`。Docker Compose 和开发启动脚本只在启动具体 JVM 时，将对应账号映射为 Spring 通用变量 `MYSQL_USER` / `MYSQL_PASS`，避免 Worker 误用写账号。
+仓库级 `.env` 按服务角色命名：管理服务与阅读服务共用 `API_MYSQL_USER` / `API_MYSQL_PASSWORD`，Worker 使用 `WORKER_MYSQL_USER` / `WORKER_MYSQL_PASSWORD`。Docker Compose 在启动具体 JVM 时，将对应账号映射为 Spring 通用变量 `MYSQL_USER` / `MYSQL_PASS`，避免 Worker 误用写账号。
 
 ### 最小授权示例（MySQL 8）
 
@@ -161,10 +161,10 @@ foreach ($volumeName in @('hq', 'lq', 'thumbs', 'metadata')) {
 git pull origin main
 
 # 2. 重新构建并滚动重启（Flyway 自动执行尚未应用的迁移）
-docker compose -f docker-compose.yml up -d --build
+docker compose up -d --build
 
 # 3. 观察迁移与健康状态
-docker compose -f docker-compose.yml ps
+docker compose ps
 docker compose logs -f api-service reading-service gateway
 ```
 
@@ -197,7 +197,7 @@ Flyway 会按版本号顺序执行 `api-service/src/main/resources/db/flyway/` �
 
 ```bash
 git checkout <上一个稳定 tag>
-docker compose -f docker-compose.yml up -d --build
+docker compose up -d --build
 ```
 
 3. **注意事项**：
@@ -225,6 +225,6 @@ docker compose -f docker-compose.yml up -d --build
 ## 八、安全基线
 
 - 管理端接口默认无鉴权：只部署在可信本机，管理端口不暴露公网。
-- RabbitMQ 管理台与 Nacos 使用 `.env` 中对应的 `REMOTE_*_PORT`，并只绑定回环地址。
+- RabbitMQ 管理台与 Nacos 使用 `.env` 中的 `RABBITMQ_MANAGEMENT_PORT`、`NACOS_HTTP_PORT` / `NACOS_GRPC_PORT`，并只绑定本机回环地址。
 - 不要把 `.env`、数据库密码、远程凭据提交到 Git 或写入文档。
 - 定期轮换 `MYSQL_ROOT_PASSWORD` 等基础设施密码。
