@@ -51,8 +51,10 @@ public class SevenZipArchiveReader implements ArchiveReader {
                         .map(item -> item.substring(item.length() - 2))
                         .filter(item -> item.matches("\\d{2}"))
                         .mapToInt(Integer::parseInt).max().orElse(0);
-            } catch (IOException ignored) {
-                // open() 会给出更明确的文件错误。
+            } catch (IOException exception) {
+                // 目录枚举失败时保守地只尝试主文件，open() 会给出更明确的文件错误。
+                org.slf4j.LoggerFactory.getLogger(SevenZipArchiveReader.class)
+                        .debug("扫描 RAR 分卷失败，回退主文件: {}", archive.getFileName(), exception);
             }
             for (int index = 0; index <= lastVolume; index++) {
                 volumes.add(archive.resolveSibling(base + ".r" + String.format("%02d", index)));
@@ -210,6 +212,7 @@ public class SevenZipArchiveReader implements ArchiveReader {
                 process.waitFor(2, TimeUnit.SECONDS);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
+                process.destroyForcibly();
             }
         }
     }

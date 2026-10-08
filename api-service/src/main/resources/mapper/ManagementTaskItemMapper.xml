@@ -1,22 +1,66 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.comicatlas.api.management.mapper.ManagementTaskItemMapper">
-
-    <!--
-      目标归属任务 ID 查询：item 直接命中 target_id，或 item 目标（章节/媒体）归属于该目标。
-      漫画级操作（LQ/HQ/转码）的任务项是章节/媒体级，字面 target_id 反查会漏掉父漫画，
-      必须把 CHAPTER→chapter.comic_id、MEDIA→page.chapter.comic_id 解析进归属。
-    -->
-    <select id="selectTaskIdsByTarget" resultType="java.lang.Long">
-        SELECT DISTINCT i.task_id
-        FROM management_task_item i
-        WHERE i.target_id = #{targetId}
-           OR (i.target_type = 'CHAPTER'
-               AND i.target_id IN (SELECT id FROM chapter WHERE comic_id = #{targetId}))
-           OR (i.target_type = 'MEDIA'
-               AND i.target_id IN (SELECT p.id FROM page p
-                                   JOIN chapter c ON c.id = p.chapter_id
-                                   WHERE c.comic_id = #{targetId}))
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.comicatlas.api.task.persistence.mapper.ManagementTaskItemMapper">
+    <select id="countActiveMetadataItems" resultType="long">
+        SELECT COUNT(*)
+        FROM management_task_item item
+        LEFT JOIN chapter target_chapter
+            ON item.target_type = 'CHAPTER' AND target_chapter.id = item.target_id
+        WHERE item.task_id = #{taskId}
+          AND item.operation_type = 'METADATA_REFRESH'
+          AND item.status IN ('QUEUED', 'RUNNING', 'CANCELLING')
+          AND (
+              (item.target_type = 'COMIC' AND item.target_id = #{comicId})
+              OR (item.target_type = 'CHAPTER' AND target_chapter.comic_id = #{comicId})
+          )
     </select>
 
+    <select id="selectTaskIdsByComicId" resultType="java.lang.Long">
+        SELECT DISTINCT item.task_id
+        FROM management_task_item item
+        LEFT JOIN chapter chapter_direct
+            ON item.target_type = 'CHAPTER' AND chapter_direct.id = item.target_id
+        LEFT JOIN page media_page
+            ON item.target_type = 'MEDIA' AND media_page.id = item.target_id
+        LEFT JOIN chapter media_chapter
+            ON media_chapter.id = media_page.chapter_id
+        WHERE (item.target_type = 'COMIC' AND item.target_id = #{comicId})
+           OR (item.target_type = 'CHAPTER' AND chapter_direct.comic_id = #{comicId})
+           OR (item.target_type = 'MEDIA' AND media_chapter.comic_id = #{comicId})
+    </select>
+
+    <update id="cancelQueuedByTask">
+        UPDATE management_task_item
+        SET status = 'CANCELLED', lock_key = NULL, completed_at = #{completedAt}, updated_at = #{updatedAt}
+        WHERE task_id = #{taskId} AND status = 'QUEUED'
+    </update>
+
+    <update id="resetForRetry">
+        UPDATE management_task_item
+        SET status = 'QUEUED', attempt = #{attempt}, progress = 0, error_message = NULL,
+            started_at = NULL, completed_at = NULL, lock_key = #{lockKey}, updated_at = #{updatedAt}
+        WHERE id = #{itemId}
+    </update>
+
+    <update id="updateStatusIfActive">
+        UPDATE management_task_item
+        SET status = #{newStatus}, updated_at = #{updatedAt}
+        <if test="startedAt != null">, started_at = #{startedAt}</if>
+        <if test="completedAt != null">, completed_at = #{completedAt}, lock_key = NULL</if>
+        <if test="errorMessage != null">, error_message = #{errorMessage}</if>
+        <if test="resultRefType != null">, result_ref_type = #{resultRefType}</if>
+        <if test="resultRefId != null">, result_ref_id = #{resultRefId}</if>
+        WHERE id = #{itemId}
+          AND status NOT IN ('SUCCEEDED', 'PARTIALLY_SUCCEEDED', 'FAILED', 'CANCELLED')
+          <choose><when test="attempt == null">AND attempt IS NULL</when><otherwise>AND attempt = #{attempt}</otherwise></choose>
+    </update>
+
+    <update id="updateProgressIfActive">
+        UPDATE management_task_item
+        SET progress = #{progress}, updated_at = #{updatedAt}
+        <if test="startItem">, status = 'RUNNING', started_at = #{startedAt}</if>
+        WHERE id = #{itemId}
+          AND status NOT IN ('SUCCEEDED', 'PARTIALLY_SUCCEEDED', 'FAILED', 'CANCELLED')
+          <choose><when test="attempt == null">AND attempt IS NULL</when><otherwise>AND attempt = #{attempt}</otherwise></choose>
+    </update>
 </mapper>

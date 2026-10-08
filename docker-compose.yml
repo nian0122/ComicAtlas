@@ -9,15 +9,16 @@ services:
     extra_hosts:
       # Docker Desktop 可能将 host.docker.internal 解析为不可达 IPv6；Nacos gRPC 必须固定走宿主 IPv4。
       - "host.docker.internal:host-gateway"
+      - "nacos.docker.gateway:host-gateway"
     ports:
       - "8000:8000"
     environment:
-      JAVA_TOOL_OPTIONS: "-Xms128m -Xmx256m"
-      NACOS_ADDR: ${REMOTE_INFRA_HOST:?请设置 REMOTE_INFRA_HOST}:${REMOTE_NACOS_HTTP_PORT:?请设置 REMOTE_NACOS_HTTP_PORT}
+      JAVA_TOOL_OPTIONS: "-Xms128m -Xmx256m -Djava.net.preferIPv4Stack=true -Djava.net.preferIPv4Addresses=true"
+      NACOS_ADDR: nacos.docker.gateway:${REMOTE_NACOS_HTTP_PORT:-8848}
       NACOS_USER: ${REMOTE_NACOS_USER:?请设置 REMOTE_NACOS_USER}
       NACOS_PASS: ${REMOTE_NACOS_PASSWORD:?请设置 REMOTE_NACOS_PASSWORD}
     healthcheck:
-      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:8000/actuator/health"]
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8000/actuator/health"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -33,28 +34,29 @@ services:
     extra_hosts:
       # Docker Desktop 可能将 host.docker.internal 解析为不可达 IPv6；Nacos gRPC 必须固定走宿主 IPv4。
       - "host.docker.internal:host-gateway"
+      - "nacos.docker.gateway:host-gateway"
     environment:
-      JAVA_TOOL_OPTIONS: "-Xms128m -Xmx384m"
-      NACOS_ADDR: ${REMOTE_INFRA_HOST:?请设置 REMOTE_INFRA_HOST}:${REMOTE_NACOS_HTTP_PORT:?请设置 REMOTE_NACOS_HTTP_PORT}
+      JAVA_TOOL_OPTIONS: "-Xms128m -Xmx384m -Duser.timezone=UTC -Djava.net.preferIPv4Stack=true -Djava.net.preferIPv4Addresses=true"
+      NACOS_ADDR: nacos.docker.gateway:${REMOTE_NACOS_HTTP_PORT:-8848}
       NACOS_USER: ${REMOTE_NACOS_USER:?请设置 REMOTE_NACOS_USER}
       NACOS_PASS: ${REMOTE_NACOS_PASSWORD:?请设置 REMOTE_NACOS_PASSWORD}
       MYSQL_HOST: ${REMOTE_INFRA_HOST:?请设置 REMOTE_INFRA_HOST}
-      MYSQL_PORT: ${REMOTE_MYSQL_PORT:?请设置 REMOTE_MYSQL_PORT}
+      MYSQL_PORT: ${REMOTE_MYSQL_PORT:-3306}
       MYSQL_USER: ${API_MYSQL_USER:?请在 .env 中设置 API_MYSQL_USER}
       MYSQL_PASS: ${API_MYSQL_PASSWORD:?请在 .env 中设置 API_MYSQL_PASSWORD}
       REDIS_HOST: ${REMOTE_INFRA_HOST:?请设置 REMOTE_INFRA_HOST}
-      REDIS_PORT: ${REMOTE_REDIS_PORT:?请设置 REMOTE_REDIS_PORT}
+      REDIS_PORT: ${REMOTE_REDIS_PORT:-6379}
       REDIS_PASS: ${REMOTE_REDIS_PASSWORD:?请设置 REMOTE_REDIS_PASSWORD}
       RABBITMQ_HOST: ${REMOTE_INFRA_HOST:?请设置 REMOTE_INFRA_HOST}
-      RABBITMQ_PORT: ${REMOTE_RABBITMQ_PORT:?请设置 REMOTE_RABBITMQ_PORT}
-      RABBITMQ_MANAGEMENT_PORT: ${REMOTE_RABBITMQ_MANAGEMENT_PORT:?请设置 REMOTE_RABBITMQ_MANAGEMENT_PORT}
+      RABBITMQ_PORT: ${REMOTE_RABBITMQ_PORT:-5672}
+      RABBITMQ_MANAGEMENT_PORT: ${REMOTE_RABBITMQ_MANAGEMENT_PORT:-15672}
       RABBITMQ_USER: ${REMOTE_RABBITMQ_USER:?请设置 REMOTE_RABBITMQ_USER}
       RABBITMQ_PASS: ${REMOTE_RABBITMQ_PASSWORD:?请设置 REMOTE_RABBITMQ_PASSWORD}
       SPRING_SECURITY_USER_NAME: ${REMOTE_RABBITMQ_USER:?请设置 REMOTE_RABBITMQ_USER}
       SPRING_SECURITY_USER_PASSWORD: ${REMOTE_RABBITMQ_PASSWORD:?请设置 REMOTE_RABBITMQ_PASSWORD}
       MANGA_ROOT: /storage
     healthcheck:
-      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:8010/actuator/health"]
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8010/actuator/health"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -77,22 +79,23 @@ services:
     extra_hosts:
       # Docker Desktop 可能将 host.docker.internal 解析为不可达 IPv6；Nacos gRPC 必须固定走宿主 IPv4。
       - "host.docker.internal:host-gateway"
+      - "nacos.docker.gateway:host-gateway"
     environment:
-      JAVA_TOOL_OPTIONS: "-Xms128m -Xmx320m"
-      NACOS_ADDR: ${REMOTE_INFRA_HOST:?请设置 REMOTE_INFRA_HOST}:${REMOTE_NACOS_HTTP_PORT:?请设置 REMOTE_NACOS_HTTP_PORT}
+      JAVA_TOOL_OPTIONS: "-Xms128m -Xmx320m -Djava.net.preferIPv4Stack=true -Djava.net.preferIPv4Addresses=true"
+      NACOS_ADDR: nacos.docker.gateway:${REMOTE_NACOS_HTTP_PORT:-8848}
       NACOS_USER: ${REMOTE_NACOS_USER:?请设置 REMOTE_NACOS_USER}
       NACOS_PASS: ${REMOTE_NACOS_PASSWORD:?请设置 REMOTE_NACOS_PASSWORD}
       MYSQL_HOST: ${REMOTE_INFRA_HOST:?请设置 REMOTE_INFRA_HOST}
-      MYSQL_PORT: ${REMOTE_MYSQL_PORT:?请设置 REMOTE_MYSQL_PORT}
+      MYSQL_PORT: ${REMOTE_MYSQL_PORT:-3306}
       # 阅读服务写入阅读进度（reading_history），需使用具备读写权限的 API 账号
       MYSQL_USER: ${API_MYSQL_USER:?请在 .env 中设置 API_MYSQL_USER}
       MYSQL_PASS: ${API_MYSQL_PASSWORD:?请在 .env 中设置 API_MYSQL_PASSWORD}
       REDIS_HOST: ${REMOTE_INFRA_HOST:?请设置 REMOTE_INFRA_HOST}
-      REDIS_PORT: ${REMOTE_REDIS_PORT:?请设置 REMOTE_REDIS_PORT}
+      REDIS_PORT: ${REMOTE_REDIS_PORT:-6379}
       REDIS_PASS: ${REMOTE_REDIS_PASSWORD:?请设置 REMOTE_REDIS_PASSWORD}
       MANGA_ROOT: /storage
     healthcheck:
-      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:8011/actuator/health"]
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8011/actuator/health"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -108,23 +111,26 @@ services:
       dockerfile: worker-service/Dockerfile
     # JVM 与四路图片解码/WebP 编码共用容器内存；像素预算会对大图自动降并发。
     mem_limit: 2g
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+      - "nacos.docker.gateway:host-gateway"
     container_name: comicatlas-worker
     restart: unless-stopped
     environment:
-      JAVA_TOOL_OPTIONS: "-Xms128m -Xmx384m"
-      NACOS_ADDR: ${REMOTE_INFRA_HOST:?请设置 REMOTE_INFRA_HOST}:${REMOTE_NACOS_HTTP_PORT:?请设置 REMOTE_NACOS_HTTP_PORT}
+      JAVA_TOOL_OPTIONS: "-Xms128m -Xmx384m -Djava.net.preferIPv4Stack=true -Djava.net.preferIPv4Addresses=true"
+      NACOS_ADDR: nacos.docker.gateway:${REMOTE_NACOS_HTTP_PORT:-8848}
       NACOS_USER: ${REMOTE_NACOS_USER:?请设置 REMOTE_NACOS_USER}
       NACOS_PASS: ${REMOTE_NACOS_PASSWORD:?请设置 REMOTE_NACOS_PASSWORD}
       RABBITMQ_HOST: ${REMOTE_INFRA_HOST:?请设置 REMOTE_INFRA_HOST}
-      RABBITMQ_PORT: ${REMOTE_RABBITMQ_PORT:?请设置 REMOTE_RABBITMQ_PORT}
+      RABBITMQ_PORT: ${REMOTE_RABBITMQ_PORT:-5672}
       RABBITMQ_USER: ${REMOTE_RABBITMQ_USER:?请设置 REMOTE_RABBITMQ_USER}
       RABBITMQ_PASS: ${REMOTE_RABBITMQ_PASSWORD:?请设置 REMOTE_RABBITMQ_PASSWORD}
       MYSQL_HOST: ${REMOTE_INFRA_HOST:?请设置 REMOTE_INFRA_HOST}
-      MYSQL_PORT: ${REMOTE_MYSQL_PORT:?请设置 REMOTE_MYSQL_PORT}
+      MYSQL_PORT: ${REMOTE_MYSQL_PORT:-3306}
       MYSQL_USER: ${WORKER_MYSQL_USER:?请在 .env 中设置 WORKER_MYSQL_USER}
       MYSQL_PASS: ${WORKER_MYSQL_PASSWORD:?请在 .env 中设置 WORKER_MYSQL_PASSWORD}
       REDIS_HOST: ${REMOTE_INFRA_HOST:?请设置 REMOTE_INFRA_HOST}
-      REDIS_PORT: ${REMOTE_REDIS_PORT:?请设置 REMOTE_REDIS_PORT}
+      REDIS_PORT: ${REMOTE_REDIS_PORT:-6379}
       REDIS_PASS: ${REMOTE_REDIS_PASSWORD:?请设置 REMOTE_REDIS_PASSWORD}
       MANGA_ROOT: /storage
       # 前端/API 传入宿主机路径时，Worker 将其映射到容器内的共享存储路径。
@@ -134,11 +140,54 @@ services:
       FFMPEG_PATH: /usr/bin/ffmpeg
       FFPROBE_PATH: /usr/bin/ffprobe
       IMAGE_OPTIMIZER_PATH: /opt/comicatlas/tools/image-optimizer
-      LQ_WORKERS: ${LQ_WORKERS:-4}
-      LQ_MAX_INFLIGHT_PIXELS: ${LQ_MAX_INFLIGHT_PIXELS:-80000000}
+      LQ_QUALITY: ${LQ_QUALITY:-70}
+      LQ_WORKERS: ${LQ_WORKERS:-8}
+      LQ_MAX_LONG_EDGE: ${LQ_MAX_LONG_EDGE:-3840}
+      LQ_MAX_INFLIGHT_PIXELS: ${LQ_MAX_INFLIGHT_PIXELS:-160000000}
     volumes:
       # 整个 MANGA_ROOT 共享，既保证导入源路径可见，也覆盖 HQ/LQ/临时/回收站/导出目录。
       - ${MANGA_ROOT:-./manga}:/storage
+
+  comic-ai-service:
+    build:
+      context: .
+      dockerfile: comic-ai-service/Dockerfile
+    mem_limit: 768m
+    container_name: comic-ai-service
+    restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      AI_DB_HOST: ${REMOTE_INFRA_HOST:?请设置 REMOTE_INFRA_HOST}
+      AI_DB_PORT: ${REMOTE_MYSQL_PORT:-3306}
+      AI_DB_NAME: ${AI_DB_NAME:-comic_atlas}
+      AI_DB_USER: ${AI_DB_USER:-${API_MYSQL_USER}}
+      AI_DB_PASSWORD: ${AI_DB_PASSWORD:-${API_MYSQL_PASSWORD}}
+      AI_BASE_URL: ${AI_BASE_URL:-http://comic-model-service:23333/v1}
+      AI_API_KEY: ${AI_API_KEY:-local}
+      AI_MODEL: ${AI_MODEL:-OpenGVLab/InternVL3_5-2B}
+      AI_MANGA_ROOT: /manga
+      AI_SAMPLE_COUNT: ${AI_SAMPLE_COUNT:-10}
+      AI_MAX_CONCURRENT_TASKS: ${AI_MAX_CONCURRENT_TASKS:-1}
+      AI_TIMEOUT_SECONDS: ${AI_TIMEOUT_SECONDS:-120}
+    volumes:
+      - ${MANGA_ROOT:?请在 .env 中设置 MANGA_ROOT}:/manga:ro
+
+  comic-model-service:
+    image: ${AI_MODEL_IMAGE:-comicatlas-lmdeploy:local}
+    build:
+      context: .
+      dockerfile: comic-model-service/Dockerfile
+    profiles: ["local-ai"]
+    container_name: comic-model-service
+    restart: unless-stopped
+    gpus: all
+    shm_size: 2gb
+    command:
+      - python3
+      - /app/server.py
+    volumes:
+      - ${AI_MODEL_DIR:-./.runtime/models/InternVL3_5-2B}:/models/InternVL3_5-2B:ro
 
   nginx:
     build: ./frontend

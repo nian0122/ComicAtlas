@@ -1,11 +1,11 @@
 # 02 — 信息架构
 
-**更新日期：** 2026-08-16
-**状态：** 与 v2.0 路由结构同步
+**更新日期：** 2026-09-29
+**状态：** 产品信息架构；具体页面清单见 [页面与路由](04-pages.md)
 **维护者：** ComicAtlas 前端组
 
 > 定义整个系统有哪些模块、模块之间是什么关系、每个模块负责什么。
-> 路由定义见 `frontend/src/router/index.ts`：阅读端 6 条 + 管理端 8 条主页面路由（另有 `/manage/intercept` 移动端拦截页与 `/manage/storage/:id` 存储详情子页）。
+> 路由定义见 `frontend/src/app/router/index.ts`；本页的模块图用于说明产品组织，完整页面与兼容跳转见 [页面与路由](04-pages.md)。
 
 ---
 
@@ -142,7 +142,7 @@ Comic Workspace
 ├── 列表 + 筛选（keyword / category / status / tags / sourceType）
 ├── 批量选择    跨页按筛选或 ID 选择（BatchEditDialog）
 ├── 编辑页      元数据 / 标签 / 分类（乐观锁 version）
-└── 删除        默认软删除进入回收站（7 天保留期；后端 /api/trash 提供恢复与永久清理）
+└── 删除        默认软删除进入回收站（保留期可配置；后端管理接口提供恢复与永久清理）
 ```
 
 **入口**：管理后台 → 漫画工作区
@@ -151,7 +151,7 @@ Comic Workspace
 
 ### 导入与任务中心（管理端）
 
-**路由**：`/manage/import`（导入）、`/manage/import/tasks`（任务中心）
+**路由**：`/manage/import`（导入）、`/manage/tasks`（任务中心）
 
 **职责**：创建导入任务（前端 UI 提供 ZIP / DIRECTORY 来源；EHENTAI 为后端/API 能力），监控导入任务进度。
 

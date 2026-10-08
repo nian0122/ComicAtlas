@@ -1,0 +1,182 @@
+.edit-panel-heading {
+  margin-bottom: var(--space-6);
+}
+.comic-edit-page {
+  display: grid;
+  gap: var(--space-5);
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  color: var(--text-primary);
+}
+.edit-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1.55fr) minmax(280px, 0.85fr);
+  align-items: start;
+  gap: var(--space-4);
+  width: 100%;
+  max-width: none;
+  margin: 0;
+}
+.edit-main-column,
+.edit-side-column {
+  display: grid;
+  align-content: start;
+  gap: var(--space-4);
+  min-width: 0;
+}
+.field-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-5);
+}
+.edit-form .el-form-item {
+  margin-bottom: var(--space-5);
+}
+.edit-form :deep(.el-form-item__label) {
+  color: var(--text-secondary);
+  font-weight: 700;
+}
+.edit-form .el-select {
+  width: 100%;
+}
+.tag-editor {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  gap: var(--space-3);
+}
+.selected-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  min-height: 26px;
+}
+.tag-add-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr) auto;
+  align-items: stretch;
+  gap: var(--space-3);
+}
+.tag-select {
+  min-width: 0;
+}
+.tag-select :deep(.el-select__wrapper) {
+  width: 100%;
+}
+.new-tag-input {
+  min-width: 0;
+}
+.field-hint {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--text-muted);
+}
+.field-hint > .el-icon {
+  color: var(--accent);
+}
+.comicinfo-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+}
+.comicinfo-item {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+}
+.comicinfo-item span {
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+.comicinfo-item strong {
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: var(--text-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.comicinfo-summary {
+  margin: var(--space-4) 0 0;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  line-height: 1.7;
+  white-space: pre-wrap;
+}
+.comicinfo-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+}
+.source-display {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 46px;
+  padding: 0 var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--control-radius);
+  color: var(--text-muted);
+}
+.source-ref {
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.source-empty {
+  font-size: var(--text-sm);
+}
+:global(.comic-tag-popper) {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--card-shadow-hover);
+}
+.form-actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-3);
+  padding: var(--space-5) 0 var(--space-2);
+  border-top: 1px solid var(--border);
+  background: linear-gradient(to bottom, var(--bg-primary) 28%, var(--bg-primary));
+}
+.form-actions > .app-button {
+  min-height: var(--control-height);
+  padding-inline: 18px;
+}
+.form-actions > .app-button--primary {
+  min-width: 132px;
+}
+@media (max-width: 1200px) {
+  .edit-form {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 820px) {
+  .field-grid {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+  .tag-add-row {
+    align-items: center;
+  }
+  .tag-select,
+  .new-tag-input {
+    min-width: 0;
+  }
+}
+@media (max-width: 600px) {
+  .tag-add-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .tag-select {
+    grid-column: 1 / -1;
+  }
+}

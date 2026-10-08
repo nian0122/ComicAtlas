@@ -26,8 +26,8 @@
     </appender>
 
     <logger name="com.alibaba.nacos" level="INFO" />
-    <logger name="org.springframework.cloud.gateway" level="DEBUG" />
-    <logger name="org.springframework.cloud.loadbalancer" level="DEBUG" />
+    <logger name="org.springframework.cloud.gateway" level="INFO" />
+    <logger name="org.springframework.cloud.loadbalancer" level="INFO" />
 
     <root level="INFO">
         <appender-ref ref="CONSOLE" />

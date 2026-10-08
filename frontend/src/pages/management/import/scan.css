@@ -1,0 +1,246 @@
+/* ——— Tab switch ——— */
+.import-tabs {
+  display: flex;
+  gap: 0;
+  margin-bottom: var(--space-xl);
+  border-bottom: 2px solid var(--border);
+}
+
+.import-tab {
+  padding: 10px 24px;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+}
+
+.import-tab:not(.active) {
+  color: var(--text-secondary);
+}
+
+.import-tab.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+.batch-panel {
+  margin-bottom: var(--space-2xl);
+}
+
+.scan-input-row {
+  display: flex;
+  gap: var(--space-base);
+}
+
+.scan-input-row .path-input {
+  flex: 1;
+}
+
+/* Scan result area */
+.scan-result-area {
+  margin-top: var(--space-xl);
+}
+
+.scan-loading {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-xl);
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+}
+
+/* Scan results header */
+.scan-results-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-base);
+  padding-bottom: var(--space-sm);
+  border-bottom: 1px solid var(--border);
+}
+
+.check-all-links {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--text-sm);
+}
+
+.link-sep {
+  color: var(--text-muted);
+  margin: 0 2px;
+}
+
+.scan-count {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+/* Scan items list */
+.scan-items-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.scan-item {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-base);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 150ms ease;
+}
+
+.scan-item:hover {
+  border-color: var(--border-strong);
+  background: var(--bg-primary);
+}
+
+.scan-item.selected {
+  border-color: var(--accent);
+  background: var(--accent-bg);
+}
+
+.scan-item.blocked {
+  opacity: var(--disabled-opacity);
+  cursor: not-allowed;
+}
+
+.scan-item.blocked:hover {
+  border-color: var(--border);
+  background: transparent;
+}
+
+.scan-checkbox {
+  flex-shrink: 0;
+  pointer-events: auto;
+}
+
+.scan-item-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.scan-item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-base);
+  min-width: 0;
+}
+
+.scan-item-name {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scan-item-count {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.scan-item-warnings {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.blocked-reason {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--danger);
+}
+
+.scan-item-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.preview-toggle {
+  align-self: flex-start;
+}
+
+.preview-tree {
+  margin-top: var(--space-sm);
+  padding: var(--space-sm);
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-family: var(--mono);
+  font-size: var(--text-xs);
+}
+
+/* 扫描统计与警告摘要 */
+.scan-summary {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-base);
+}
+
+.scan-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-base);
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+.stat-item strong {
+  color: var(--text-primary);
+  font-weight: 700;
+}
+
+.scan-warnings {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+/* Scan actions */
+.scan-actions {
+  margin-top: var(--space-lg);
+  display: flex;
+  gap: var(--space-lg);
+  align-items: center;
+}
+
+@media (max-width: 640px) {
+  .source-types {
+    grid-template-columns: 1fr;
+  }
+  .form-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .ghost-link {
+    text-align: center;
+  }
+  .scan-stats {
+    gap: var(--space-sm);
+  }
+  .scan-item-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+  }
+  .scan-item-count {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+}

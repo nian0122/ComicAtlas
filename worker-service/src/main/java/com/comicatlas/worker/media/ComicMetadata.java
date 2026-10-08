@@ -1,65 +1,186 @@
 package com.comicatlas.worker.media;
 
-import com.comicatlas.worker.importer.metadata.MetadataAssembler;
 import com.comicatlas.common.constant.MediaTypes;
+import com.fasterxml.jackson.annotation.JsonAutoDetect;
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.math.BigDecimal;
 import java.util.List;
 
-public record ComicMetadata(
-    String title,
-    String author,
-    String category,
-    List<String> tags,
-    String description,
-    List<CatalogInfo> catalogs,
-    List<ChapterInfo> chapters
-) {
+@JsonAutoDetect(fieldVisibility = JsonAutoDetect.Visibility.ANY)
+public final class ComicMetadata {
+    private final String title;
+    private final String author;
+    private final String category;
+    private final List<String> tags;
+    private final String description;
+    private final List<CatalogInfo> catalogs;
+    private final List<ChapterInfo> chapters;
+
+    @JsonCreator
+    public ComicMetadata(@JsonProperty("title") String title, @JsonProperty("author") String author,
+                         @JsonProperty("category") String category, @JsonProperty("tags") List<String> tags,
+                         @JsonProperty("description") String description,
+                         @JsonProperty("catalogs") List<CatalogInfo> catalogs,
+                         @JsonProperty("chapters") List<ChapterInfo> chapters) {
+        this.title = title;
+        this.author = author;
+        this.category = category;
+        this.tags = tags;
+        this.description = description;
+        this.catalogs = catalogs;
+        this.chapters = chapters;
+    }
+
+    public String title() { return title; }
+    public String author() { return author; }
+    public String category() { return category; }
+    public List<String> tags() { return tags; }
+    public String description() { return description; }
+    public List<CatalogInfo> catalogs() { return catalogs; }
+    public List<ChapterInfo> chapters() { return chapters; }
+
     /** 兼容无简介字段的旧构造方式。 */
     public ComicMetadata(String title, String author, String category, List<String> tags,
                          List<CatalogInfo> catalogs, List<ChapterInfo> chapters) {
         this(title, author, category, tags, null, catalogs, chapters);
     }
-    public record CatalogInfo(
-        String title,
-        int sortOrder,
-        Integer parentIndex
-    ) {}
+    @JsonAutoDetect(fieldVisibility = JsonAutoDetect.Visibility.ANY)
+    public static final class CatalogInfo {
+        private final String title;
+        private final int sortOrder;
+        private final Integer parentIndex;
 
-    public record ChapterInfo(
-        String title,
-        String chapterNo,
-        int sortOrder,
-        int globalOrder,
-        Integer catalogIndex,
-        String sourceDir,
-        List<MediaInfo> pages
-    ) {}
+        @JsonCreator
+        public CatalogInfo(@JsonProperty("title") String title,
+                           @JsonProperty("sortOrder") int sortOrder,
+                           @JsonProperty("parentIndex") Integer parentIndex) {
+            this.title = title;
+            this.sortOrder = sortOrder;
+            this.parentIndex = parentIndex;
+        }
+
+        public String title() { return title; }
+        public int sortOrder() { return sortOrder; }
+        public Integer parentIndex() { return parentIndex; }
+    }
+
+    @JsonAutoDetect(fieldVisibility = JsonAutoDetect.Visibility.ANY)
+    public static final class ChapterInfo {
+        private final String title;
+        private final String chapterNo;
+        private final int sortOrder;
+        private final int globalOrder;
+        private final Integer catalogIndex;
+        private final String sourceDir;
+        private final List<MediaInfo> pages;
+
+        @JsonCreator
+        public ChapterInfo(@JsonProperty("title") String title,
+                           @JsonProperty("chapterNo") String chapterNo,
+                           @JsonProperty("sortOrder") int sortOrder,
+                           @JsonProperty("globalOrder") int globalOrder,
+                           @JsonProperty("catalogIndex") Integer catalogIndex,
+                           @JsonProperty("sourceDir") String sourceDir,
+                           @JsonProperty("pages") List<MediaInfo> pages) {
+            this.title = title;
+            this.chapterNo = chapterNo;
+            this.sortOrder = sortOrder;
+            this.globalOrder = globalOrder;
+            this.catalogIndex = catalogIndex;
+            this.sourceDir = sourceDir;
+            this.pages = pages;
+        }
+
+        public String title() { return title; }
+        public String chapterNo() { return chapterNo; }
+        public int sortOrder() { return sortOrder; }
+        public int globalOrder() { return globalOrder; }
+        public Integer catalogIndex() { return catalogIndex; }
+        public String sourceDir() { return sourceDir; }
+        public List<MediaInfo> pages() { return pages; }
+    }
 
     /**
      * 媒体项元数据（图片 + 视频）。
      * fieldName 取代 imageName 以兼容图片和视频。
      * 视频字段（duration/container/videoCodec/audioCodec）仅 VIDEO 媒体有值。
      */
-    public record MediaInfo(
-        String fileName,
-        int pageNumber,
-        String hqStatus,
-        String lqStatus,
-        long fileSize,
-        Integer width,
-        Integer height,
-        String mediaType,
-        BigDecimal duration,
-        String container,
-        String videoCodec,
-        String audioCodec,
-        String format,
-        Boolean decodable,
-        Boolean needsConversion,
-        String conversionStatus,
-        String conversionError
-    ) {
+    @JsonAutoDetect(fieldVisibility = JsonAutoDetect.Visibility.ANY)
+    public static final class MediaInfo {
+        private final String fileName;
+        private final int pageNumber;
+        private final String hqStatus;
+        private final String lqStatus;
+        private final long fileSize;
+        private final Integer width;
+        private final Integer height;
+        private final String mediaType;
+        private final BigDecimal duration;
+        private final String container;
+        private final String videoCodec;
+        private final String audioCodec;
+        private final String format;
+        private final Boolean decodable;
+        private final Boolean needsConversion;
+        private final String conversionStatus;
+        private final String conversionError;
+
+        @JsonCreator
+        public MediaInfo(@JsonProperty("fileName") String fileName,
+                         @JsonProperty("pageNumber") int pageNumber,
+                         @JsonProperty("hqStatus") String hqStatus,
+                         @JsonProperty("lqStatus") String lqStatus,
+                         @JsonProperty("fileSize") long fileSize,
+                         @JsonProperty("width") Integer width,
+                         @JsonProperty("height") Integer height,
+                         @JsonProperty("mediaType") String mediaType,
+                         @JsonProperty("duration") BigDecimal duration,
+                         @JsonProperty("container") String container,
+                         @JsonProperty("videoCodec") String videoCodec,
+                         @JsonProperty("audioCodec") String audioCodec,
+                         @JsonProperty("format") String format,
+                         @JsonProperty("decodable") Boolean decodable,
+                         @JsonProperty("needsConversion") Boolean needsConversion,
+                         @JsonProperty("conversionStatus") String conversionStatus,
+                         @JsonProperty("conversionError") String conversionError) {
+            this.fileName = fileName;
+            this.pageNumber = pageNumber;
+            this.hqStatus = hqStatus;
+            this.lqStatus = lqStatus;
+            this.fileSize = fileSize;
+            this.width = width;
+            this.height = height;
+            this.mediaType = mediaType;
+            this.duration = duration;
+            this.container = container;
+            this.videoCodec = videoCodec;
+            this.audioCodec = audioCodec;
+            this.format = format;
+            this.decodable = decodable;
+            this.needsConversion = needsConversion;
+            this.conversionStatus = conversionStatus;
+            this.conversionError = conversionError;
+        }
+
+        public String fileName() { return fileName; }
+        public int pageNumber() { return pageNumber; }
+        public String hqStatus() { return hqStatus; }
+        public String lqStatus() { return lqStatus; }
+        public long fileSize() { return fileSize; }
+        public Integer width() { return width; }
+        public Integer height() { return height; }
+        public String mediaType() { return mediaType; }
+        public BigDecimal duration() { return duration; }
+        public String container() { return container; }
+        public String videoCodec() { return videoCodec; }
+        public String audioCodec() { return audioCodec; }
+        public String format() { return format; }
+        public Boolean decodable() { return decodable; }
+        public Boolean needsConversion() { return needsConversion; }
+        public String conversionStatus() { return conversionStatus; }
+        public String conversionError() { return conversionError; }
         /**
          * 向后兼容构造函数：仅传入图片场景的 7 个参数，
          * 其余视频字段默认为 null，mediaType 默认为 "IMAGE"。

@@ -1,6 +1,7 @@
 package com.comicatlas.common.dto;
 
 import java.util.List;
+import com.fasterxml.jackson.annotation.JsonAutoDetect;
 
 /**
  * MQ 积压与死信统计 — 管理 API 返回。
@@ -20,13 +21,9 @@ import java.util.List;
  * @param queuedTotal 主队列 ready 消息总数
  * @param queues 有积压的队列明细
  */
-public record MqStatsDTO(
-    boolean available,
-    long dlqTotal,
-    int dlqQueues,
-    long queuedTotal,
-    List<MqQueueStat> queues
-) {
+@JsonAutoDetect(fieldVisibility = JsonAutoDetect.Visibility.ANY)
+public record MqStatsDTO(boolean available, long dlqTotal, int dlqQueues, long queuedTotal,
+        List<MqQueueStat> queues) {
     /**
      * 单队列积压快照。
      *
@@ -35,8 +32,8 @@ public record MqStatsDTO(
      * @param consumers 当前消费者数（0 表示无消费者，消息可能永久堆积）
      * @param dlq 是否死信队列
      */
-    public record MqQueueStat(String name, long messages, long consumers, boolean dlq) {
-    }
+    @JsonAutoDetect(fieldVisibility = JsonAutoDetect.Visibility.ANY)
+    public record MqQueueStat(String name, long messages, long consumers, boolean dlq) { }
 
     /** Management API 不可用时返回的降级统计。 */
     public static MqStatsDTO unavailable() {

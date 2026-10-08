@@ -1,6 +1,9 @@
 package com.comicatlas.common.dto;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonAutoDetect;
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.time.Instant;
 import java.util.List;
@@ -19,16 +22,44 @@ import java.util.List;
  * </ul>
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
-public record TrashManifestItemDTO(
-    int version,
-    String targetType,
-    Long targetId,
-    Long taskId,
-    String status,
-    String errorMessage,
-    Instant completedAt,
-    List<Entry> entries
-) {
+@JsonAutoDetect(fieldVisibility = JsonAutoDetect.Visibility.ANY)
+public final class TrashManifestItemDTO {
+    private final int version;
+    private final String targetType;
+    private final Long targetId;
+    private final Long taskId;
+    private final String status;
+    private final String errorMessage;
+    private final Instant completedAt;
+    private final List<Entry> entries;
+
+    @JsonCreator
+    public TrashManifestItemDTO(@JsonProperty("version") int version,
+                                @JsonProperty("targetType") String targetType,
+                                @JsonProperty("targetId") Long targetId,
+                                @JsonProperty("taskId") Long taskId,
+                                @JsonProperty("status") String status,
+                                @JsonProperty("errorMessage") String errorMessage,
+                                @JsonProperty("completedAt") Instant completedAt,
+                                @JsonProperty("entries") List<Entry> entries) {
+        this.version = version;
+        this.targetType = targetType;
+        this.targetId = targetId;
+        this.taskId = taskId;
+        this.status = status;
+        this.errorMessage = errorMessage;
+        this.completedAt = completedAt;
+        this.entries = entries;
+    }
+
+    public int version() { return version; }
+    public String targetType() { return targetType; }
+    public Long targetId() { return targetId; }
+    public Long taskId() { return taskId; }
+    public String status() { return status; }
+    public String errorMessage() { return errorMessage; }
+    public Instant completedAt() { return completedAt; }
+    public List<Entry> entries() { return entries; }
 
     public static final int CURRENT_VERSION = 1;
 
@@ -39,13 +70,32 @@ public record TrashManifestItemDTO(
     public static final String STATUS_PURGED = "PURGED";
 
     /** 每个条目的实际结果。 */
-    public record Entry(
-        String rootKey,
-        String sourceRelativePath,
-        String trashRelativePath,
-        String state,
-        String detail
-    ) {
+    @JsonAutoDetect(fieldVisibility = JsonAutoDetect.Visibility.ANY)
+    public static final class Entry {
+        private final String rootKey;
+        private final String sourceRelativePath;
+        private final String trashRelativePath;
+        private final String state;
+        private final String detail;
+
+        @JsonCreator
+        public Entry(@JsonProperty("rootKey") String rootKey,
+                     @JsonProperty("sourceRelativePath") String sourceRelativePath,
+                     @JsonProperty("trashRelativePath") String trashRelativePath,
+                     @JsonProperty("state") String state,
+                     @JsonProperty("detail") String detail) {
+            this.rootKey = rootKey;
+            this.sourceRelativePath = sourceRelativePath;
+            this.trashRelativePath = trashRelativePath;
+            this.state = state;
+            this.detail = detail;
+        }
+
+        public String rootKey() { return rootKey; }
+        public String sourceRelativePath() { return sourceRelativePath; }
+        public String trashRelativePath() { return trashRelativePath; }
+        public String state() { return state; }
+        public String detail() { return detail; }
 
         /** 已移入 TRASH */
         public static final String STATE_TRASHED = "TRASHED";

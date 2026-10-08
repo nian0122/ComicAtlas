@@ -4,7 +4,7 @@ import com.comicatlas.common.event.ManagementCommandRequestedEvent;
 import com.comicatlas.common.constant.ManagementOperationTypes;
 import com.comicatlas.common.constant.MediaTypes;
 import com.comicatlas.common.event.payload.TranscodeMediaInfo;
-import com.comicatlas.common.util.VideoPlayability;
+import com.comicatlas.common.media.video.VideoPlayability;
 import com.comicatlas.worker.config.WorkerConfig;
 import com.comicatlas.worker.persistence.record.MediaRecord;
 import com.comicatlas.worker.task.publisher.ManagementCommandPublisher;
@@ -175,7 +175,7 @@ public class TranscodeCommandHandler {
             Thread.currentThread().interrupt();
             log.warn("转码命令被中断: pageId={}", pageId);
             return new TranscodeResult(ERROR_INTERRUPTED, null);
-        } catch (Exception e) {
+        } catch (IOException | RuntimeException e) {
             log.error("转码失败: pageId={}", pageId, e);
             return new TranscodeResult(
                     e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName(), null);
@@ -227,7 +227,7 @@ public class TranscodeCommandHandler {
         }
         try {
             Files.deleteIfExists(tempFile);
-        } catch (Exception e) {
+        } catch (IOException | SecurityException e) {
             log.warn("转码临时文件清理失败: pageId={}, tempFile={}", pageId, tempFile, e);
         }
     }
@@ -238,16 +238,16 @@ public class TranscodeCommandHandler {
      */
     private TranscodeMediaInfo probeTranscodedMetadata(Path file, String newHqPath) {
         try {
-            Optional<ComicMetadata.MediaInfo> opt = mediaAnalyzer.analyzeVideo(file);
-            if (opt.isEmpty()) {
+            Optional<ComicMetadata.MediaInfo> mediaInfoOptional = mediaAnalyzer.analyzeVideo(file);
+            if (mediaInfoOptional.isEmpty()) {
                 return new TranscodeMediaInfo(null, null, null, null, null, newHqPath);
             }
-            ComicMetadata.MediaInfo info = opt.get();
+            ComicMetadata.MediaInfo mediaInfo = mediaInfoOptional.get();
             return new TranscodeMediaInfo(
-                    info.duration(), info.container(), info.videoCodec(), info.audioCodec(),
-                    info.fileSize(), newHqPath);
-        } catch (Exception e) {
-            log.warn("转码后元数据探测失败，元数据字段降级为 null: file={}, error={}", file, e.getMessage());
+                    mediaInfo.duration(), mediaInfo.container(), mediaInfo.videoCodec(), mediaInfo.audioCodec(),
+                    mediaInfo.fileSize(), newHqPath);
+        } catch (RuntimeException e) {
+            log.warn("转码后元数据探测失败，元数据字段降级为 null: file={}, error={}", file, e.getMessage(), e);
             return new TranscodeMediaInfo(null, null, null, null, null, newHqPath);
         }
     }
@@ -259,6 +259,16 @@ public class TranscodeCommandHandler {
     }
 
     /** 单页转码结果：error 为 null 表示成功；transcode 为成功时的实测元数据（可能为 null）。 */
-    private record TranscodeResult(String error, TranscodeMediaInfo transcode) {
+    private static final class TranscodeResult {
+        private final String error;
+        private final TranscodeMediaInfo transcode;
+
+        private TranscodeResult(String error, TranscodeMediaInfo transcode) {
+            this.error = error;
+            this.transcode = transcode;
+        }
+
+        private String error() { return error; }
+        private TranscodeMediaInfo transcode() { return transcode; }
     }
 }

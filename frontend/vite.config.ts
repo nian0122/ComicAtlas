@@ -1,11 +1,27 @@
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
+import Components from 'unplugin-vue-components/vite'
+import { ElementPlusResolver } from 'unplugin-vue-components/resolvers'
 import { resolve } from 'path'
 
 export default defineConfig({
-  plugins: [vue()],
+  plugins: [
+    vue(),
+    Components({
+      // 全量基础样式已由 app/styles/index.scss 装配，避免懒加载组件再次覆盖公共主题。
+      resolvers: [ElementPlusResolver({ importStyle: false })],
+    }),
+  ],
   resolve: {
-    alias: { '@': resolve(__dirname, 'src') },
+    alias: {
+      '@': resolve(__dirname, 'src'),
+      '@/app': resolve(__dirname, 'src/app'),
+      '@/pages': resolve(__dirname, 'src/pages'),
+      '@/widgets': resolve(__dirname, 'src/widgets'),
+      '@/features': resolve(__dirname, 'src/features'),
+      '@/entities': resolve(__dirname, 'src/entities'),
+      '@/shared': resolve(__dirname, 'src/shared'),
+    },
   },
   server: {
     proxy: {

@@ -1,0 +1,4 @@
+-- complete 校验期间冻结会话，避免长时间文件读取占用数据库事务。
+ALTER TABLE upload_session
+    MODIFY COLUMN status VARCHAR(16) NOT NULL DEFAULT 'ACTIVE'
+        COMMENT 'ACTIVE/VERIFYING/COMPLETED/CANCELLED/EXPIRED/FAILED';

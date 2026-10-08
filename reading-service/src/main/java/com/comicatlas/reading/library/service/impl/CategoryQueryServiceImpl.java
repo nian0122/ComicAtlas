@@ -1,6 +1,5 @@
 package com.comicatlas.reading.library.service.impl;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.comicatlas.contract.comic.cache.ComicReferenceCache;
 import com.comicatlas.contract.comic.dto.CategoryDTO;
 import com.comicatlas.persistence.comic.entity.Category;
@@ -26,18 +25,18 @@ public class CategoryQueryServiceImpl implements CategoryQueryService {
         key = "'" + ComicReferenceCache.ALL_KEY + "'",
         unless = "#result == null || #result.isEmpty()")
     public List<CategoryDTO> listCategories() {
-        return new ArrayList<>(categoryMapper.selectList(new LambdaQueryWrapper<Category>().orderByAsc(Category::getSortOrder))
+        return new ArrayList<>(categoryMapper.selectAllOrderedBySortOrder()
                 .stream()
                 .map(this::toDTO)
-                .sorted(Comparator.comparingInt(c -> c.getSortOrder() == null ? 0 : c.getSortOrder()))
+                .sorted(Comparator.comparingInt(category -> category.getSortOrder() == null ? 0 : category.getSortOrder()))
                 .toList());
     }
 
-    private CategoryDTO toDTO(Category c) {
-        CategoryDTO dto = new CategoryDTO();
-        dto.setId(c.getId());
-        dto.setName(c.getName());
-        dto.setSortOrder(c.getSortOrder());
-        return dto;
+    private CategoryDTO toDTO(Category category) {
+        CategoryDTO categoryData = new CategoryDTO();
+        categoryData.setId(category.getId());
+        categoryData.setName(category.getName());
+        categoryData.setSortOrder(category.getSortOrder());
+        return categoryData;
     }
 }

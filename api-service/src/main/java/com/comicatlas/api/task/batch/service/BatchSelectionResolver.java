@@ -1,13 +1,13 @@
 package com.comicatlas.api.task.batch.service;
 
-import com.comicatlas.persistence.comic.mapper.ComicMapper;
+import com.comicatlas.api.library.dto.ManagementComicListQuery;
+import com.comicatlas.api.library.persistence.mapper.ManagementComicListMapper;
+import com.comicatlas.api.library.support.ManagementComicFilterNormalizer;
 import com.comicatlas.api.task.batch.dto.BatchSelectionVO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
-import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Set;
 
 /**
  * 批量选择解析器 — 将 IDS / FILTER 判别联合解析为稳定排序的漫画 id 列表。
@@ -19,7 +19,7 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class BatchSelectionResolver {
 
-    private final ComicMapper comicMapper;
+    private final ManagementComicListMapper listMapper;
 
     /**
      * @param selection 判别联合
@@ -31,13 +31,10 @@ public class BatchSelectionResolver {
             return dedupSorted(ids.getIds());
         }
         if (selection instanceof BatchSelectionVO.Filter filter) {
-            List<Long> matched = comicMapper.selectIdsByQuery(filter.getQuery(), limit);
-            Set<Long> excluded = new LinkedHashSet<>(
-                    filter.getExcludedIds() == null ? List.of() : filter.getExcludedIds());
-            return matched.stream()
-                    .filter(id -> !excluded.contains(id))
-                    .sorted()
-                    .toList();
+            ManagementComicListQuery query = filter.getQuery() == null ? new ManagementComicListQuery() : filter.getQuery();
+            ManagementComicFilterNormalizer.normalize(query);
+            List<Long> excludedIds = filter.getExcludedIds() == null ? List.of() : dedupSorted(filter.getExcludedIds());
+            return listMapper.selectIdsByQuery(query, excludedIds, limit);
         }
         throw new IllegalArgumentException("未知选择类型: " + selection.getClass().getSimpleName());
     }

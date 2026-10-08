@@ -86,16 +86,16 @@ public class HttpDownloader implements DownloadStrategy {
             "gidlist", List.of(List.of(gid, token)),
             "namespace", 1
         );
-        HttpRequest req = HttpRequest.newBuilder()
+        HttpRequest httpRequest = HttpRequest.newBuilder()
             .uri(URI.create(apiUrl))
             .header("Content-Type", "application/json")
             .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(body)))
             .build();
-        HttpResponse<String> resp = http.send(req, HttpResponse.BodyHandlers.ofString());
-        if (resp.statusCode() != 200) { return null; }
+        HttpResponse<String> httpResponse = http.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+        if (httpResponse.statusCode() != 200) { return null; }
 
         @SuppressWarnings("unchecked")
-        Map<String, Object> result = objectMapper.readValue(resp.body(), Map.class);
+        Map<String, Object> result = objectMapper.readValue(httpResponse.body(), Map.class);
         List<Object> list = (List<Object>) result.get("gmetadata");
         return (list == null || list.isEmpty()) ? null : GalleryMetadata.fromApiResponse(list.get(0));
     }

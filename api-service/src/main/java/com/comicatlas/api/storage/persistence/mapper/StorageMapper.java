@@ -29,9 +29,6 @@ public interface StorageMapper {
     /** 批量查询多个漫画的转码状态聚合（comicId → 逗号分隔的 transcode_status 集合）。 */
     List<ComicTranscodeStatusVO> selectTranscodeStatusList(@Param("comicIds") List<Long> comicIds);
 
-    /** 全局存储统计：HQ/LQ 已就绪文件的总字节数（DB 聚合，避免全量遍历文件系统）。 */
-    StorageStatsDTO selectStorageStats();
-
-    /** 有效漫画数量（未删除）。 */
-    long countActiveComics();
+    /** 活动漫画、章节、媒体的登记容量汇总，包含空漫画数量。 */
+    StorageStatsDTO selectLibraryCapacity();
 }

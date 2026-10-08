@@ -12,6 +12,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 @SpringBootApplication(scanBasePackages = {
         "com.comicatlas.reading",
         "com.comicatlas.contract",
+        "com.comicatlas.web",
         "com.comicatlas.persistence"
 })
 public class ReadingApplication {

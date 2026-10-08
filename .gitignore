@@ -68,6 +68,7 @@ frontend/test-results/
 worker-service/tools/aria2c/
 worker-service/tools/ffmpeg/
 worker-service/tools/image-optimizer/image-optimizer.exe
+worker-service/tools/image-optimizer/.runtime/
 /tools/vendor/frp/
 /.runtime/
 
@@ -85,3 +86,5 @@ frontend/screenshots/
 
 # ffmpeg -encoders 探测在测试工作目录的误产物
 worker-service/-encoders
+puremedia_product_names.csv
+puremedia_missing_products.csv

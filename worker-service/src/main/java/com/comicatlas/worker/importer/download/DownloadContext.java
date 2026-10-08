@@ -55,7 +55,7 @@ public class DownloadContext {
             } catch (Exception ex) {
                 // 回退策略：Archiver 任何非中断失败（IO/超时/解析）都回退 Torrent，
                 // 必须捕获全部非中断异常并记录现场，故在此宽泛捕获
-                log.warn("Archiver failed, fallback to torrent: {}", ex.getMessage());
+                log.warn("Archiver failed, fallback to torrent: {}", ex.getMessage(), ex);
             }
         }
 
@@ -75,6 +75,19 @@ public class DownloadContext {
         throw new RuntimeException("该 Gallery 无 Archiver 也无 Torrent，无法下载");
     }
 
-    public record DownloadResult(long bytes, String method, Map<String, Object> metadata) {
+    public static final class DownloadResult {
+        private final long bytes;
+        private final String method;
+        private final Map<String, Object> metadata;
+
+        public DownloadResult(long bytes, String method, Map<String, Object> metadata) {
+            this.bytes = bytes;
+            this.method = method;
+            this.metadata = metadata;
+        }
+
+        public long bytes() { return bytes; }
+        public String method() { return method; }
+        public Map<String, Object> metadata() { return metadata; }
     }
 }

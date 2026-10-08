@@ -1,6 +1,5 @@
 package com.comicatlas.worker.importer.download;
 
-import com.comicatlas.worker.importer.handler.DirectoryImportHandler;
 import com.comicatlas.worker.config.WorkerConfig;
 import com.comicatlas.worker.importer.archive.extract.ZipExtractor;
 import lombok.RequiredArgsConstructor;

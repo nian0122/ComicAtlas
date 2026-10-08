@@ -7,7 +7,7 @@
     <parent>
         <groupId>com.comicatlas</groupId>
         <artifactId>comic-atlas</artifactId>
-        <version>0.0.1-SNAPSHOT</version>
+        <version>2.2.0</version>
     </parent>
 
     <artifactId>comic-shared</artifactId>
@@ -15,12 +15,11 @@
     <name>Comic Shared</name>
     <description>跨服务共享模型：contract 与 persistence 包边界</description>
 
-    <properties>
-        <!-- 上游 -Dtest 指定服务测试时，本模块无匹配测试不视为失败 -->
-        <surefire.failIfNoSpecifiedTests>false</surefire.failIfNoSpecifiedTests>
-    </properties>
-
     <dependencies>
+        <dependency>
+            <groupId>com.ibm.icu</groupId>
+            <artifactId>icu4j</artifactId>
+        </dependency>
         <!-- Spring Web（全局异常处理器与协议适配） -->
         <dependency>
             <groupId>org.springframework</groupId>
@@ -62,17 +61,7 @@
             <optional>true</optional>
         </dependency>
 
-        <!-- 测试 -->
-        <dependency>
-            <groupId>org.junit.jupiter</groupId>
-            <artifactId>junit-jupiter</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.mockito</groupId>
-            <artifactId>mockito-core</artifactId>
-            <scope>test</scope>
-        </dependency>
+
     </dependencies>
 
     <build>

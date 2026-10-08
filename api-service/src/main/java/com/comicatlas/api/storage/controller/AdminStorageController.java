@@ -77,10 +77,10 @@ public class AdminStorageController {
      */
     @GetMapping("/comics/{comicId}")
     public Result<ComicStorageDTO> getComic(@PathVariable Long comicId) {
-        ComicStorageDTO dto = storageQueryService.getComic(comicId);
-        if (dto == null) {
+        ComicStorageDTO comicStorage = storageQueryService.getComic(comicId);
+        if (comicStorage == null) {
             return Result.fail(HttpStatusCodes.NOT_FOUND, "漫画不存在");
         }
-        return Result.ok(dto);
+        return Result.ok(comicStorage);
     }
 }

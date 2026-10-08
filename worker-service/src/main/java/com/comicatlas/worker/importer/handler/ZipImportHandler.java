@@ -21,7 +21,7 @@ import java.util.stream.Stream;
  * ZIP 导入处理器 — 解压到任务唯一临时目录后委托 {@link DirectoryImportHandler}。
  *
  * <p>安全语义：解压复用 {@link ZipExtractor}（含标准分卷 .zNN 支持与全套安全校验）；
- * 无论成功失败，finally 一律用 NIO {@link Files#walk} 逆序递归删除临时目录；删除失败
+ * 解压失败或导入成功后，用 NIO {@link Files#walk} 逆序递归删除临时目录；整理失败保留恢复现场。删除失败
  * 不得静默（聚合记录 cause），但绝不掩盖主异常 cause（主异常优先保留）。
  * 日志与异常消息不含源 zip 完整路径，只记录文件名。
  */
@@ -37,8 +37,11 @@ public class ZipImportHandler {
     private final WorkerConfig config;
     private final DirectoryImportHandler directoryHandler;
 
-    public Path importZip(ImportContext ctx, Long taskId, Long comicId, Path mangaRoot) throws Exception {
-        Path zipFile = ctx.sourcePath();
+    public Path importZip(ImportContext importContext, Long taskId, Long comicId, Path mangaRoot) throws Exception {
+        if (directoryHandler.hasRecoveryPoint(mangaRoot, taskId)) {
+            return resumeExisting(taskId, comicId, mangaRoot);
+        }
+        Path zipFile = importContext.sourcePath();
         if (!Files.exists(zipFile)) {
             throw new IllegalArgumentException("ZIP 文件不存在: " + zipFile.getFileName());
         }
@@ -46,10 +49,14 @@ public class ZipImportHandler {
         // 任务唯一临时目录：temp/{taskId}/extracted，互不干扰
         Path tempRoot = config.resolveTempDir().resolve(taskId.toString());
         Path extractDir = tempRoot.resolve(EXTRACT_DIR_NAME);
+        deleteRecursively(tempRoot);
         Files.createDirectories(extractDir);
 
+        boolean importPrepared = false;
+        boolean extractionCompleted = false;
         try {
             zipExtractor.extract(zipFile, extractDir);
+            extractionCompleted = true;
             log.info("ZIP 解压完成: archive={}", zipFile.getFileName());
 
             String fileName = zipFile.getFileName().toString();
@@ -57,13 +64,25 @@ public class ZipImportHandler {
             String titleHint = lastDotIndex >= 0 ? fileName.substring(0, lastDotIndex) : fileName;
             // 保留原始来源类型（ZIP），使 parser 对解压根执行"恰有一个有效子目录时剥离一层
             // 传输包装"的语义；不得改写成 DIRECTORY，否则单层包装目录无法被剥离。
-            ImportContext extractCtx = new ImportContext(
-                ctx.sourceType(), extractDir, ctx.generateLq(), ctx.overwrite(), titleHint
+            ImportContext extractionContext = new ImportContext(
+                importContext.sourceType(), extractDir, importContext.generateLq(), importContext.overwrite(), titleHint
             );
-            return directoryHandler.handle(extractCtx, taskId, comicId, mangaRoot);
+            Path metadataPath = directoryHandler.handle(extractionContext, taskId, comicId, mangaRoot);
+            importPrepared = true;
+            return metadataPath;
         } finally {
-            deleteRecursively(tempRoot);
+            if (importPrepared || !extractionCompleted) {
+                deleteRecursively(tempRoot);
+            } else {
+                log.info("导入未完成，保留解压恢复现场: taskId={}", taskId);
+            }
         }
+    }
+
+    public Path resumeExisting(Long taskId, Long comicId, Path mangaRoot) throws IOException {
+        Path metadataPath = directoryHandler.resumeExisting(taskId, comicId, mangaRoot);
+        deleteRecursively(config.resolveTempDir().resolve(taskId.toString()));
+        return metadataPath;
     }
 
     /**

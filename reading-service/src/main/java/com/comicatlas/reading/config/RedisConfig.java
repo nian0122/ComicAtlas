@@ -81,7 +81,7 @@ public class RedisConfig implements CachingConfigurer {
             RedisConnectionFactory factory,
             @Value("${comic.cache.catalog-ttl:30m}") Duration catalogTtl,
             @Value("${comic.cache.reference-ttl:30m}") Duration referenceTtl,
-            @Value("${comic.cache.list-ttl:60s}") Duration listTtl) {
+            @Value("${comic.cache.list-ttl:1m}") Duration listTtl) {
         RedisCacheConfiguration baseConfig = RedisCacheConfiguration.defaultCacheConfig()
                 .disableCachingNullValues()
                 .serializeKeysWith(RedisSerializationContext.SerializationPair

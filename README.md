@@ -1,182 +1,67 @@
-# ComicAtlas 2.1
+# ComicAtlas 2.2.0
 
-ComicAtlas 是一个面向个人收藏的本地漫画仓库平台。它把 ZIP 和本地目录统一导入到受控存储中，提供漫画管理、章节目录、图片与视频混排阅读、阅读历史以及存储维护能力。
+个人漫画仓库：导入 ZIP、CBZ、本地目录，管理漫画与章节，阅读图片和视频，记录进度与喜欢，维护存储和回收站。
 
-## 版本定位
+main 是面向用户的稳定部署分支，只包含应用源码、生产构建配置、部署文件和文档。测试、演示页面、开发启动脚本和迁移工具保留在 develop / feature 分支。用户只需安装 Docker，无需安装 Java、Node.js、Maven 或启动开发服务器。
 
-`main` 分支是面向用户使用的 2.1 稳定版本；日常功能开发进入 `develop` 分支。完整的安装、导入、阅读和维护说明见 [用户指南](docs/user-guide.md)。
+## 首次安装（本机基础设施）
 
-## 功能概览
+1. 安装并启动 Docker Desktop（Windows）或 Docker Engine 与 Compose 插件（Linux）。
+2. 下载本版本源码包并解压，或检出 v2.2.0。进入项目目录，将 .env.example 复制为 .env。
+3. 设置 MANGA_ROOT 为实际存储绝对路径（Windows 示例 F:/manga，Linux 示例 /data/manga），填写 MYSQL_ROOT_PASSWORD、API_MYSQL_PASSWORD、WORKER_MYSQL_PASSWORD、REMOTE_REDIS_PASSWORD、REMOTE_RABBITMQ_USER / PASSWORD、REMOTE_NACOS_USER / PASSWORD。首次本机安装无需填写 FRP 和公网入口参数。
+4. 在存储根下创建 hq、lq、thumbs、metadata、staging、trash、export、import 目录。待导入漫画放入 import；Worker 容器只看得到 MANGA_ROOT 内的文件。
+5. 启动基础设施：
 
-- 漫画导入：ZIP、CBZ 或本地目录导入，异步解析并写入受控存储
-- ComicInfo：导入 CBZ 内的 `ComicInfo.xml`，并在导出时生成对应元数据
-- 漫画导出：按漫画 ID 导出 ZIP 或 CBZ，支持大文件标准分卷
-- HQ 删除：删除高清文件并保留数据库记录与 LQ 文件
-- LQ 生成：根据 HQ 图片手动生成 LQ 图片
-- 视频转码：处理导入时标记为非标准的视频
-- 刷新元数据：按漫画 ID 重新分析本地媒体并同步数据库
-- 扫盘恢复：扫描 HQ 存储并恢复缺失的数据库记录
-- 漫画库搜索、筛选、排序和详情管理
-- 漫画元数据、分类、标签和封面管理
-- 多级目录树、章节排序和章节导航
-- 图片、视频混排阅读，以及阅读进度与历史记录
-- 管理任务中心：查看进度、失败原因、取消和重试
-- 存储统计：查看 HQ/LQ/缩略图占用与媒体状态
-- 死信队列管理：查看、重放和清理失败消息
-- 统一 MANAGED 存储，数据库只保存相对路径
+       docker compose -f docker-compose.infra.yml up -d --wait
 
-> 当前维护功能以上述清单为准。EHENTAI 下载对接、自动分类/标签、媒体上传/替换等内容属于历史接口或后续能力，不能视为当前主流程入口。
+6. 创建 Worker 只读数据库账号。执行下列命令并输入 .env 中的 MySQL root 密码：
 
-### 管理控制台
+       docker compose -f docker-compose.infra.yml exec mysql mysql -uroot -p
 
-管理后台位于 `/manage`，提供：
+   在 MySQL 中执行以下 SQL，将账号和密码替换为 .env 中 WORKER_MYSQL_USER / WORKER_MYSQL_PASSWORD 的实际值；密码含单引号时需按 SQL 规则转义：
 
-- **漫画工作区**：列表、详情、编辑（乐观锁 `version`）、元数据、标签、封面
-- **目录/章节管理**：目录树的创建、重命名、移动、排序、删除；章节的创建、重排、回收
-- **任务中心**：查看导入、导出、LQ、HQ、转码、元数据刷新和恢复任务
-- **存储管理**：查看存储状态并触发上述维护任务
-- **导入管理**：选择 ZIP 或本地目录，确认后创建异步导入任务
-- **恢复管理**：扫描 HQ 存储并恢复缺失的数据库记录
+       CREATE USER IF NOT EXISTS 'comicatlas_ro'@'%' IDENTIFIED BY '替换为 Worker 密码';
+       GRANT SELECT ON comic_atlas.* TO 'comicatlas_ro'@'%';
+       EXIT;
 
-> 回收站、媒体上传/替换和其他批量管理接口目前不列入主功能清单，详见 API 文档中的兼容说明。
+   API 账号由全新 MySQL 数据卷自动创建；已有数据库需按[部署运维](docs/operations/management.md)核对授权。修改 .env 不会自动修改已有数据库账号密码。
 
-## 快速开始
+7. 构建并启动应用：
 
-### 运行环境
+       docker compose -f docker-compose.infra.yml -f docker-compose.yml -f docker-compose.local.yml up -d --build --wait
 
-- Docker Desktop 或 Docker Engine
-- Java 21（源码运行时）
-- Node.js 20+（前端开发时）
-- MySQL 8、Redis、RabbitMQ、Nacos
+8. 打开 [漫画库](http://localhost) 或 [管理后台](http://localhost/manage)。首次构建会下载镜像和依赖，需要网络连接。查看状态与故障：
 
-### 使用 Docker 部署
+       docker compose -f docker-compose.infra.yml -f docker-compose.yml -f docker-compose.local.yml ps
+       docker compose -f docker-compose.infra.yml -f docker-compose.yml -f docker-compose.local.yml logs --tail=100 api-service worker-service gateway reading-service
 
-1. 复制 `.env.example` 为不受 Git 跟踪的 `.env`，按分组填写漫画存储、远端基础设施和 FRP 配置：
+基础设施只绑定宿主机回环地址，本机应用通过容器服务名连接。管理端面向可信个人环境，默认无业务鉴权；不要直接将管理后台或 Gateway 暴露到公网。
 
-   ```dotenv
-   MANGA_ROOT=F:/manga
-   REMOTE_INFRA_HOST=host.docker.internal
-   MYSQL_ROOT_PASSWORD=请设置强密码
-   API_MYSQL_USER=comicatlas_api
-   API_MYSQL_PASSWORD=请设置强密码
-   WORKER_MYSQL_USER=comicatlas_ro
-   WORKER_MYSQL_PASSWORD=请设置另一组强密码
-   REMOTE_MYSQL_PORT=3306
-   REMOTE_REDIS_PORT=6379
-   REMOTE_RABBITMQ_PORT=5672
-   REMOTE_RABBITMQ_MANAGEMENT_PORT=15672
-   REMOTE_NACOS_HTTP_PORT=8848
-   REMOTE_NACOS_GRPC_PORT=9848
-   REMOTE_NACOS_USER=nacos
-   REMOTE_NACOS_PASSWORD=nacos
-   REMOTE_REDIS_PASSWORD=
-   REMOTE_RABBITMQ_USER=guest
-   REMOTE_RABBITMQ_PASSWORD=guest
-   FRP_SERVER_ADDR=远端服务器公网地址
-   FRP_SERVER_PORT=7000
-   FRP_DASHBOARD_PORT=7500
-   ```
+## 使用
 
-   > 仓库级 `.env` 使用 `API_MYSQL_*` 和 `WORKER_MYSQL_*` 区分写账号与只读账号。启动脚本或 Compose 会在进程边界映射为 Spring 使用的 `MYSQL_USER` / `MYSQL_PASS`；Worker 账号仅授予 `SELECT`，详见[部署运维](docs/operations/management.md)的"数据库账号"小节。
+- 在管理后台导入 MANGA_ROOT/import 下的 ZIP、CBZ 或目录；宿主机绝对路径必须位于配置的 MANGA_ROOT 内。标准分卷只选择最后的 .zip，所有 .z01… 分卷必须齐全。
+- 漫画库提供搜索、筛选、阅读历史、喜欢与继续阅读；阅读器支持图片/视频混排、短视频模式、全屏与章节导航。
+- 管理后台支持元数据、目录/章节、上传/替换、导出、任务中心、LQ 生成、HQ 删除、存储统计和回收站。
+- 删除先进入回收站；永久清理需在回收站预览确认。HQ 删除前先确认已有可用 LQ。
+- 导出为本地文件，产物位于 MANGA_ROOT/export，不提供浏览器下载端点。
 
-2. 确认 `MANGA_ROOT` 下存在 `hq`、`lq`、`thumbs`、`metadata`、`temp` 目录。
+## 可选配置
 
-3. 如需在当前主机运行基础服务，单独启动 MySQL、Redis、RabbitMQ 和 Nacos：
+- 使用已有远端基础设施：填写 .env 的 REMOTE_* 参数，按[FRP 基础设施连接](docs/operations/frp-infrastructure.md)配置连接，仅执行 docker compose -f docker-compose.yml up -d --build --wait，不加载本机覆盖文件。
+- AI 分析默认连接 AI_BASE_URL；本地模型需另备兼容 NVIDIA GPU、驱动和模型文件，使用 local-ai profile。普通漫画导入和阅读不依赖本地模型。
+- 公网只读入口默认关闭；按[公网阅读部署](docs/operations/public-reading.md)配置独立过滤入口，不能直接映射管理站。
 
-   ```bash
-   docker compose -f docker-compose.infra.yml up -d
-   ```
+## 升级与备份
 
-4. 启动 Gateway、阅读服务、管理服务和 Nginx：
-
-   ```bash
-   docker compose -f docker-compose.yml up -d --build
-   ```
-
-5. 浏览器打开 [http://localhost](http://localhost)。管理后台位于 `/manage`。
-
-> `docker-compose.infra.yml` 只管理基础服务，`docker-compose.yml` 只管理项目服务。使用远端基础设施时，不要在本地启动基础服务文件；通过 `tools/maintenance/manage-remote-infra-frp.ps1` 建立 FRP STCP 连接。部署步骤见 [FRP 基础设施连接](docs/operations/frp-infrastructure.md)。
-
-### 源码开发
-
-开发分支为 `develop`。在 Windows PowerShell 中可使用：
-
-```powershell
-.\scripts\dev\start-dev.ps1
-```
-
-前端单独启动：
-
-```bash
-cd frontend
-pnpm install
-pnpm dev
-```
-
-构建前端：
-
-```bash
-cd frontend
-pnpm build
-```
-
-构建后端：
-
-```bash
-.\mvnw clean package
-```
-
-## 存储约定
-
-漫画文件统一存放在：
-
-```text
-{MANGA_ROOT}/hq/{comicId}/{chapterId}/
-{MANGA_ROOT}/lq/{comicId}/{chapterId}/
-{MANGA_ROOT}/thumbs/
-{MANGA_ROOT}/metadata/
-{MANGA_ROOT}/staging/        # 上传临时目录（API 可写，不对外暴露）
-{MANGA_ROOT}/trash/          # 回收站文件卷（软删除后移入，7 天保留期）
-{MANGA_ROOT}/export/         # 导出产物目录
-```
-
-数据库中的页面只保存 `hq_root`、`hq_path` 等相对引用，不保存宿主机绝对路径。迁移存储时优先修改 `MANGA_ROOT` 或 `storage.roots.HQ.path` 配置，不要手动改写页面路径。
-
-### 上传限制（默认）
-
-| 项 | 默认值 | 环境变量 |
-|----|--------|---------|
-| 分块大小 | 16 MiB | `UPLOAD_CHUNK_SIZE` |
-| 单文件上限 | 20 GiB | `UPLOAD_MAX_FILE_SIZE` |
-| 单会话上限 | 100 GiB | `UPLOAD_MAX_SESSION_SIZE` |
-| 单会话文件数 | 10000 | `UPLOAD_MAX_FILES` |
-| 会话过期 | 24 小时 | `UPLOAD_SESSION_TTL` |
-| 磁盘剩余下限 | 5 GiB 或 10% | `UPLOAD_FREE_SPACE_MIN_BYTES` / `UPLOAD_FREE_SPACE_MIN_RATIO` |
-
-### 可信本机部署
-
-ComicAtlas 面向单机个人仓库，管理端接口（回收站、永久清理、DLQ 等）默认不开启鉴权。请遵守：
-
-- 仅部署在可信本机环境；基础服务（`docker-compose.infra.yml`）只绑定 `127.0.0.1` 回环地址。
-- 不要把 Gateway 或 `.env` 中的数据库、管理台、注册中心端口直接暴露到公网；FRP 只开放 `FRP_SERVER_PORT`。
-- 在宿主机或防火墙层限制对管理后台 `/manage` 的访问，需要远程访问时使用 SSH 隧道。
+升级前暂停任务并备份数据库和整个 MANGA_ROOT。保留 .env，替换为新版本文件后重复应用启动命令。API 启动时执行 Flyway 迁移；先确认 API 健康，再检查阅读和任务功能。数据库升级后的回退必须配套恢复升级前数据库备份。不要使用 docker compose down -v 删除数据卷。
 
 ## 文档
 
-- [用户指南](docs/user-guide.md)：安装、配置、导入、阅读、管理和故障排查
-- [部署运维](docs/operations/management.md)：数据库账号、存储卷、备份、升级与回滚
-- [开发流程](docs/development-guide.md)：分支、提交、合并、推送与发布
-- [API 文档](docs/api.md)：HTTP 接口与事件状态
-- [发布说明](docs/releases/v2.1.0.md)：2.1 功能范围、升级说明与已知限制（历史版本见 [v2.0.1](docs/releases/v2.0.1.md)）
-- [架构索引](docs/architecture/00-index.md)：系统设计与模块说明
-
-## 分支约定
-
-| 分支 | 用途 |
-|------|------|
-| `main` | 用户使用的稳定版本，发布 2.1 |
-| `develop` | 日常开发、实验性功能和下一版本准备 |
+- [用户指南](docs/user-guide.md)
+- [部署与维护](docs/operations/management.md)
+- [2.2.0 发布说明](docs/releases/v2.2.0.md)
+- [API 文档](docs/api.md)
 
 ## 许可证
 
-当前仓库未声明开源许可证。除非项目所有者另行授权，请仅在个人设备和合法取得的内容范围内使用。
+仓库未声明开源许可证；使用范围以项目所有者授权为准。

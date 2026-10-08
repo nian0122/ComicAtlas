@@ -65,6 +65,35 @@ public class MetadataAssembler {
 
     public AssembleResult assembleWithWarnings(DirectoryTree tree, ImportContext importContext,
                                                 ComicInfoMetadata comicInfo) {
+        return assembleInternal(tree, importContext, comicInfo, true);
+    }
+
+    /** 仅从目录结构规划章节和媒体文件，不读取图片尺寸或调用视频探测工具。 */
+    public ComicMetadata planStructure(DirectoryTree tree, ImportContext importContext,
+                                       ComicInfoMetadata comicInfo) {
+        return assembleInternal(tree, importContext, comicInfo, false).metadata();
+    }
+
+    /** 根据持久化结构计划直接分析平铺暂存区，不再依赖原始来源目录或其文件路径。 */
+    public ComicMetadata analyzePlannedFromStaging(ComicMetadata plannedMetadata, Path stagingComicRoot) {
+        List<ComicMetadata.ChapterInfo> analyzedChapters = new ArrayList<>(plannedMetadata.chapters().size());
+        for (ComicMetadata.ChapterInfo chapter : plannedMetadata.chapters()) {
+            List<ComicMetadata.MediaInfo> analyzedPages = new ArrayList<>(chapter.pages().size());
+            for (ComicMetadata.MediaInfo page : chapter.pages()) {
+                Path mediaPath = stagingComicRoot.resolve(String.valueOf(chapter.globalOrder()))
+                        .resolve(page.fileName());
+                analyzedPages.add(mediaAnalyzer.analyze(mediaPath).withPageNumber(page.pageNumber()));
+            }
+            analyzedChapters.add(new ComicMetadata.ChapterInfo(chapter.title(), chapter.chapterNo(),
+                    chapter.sortOrder(), chapter.globalOrder(), chapter.catalogIndex(),
+                    String.valueOf(chapter.globalOrder()), analyzedPages));
+        }
+        return new ComicMetadata(plannedMetadata.title(), plannedMetadata.author(), plannedMetadata.category(),
+                plannedMetadata.tags(), plannedMetadata.description(), plannedMetadata.catalogs(), analyzedChapters);
+    }
+
+    private AssembleResult assembleInternal(DirectoryTree tree, ImportContext importContext,
+                                             ComicInfoMetadata comicInfo, boolean analyzeMedia) {
         String title = importContext.titleHint() != null ? importContext.titleHint() : tree.name();
         List<ComicMetadata.CatalogInfo> catalogs = new ArrayList<>();
         List<ComicMetadata.ChapterInfo> chapters = new ArrayList<>();
@@ -75,7 +104,7 @@ public class MetadataAssembler {
         Map<Integer, AtomicInteger> scopeSortOrders = new HashMap<>();
         Path root = tree.path();
 
-        processRoot(tree, root, catalogs, chapters, globalOrder, scopeSortOrders, warnings);
+        processRoot(tree, root, catalogs, chapters, globalOrder, scopeSortOrders, warnings, analyzeMedia);
 
         if (chapters.isEmpty()) { throw new RuntimeException("无可用章节: " + tree.path()); }
         String resolvedTitle = firstNonBlank(comicInfo == null ? null : comicInfo.series(),
@@ -113,12 +142,13 @@ public class MetadataAssembler {
             List<ComicMetadata.CatalogInfo> catalogs,
             List<ComicMetadata.ChapterInfo> chapters,
             AtomicInteger globalOrder, Map<Integer, AtomicInteger> scopeSortOrders,
-            List<AssembleResult.AssembleWarning> warnings) {
+            List<AssembleResult.AssembleWarning> warnings, boolean analyzeMedia) {
         if (node.isLeaf()) {
-            addChapter(node, root, null, chapters, globalOrder, scopeSortOrders);
+            addChapter(node, root, null, chapters, globalOrder, scopeSortOrders, analyzeMedia);
         }
         for (DirectoryTree child : node.children()) {
-            processChild(child, root, null, catalogs, chapters, globalOrder, scopeSortOrders, warnings);
+            processChild(child, root, null, catalogs, chapters, globalOrder, scopeSortOrders, warnings,
+                    analyzeMedia);
         }
     }
 
@@ -130,7 +160,7 @@ public class MetadataAssembler {
             List<ComicMetadata.CatalogInfo> catalogs,
             List<ComicMetadata.ChapterInfo> chapters,
             AtomicInteger globalOrder, Map<Integer, AtomicInteger> scopeSortOrders,
-            List<AssembleResult.AssembleWarning> warnings) {
+            List<AssembleResult.AssembleWarning> warnings, boolean analyzeMedia) {
 
         boolean hasMedia = node.isLeaf();
         boolean hasChildren = node.hasChildren();
@@ -146,18 +176,20 @@ public class MetadataAssembler {
         if (hasMedia && hasChildren) {
             // 嵌套混合：生成 Catalog，先生成挂在其下的"本目录散页"Chapter，再递归 children。
             int catalogIndex = addCatalog(node, parentCatalogIndex, catalogs, scopeSortOrders);
-            addChapter(node, root, catalogIndex, chapters, globalOrder, scopeSortOrders);
+            addChapter(node, root, catalogIndex, chapters, globalOrder, scopeSortOrders, analyzeMedia);
             for (DirectoryTree child : node.children()) {
-                processChild(child, root, catalogIndex, catalogs, chapters, globalOrder, scopeSortOrders, warnings);
+                processChild(child, root, catalogIndex, catalogs, chapters, globalOrder, scopeSortOrders,
+                        warnings, analyzeMedia);
             }
         } else if (hasMedia) {
             // 纯媒体节点 → 直接生成 Chapter。
-            addChapter(node, root, parentCatalogIndex, chapters, globalOrder, scopeSortOrders);
+            addChapter(node, root, parentCatalogIndex, chapters, globalOrder, scopeSortOrders, analyzeMedia);
         } else {
             // 纯子目录节点 → 生成 Catalog 后递归 children。
             int catalogIndex = addCatalog(node, parentCatalogIndex, catalogs, scopeSortOrders);
             for (DirectoryTree child : node.children()) {
-                processChild(child, root, catalogIndex, catalogs, chapters, globalOrder, scopeSortOrders, warnings);
+                processChild(child, root, catalogIndex, catalogs, chapters, globalOrder, scopeSortOrders,
+                        warnings, analyzeMedia);
             }
         }
     }
@@ -175,8 +207,10 @@ public class MetadataAssembler {
     /** 创建 Chapter（含该节点自身媒体的"散页"语义）。防御：空媒体不创建空 Chapter。 */
     private void addChapter(DirectoryTree node, Path root, Integer catalogIndex,
             List<ComicMetadata.ChapterInfo> chapters,
-            AtomicInteger globalOrder, Map<Integer, AtomicInteger> scopeSortOrders) {
-        List<ComicMetadata.MediaInfo> mediaItems = scanMediaItems(node);
+            AtomicInteger globalOrder, Map<Integer, AtomicInteger> scopeSortOrders,
+            boolean analyzeMedia) {
+        int chapterGlobalOrder = globalOrder.get();
+        List<ComicMetadata.MediaInfo> mediaItems = scanMediaItems(node, analyzeMedia);
         if (mediaItems.isEmpty()) {
             return;
         }
@@ -200,13 +234,27 @@ public class MetadataAssembler {
      * 扫描节点下的所有媒体文件（图片 + 视频），由 MediaAnalyzer 读取元数据，
      * 并按出现顺序填入 pageNumber。
      */
-    private List<ComicMetadata.MediaInfo> scanMediaItems(DirectoryTree node) {
+    private List<ComicMetadata.MediaInfo> scanMediaItems(DirectoryTree node, boolean analyzeMedia) {
         List<ComicMetadata.MediaInfo> mediaItems = new ArrayList<>();
         List<Path> files = node.mediaFiles();
 
         for (int i = 0; i < files.size(); i++) {
-            Path file = files.get(i);
-            mediaItems.add(mediaAnalyzer.analyze(file).withPageNumber(i + 1));
+            Path sourceFile = files.get(i);
+            String fileName = sourceFile.getFileName().toString();
+            if (analyzeMedia) {
+                mediaItems.add(mediaAnalyzer.analyze(sourceFile).withPageNumber(i + 1));
+            } else {
+                long fileSize = 0L;
+                try {
+                    fileSize = java.nio.file.Files.size(sourceFile);
+                } catch (java.io.IOException exception) {
+                    log.warn("读取媒体大小失败: fileName={}", fileName, exception);
+                }
+                mediaItems.add(new ComicMetadata.MediaInfo(fileName, i + 1,
+                        com.comicatlas.common.constant.MediaStatuses.READY,
+                        com.comicatlas.common.constant.MediaStatuses.NOT_GENERATED,
+                        fileSize, null, null, null, null, null, null, null));
+            }
         }
         return mediaItems;
     }

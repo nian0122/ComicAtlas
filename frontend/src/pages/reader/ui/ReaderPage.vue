@@ -1,0 +1,546 @@
+<template>
+  <div class="reader-page" :class="{ 'is-fullscreen': isFullscreen }" @pointerdown="scheduleFullscreenControlsHide">
+    <div v-if="store.progressSaveError && !store.loading && !store.error" class="progress-save-error" role="alert">
+      <span>阅读进度暂未保存：{{ store.progressSaveError }}</span>
+      <AppButton variant="ghost" @click="retryProgressSave">重试保存</AppButton>
+    </div>
+    <!-- 桌面工具栏始终作为覆盖层，显隐不参与阅读视口布局。 -->
+    <ReaderToolbar
+      v-if="mode === 'desktop'"
+      :mode="mode"
+      :title="toolbarTitle"
+      :current-page="store.currentPage"
+      :total-pages="store.totalPages"
+      :prev-chapter-id="store.prevChapterId"
+      :next-chapter-id="store.nextChapterId"
+      :chapter-id="store.chapterId"
+      :reaction="store.reaction"
+      :is-fullscreen="isFullscreen"
+      :fullscreen-pending="fullscreenPending"
+      :visibility-override="isFullscreen ? fullscreenToolbarVisible : undefined"
+      @toggle-fullscreen="toggleFullscreen"
+      @back="nav.goBack"
+      @prev-chapter="nav.goPrevChapter()"
+      @next-chapter="nav.goNextChapter()"
+      @jump-to-page="onPageChange"
+      @open-immersive="openImmersive"
+      @toggle-reaction="toggleChapterReaction"
+    />
+
+    <!-- Loading -->
+    <ContentState v-if="store.loading" state="loading" message="加载中..." />
+
+    <!-- Error -->
+    <ContentState v-else-if="store.error" state="error" :message="store.error">
+      <AppButton variant="primary" @click="reload">重试</AppButton>
+    </ContentState>
+
+    <!-- Empty -->
+    <ContentState v-else-if="store.pages.length === 0" state="empty" message="暂无页面">
+      <template #icon><PictureFilled /></template>
+    </ContentState>
+
+    <!-- Reader Viewport:纵向=连续滚动,横向=单页翻页(§需求 2026-07) -->
+    <ReaderPagedViewport
+      v-else-if="isPagedMode"
+      ref="viewportComponentRef"
+      :pages="store.pages"
+      :current-page="store.currentPage"
+      :force-hq-pages="forceHqPages"
+      @page-request="onPageRequest"
+      @visible-range="onVisibleRange"
+      @scroll-direction="onViewportScrollDirection"
+      @video-started="onVideoStarted"
+    />
+    <ReaderViewport
+      v-else
+      ref="viewportComponentRef"
+      :pages="store.pages"
+      :current-page="store.currentPage"
+      :force-hq-pages="forceHqPages"
+      :page-mode="mode === 'mobile'"
+      @update:current-page="onViewportPageChange"
+      @visible-range="onVisibleRange"
+      @scroll-direction="onViewportScrollDirection"
+      @video-started="onVideoStarted"
+    />
+
+    <!-- 移动端覆盖层：显隐全部由 useReaderToolbar 状态机驱动 -->
+    <template v-if="mode === 'mobile'">
+      <ReaderToolbar
+        v-if="toolbarVisible"
+        :mode="mode"
+        :title="toolbarTitle"
+        :chapter-id="store.chapterId"
+        :reaction="store.reaction"
+        :is-fullscreen="isFullscreen"
+        :fullscreen-pending="fullscreenPending"
+        @toggle-fullscreen="toggleFullscreen"
+        @back="nav.goBack"
+        @open-settings="dispatch(ReaderAction.OpenSettings)"
+        @open-immersive="openImmersive"
+        @toggle-reaction="toggleChapterReaction"
+      />
+      <ReaderBottomNav
+        v-if="toolbarVisible"
+        :current-page="store.currentPage"
+        :total-pages="store.totalPages"
+        :has-prev="store.prevChapterId !== null"
+        :has-next="store.nextChapterId !== null"
+        @prev-chapter="nav.goPrevChapter()"
+        @catalog="nav.goToCatalog"
+        @next-chapter="nav.goNextChapter"
+        @jump-to-page="onPageChange"
+      />
+      <ReaderSettingsDrawer :visible="isSettings" @close="dispatch(ReaderAction.CloseSettings)" />
+    </template>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { AppButton } from '@/shared/ui/button'
+import { ContentState } from '@/shared/ui/content-state'
+import { ref, reactive, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { ElMessage } from 'element-plus'
+import { PictureFilled } from '@element-plus/icons-vue'
+import { useReaderStore } from '@/features/reader-navigation'
+import { useReadingNavigation } from '@/features/reading-navigation'
+import { useReaderSettingsStore } from '@/features/reader-settings'
+import {
+  ReaderViewport,
+  ReaderPagedViewport,
+  ReaderToolbar,
+  ReaderBottomNav,
+  ReaderSettingsDrawer,
+  useReaderNavigation,
+  useReaderShortcuts,
+} from '@/widgets/reader'
+import { ReaderAction, useInteractionMode, useReaderGesture, useReaderToolbar } from '@/features/reader-interaction'
+import { catalogApi, comicApi } from '@/entities/comic'
+import type { CatalogNode } from '@/entities/comic'
+import { searchCatalogChapters } from '@/features/chapter-search'
+import { readerApi } from '@/entities/chapter'
+import { getApiErrorMessage } from '@/shared/api/http'
+import { preloadEngine } from '@/widgets/reader'
+import { isVideoMedia } from '@/entities/media'
+import type { MediaReaction } from '@/entities/media'
+import { useReaderProgress } from './composables/useReaderProgress'
+import { useReaderFullscreen } from './composables/useReaderFullscreen'
+
+const route = useRoute()
+const router = useRouter()
+const store = useReaderStore()
+const settings = useReaderSettingsStore()
+const { isFullscreen, isPending: fullscreenPending, toggleFullscreen } = useReaderFullscreen()
+const fullscreenToolbarVisible = ref(true)
+let fullscreenControlsTimer: ReturnType<typeof setTimeout> | null = null
+
+function scheduleFullscreenControlsHide(): void {
+  if (fullscreenControlsTimer != null) clearTimeout(fullscreenControlsTimer)
+  fullscreenControlsTimer = null
+  if (!isFullscreen.value) return
+  fullscreenControlsTimer = setTimeout(() => {
+    fullscreenControlsTimer = null
+    if (!isFullscreen.value || isSettings.value) return
+    if (mode.value === 'mobile') dispatch(ReaderAction.SwipeUp)
+    else fullscreenToolbarVisible.value = false
+  }, 2600)
+}
+
+// ── 移动端交互系统（设计规范 §3/§9）────────────────────────────
+const { mode } = useInteractionMode()
+const nav = useReaderNavigation()
+const readingNavigation = useReadingNavigation()
+// EXIT 哨兵（IMMERSIVE 下 AndroidBack）→ 返回详情页
+const { dispatch, toolbarVisible, isSettings } = useReaderToolbar({ onExit: nav.goBack })
+
+// ReaderViewport / ReaderPagedViewport 组件实例 → 根元素，供手势绑定。
+// 两组件互斥渲染共用同一 ref 位；v-if 切换时 useReaderGesture 内部 watch 会重绑。
+const viewportComponentRef = ref<InstanceType<typeof ReaderViewport> | null>(null)
+const viewportElRef = computed<HTMLElement | null>(() => {
+  const el: unknown = viewportComponentRef.value?.$el
+  return el instanceof HTMLElement ? el : null
+})
+const gesture = useReaderGesture(viewportElRef)
+
+// 横向 = 单页翻页模式；其余方向（vertical/ltr/rtl）沿用纵向连续滚动
+const isPagedMode = computed(() => settings.readingDirection === 'horizontal')
+
+// 翻页请求统一决策：页内步进，越界自动跳章（上一章落到最后一页）
+function onPageRequest(direction: 'next' | 'prev') {
+  if (direction === 'next') {
+    if (store.currentPage < store.totalPages) {
+      store.currentPage++
+    } else {
+      nav.goNextChapter()
+    }
+  } else {
+    if (store.currentPage > 1) {
+      store.currentPage--
+    } else {
+      nav.goPrevChapter('last')
+    }
+  }
+}
+
+// 手势路由：翻页模式下 tap 三分区（左 30% 上一页 / 右 30% 下一页 / 中央唤工具栏）；
+// 纵向模式 tap 仅移动端派发状态机（桌面工具栏走 settings.showToolbar 布尔）。
+gesture.onTap((point) => {
+  if (isPagedMode.value && viewportElRef.value) {
+    const rect = viewportElRef.value.getBoundingClientRect()
+    if (rect.width > 0) {
+      const ratio = (point.x - rect.left) / rect.width
+      if (ratio < 0.3) {
+        onPageRequest('prev')
+        return
+      }
+      if (ratio > 0.7) {
+        onPageRequest('next')
+        return
+      }
+    }
+  }
+  if (mode.value === 'mobile') {
+    dispatch(ReaderAction.TapCenter)
+  } else if (isFullscreen.value) {
+    fullscreenToolbarVisible.value = !fullscreenToolbarVisible.value
+  }
+  scheduleFullscreenControlsHide()
+})
+
+// swipe 仅翻页模式响应：内容随手指方向前进（左划=下一页）
+gesture.onSwipe((direction) => {
+  if (direction === 'left' || direction === 'right') {
+    if (!isPagedMode.value) return
+    onPageRequest(direction === 'left' ? 'next' : 'prev')
+    return
+  }
+
+  if (mode.value !== 'mobile') return
+  dispatch(direction === 'up' ? ReaderAction.SwipeUp : ReaderAction.SwipeDown)
+})
+
+const comicTitle = ref('')
+const {
+  lastSyncedPage,
+  chapterLoading,
+  prepareProgressForReload,
+  retryProgressSave,
+  saveVideoProgress,
+  prepareProgressForChapterChange,
+} = useReaderProgress()
+const toolbarTitle = computed(() => {
+  const chapterTitle = store.chapterTitle?.trim()
+  const fallbackTitle = comicTitle.value || `漫画 #${store.comicId}`
+  if (!chapterTitle) return fallbackTitle
+  if (mode.value === 'mobile') return chapterTitle
+  return `${fallbackTitle} · ${chapterTitle}`
+})
+
+function openImmersive() {
+  if (!store.chapterId) return
+  readingNavigation.goToImmersive(store.chapterId, { ...route.query, page: store.currentPage })
+}
+
+async function toggleChapterReaction(next: MediaReaction) {
+  if (!store.chapterId) return
+  const target: MediaReaction = store.reaction === next ? 'NONE' : next
+  const previous = store.reaction
+  store.reaction = target
+  try {
+    await readerApi.updateChapterReaction(store.chapterId, target)
+  } catch (reason: unknown) {
+    store.reaction = previous
+    ElMessage.error(getApiErrorMessage(reason, '保存章节标记失败'))
+  }
+}
+let chapterLoadToken = 0
+/** 被双击切到 HQ 的页面索引（0-based），使用 reactive Set 保持响应性 */
+const forceHqPages = reactive(new Set<number>())
+const catalogTreeCache = new Map<number, CatalogNode[]>()
+
+async function applySearchChapterNavigation(chapterId: number, loadToken: number) {
+  const searchKeyword = route.query.search
+  if (typeof searchKeyword !== 'string' || !searchKeyword.trim()) return
+
+  try {
+    let catalogTree = catalogTreeCache.get(store.comicId)
+    if (!catalogTree) {
+      const response = await catalogApi.tree(store.comicId)
+      catalogTree = [...response.data]
+      catalogTreeCache.set(store.comicId, catalogTree)
+    }
+    if (loadToken !== chapterLoadToken || Number(route.params.chapterId) !== chapterId) return
+
+    const matchingChapters = searchCatalogChapters(catalogTree, searchKeyword)
+    const currentIndex = matchingChapters.findIndex((item) => item.chapter.id === chapterId)
+    if (currentIndex < 0) return
+    store.prevChapterId = matchingChapters[currentIndex - 1]?.chapter.id ?? null
+    store.nextChapterId = matchingChapters[currentIndex + 1]?.chapter.id ?? null
+  } catch {
+    // 搜索上下文不可用时保留阅读 API 返回的全书相邻章节。
+  }
+}
+
+// 移动端不依赖浏览器 dblclick：触控双击同一图片后，幂等加载当前页 HQ。
+gesture.onDoubleTap(() => {
+  forceHqPages.add(store.currentPage - 1)
+})
+
+const { onKeydown, onWheel, onDblClick } = useReaderShortcuts({
+  isPagedMode,
+  readerStore: store,
+  readerSettings: settings,
+  forceHqPages,
+  onPageRequest,
+})
+
+async function reload() {
+  // 重载会暂时把 currentPage 重置为 1，先确认当前进度，避免重载覆盖历史。
+  const canRestoreProgress = await prepareProgressForReload()
+  await loadCurrentChapter(true, canRestoreProgress)
+}
+
+async function loadCurrentChapter(preservePage = false, restoreProgress = true) {
+  const chapterId = Number(route.params.chapterId)
+  const rawPage = preservePage ? undefined : route.query.page
+
+  if (!chapterId) {
+    store.error = '参数不完整'
+    return
+  }
+
+  const loadToken = ++chapterLoadToken
+  chapterLoading.value = true
+
+  try {
+    await store.loadChapter(chapterId, preservePage)
+
+    // 竞态闸：等待期间用户又切了章，丢弃本次过期结果。
+    if (loadToken !== chapterLoadToken || Number(route.params.chapterId) !== chapterId) return
+
+    if (store.error) {
+      ElMessage.error(store.error)
+      return
+    }
+
+    await applySearchChapterNavigation(chapterId, loadToken)
+    if (loadToken !== chapterLoadToken || Number(route.params.chapterId) !== chapterId) return
+
+    forceHqPages.clear()
+    preloadEngine.reset(store.totalPages)
+    preloadEngine.setUrlResolver((index: number, priority: 'immediate' | 'cascade') => {
+      const page = store.pages[index]
+      if (!page) return null
+      // 视频只由 <video preload="metadata"> 按需读取，禁止图片预加载器
+      // 把视频 URL 交给 new Image() 并发起额外媒体请求。
+      if (isVideoMedia(page)) return null
+      // 只有可视区附近的 immediate 才预加载 HQ；远处 cascade 一律优先 LQ，
+      // 避免快速滚动时同时下载和解码大量原图导致 Safari 内存崩溃。
+      const wantHq = priority === 'immediate' && (settings.qualityMode !== 'LQ_ONLY' || forceHqPages.has(index))
+      if (wantHq) return page.hqUrl || page.lqUrl || null
+      return page.lqUrl || page.hqUrl || null
+    })
+
+    if (rawPage === 'last') {
+      store.currentPage = Math.max(1, store.totalPages)
+    } else {
+      const pageFromQuery = Number(rawPage)
+      // 显式页码代表本次导航意图：切换章节的 page=1 必须从章节开头开始，不能被上一章历史覆盖。
+      if (rawPage !== undefined && pageFromQuery >= 1 && pageFromQuery <= store.totalPages) {
+        store.currentPage = pageFromQuery
+      } else if (restoreProgress) {
+        await store.restoreProgress()
+      }
+    }
+
+    // 移动端连续滚动模式不监听 currentPage 回流，首次恢复历史进度后必须主动定位，
+    // 否则页码状态已是第 N 页，但窗口仍停留在章节开头。
+    if (!isPagedMode.value) {
+      await nextTick()
+      viewportComponentRef.value?.scrollToPage?.(store.currentPage)
+    }
+
+    if (loadToken !== chapterLoadToken || Number(route.params.chapterId) !== chapterId) return
+
+    try {
+      const detail = await comicApi.detail(store.comicId)
+      const detailData = detail.data
+      comicTitle.value = detailData.title || `漫画 #${store.comicId}`
+    } catch {
+      comicTitle.value = `漫画 #${store.comicId}`
+    }
+
+    lastSyncedPage.value = store.currentPage
+
+    // 页码参数只用于本次导航，加载完成后从地址栏移除。
+    // 否则浏览器崩溃/刷新会重复使用 ?page=1，覆盖阅读历史恢复结果。
+    if (rawPage !== undefined && route.query.page === rawPage) {
+      const nextQuery = { ...route.query }
+      delete nextQuery.page
+      await router.replace({ query: nextQuery })
+    }
+  } finally {
+    if (loadToken === chapterLoadToken) {
+      chapterLoading.value = false
+    }
+  }
+}
+
+function onPageChange(page: number) {
+  if (page >= 1 && page <= store.totalPages) {
+    store.currentPage = page
+    // 连续滚动模式不依赖 currentPage watcher 回流定位，外部跳页必须显式执行定位。
+    if (!isPagedMode.value) {
+      viewportComponentRef.value?.scrollToPage?.(page)
+    }
+  }
+}
+
+/** 自然滚动只同步页码，不再次调用定位，避免滑动时页面位置被抢回。 */
+function onViewportPageChange(page: number) {
+  if (page >= 1 && page <= store.totalPages) {
+    store.currentPage = page
+  }
+}
+
+function onVisibleRange(range: { start: number; end: number; total: number }) {
+  if (!settings.enablePreload) return
+  preloadEngine.onVisibleChange(range.start, range.end, range.total)
+}
+
+function onVideoStarted(page: number) {
+  if (page < 0 || page >= store.totalPages) return
+  const pageNumber = page + 1
+  if (store.currentPage !== pageNumber) {
+    store.currentPage = pageNumber
+  }
+  if (store.comicId <= 0 || store.chapterId <= 0) return
+
+  saveVideoProgress(pageNumber)
+}
+
+/** 以真实滚动方向控制阅读端工具栏，避免依赖会被浏览器取消的 pointer swipe。 */
+function onViewportScrollDirection(direction: 'up' | 'down') {
+  if (isFullscreen.value && mode.value === 'desktop') {
+    fullscreenToolbarVisible.value = direction === 'down'
+    scheduleFullscreenControlsHide()
+    return
+  }
+  if (mode.value === 'mobile') {
+    dispatch(direction === 'up' ? ReaderAction.SwipeUp : ReaderAction.SwipeDown)
+    return
+  }
+
+  if (direction === 'up' && settings.showToolbar) {
+    settings.toggleToolbar()
+  } else if (direction === 'down' && !settings.showToolbar) {
+    settings.toggleToolbar()
+  }
+}
+
+onMounted(async () => {
+  // 全局页面为导航使用 smooth，但阅读器页码跳转必须即时定位，
+  // 否则移动端窗口滚动会与自然滑动、工具栏显隐叠加造成位置抢占。
+  document.documentElement.classList.add('reader-document')
+
+  // 桌面专属交互（键盘快捷键 / Ctrl+滚轮缩放 / 双击重置缩放）：
+  // 移动端不注册，避免与触摸手势系统冲突。
+  if (mode.value === 'desktop') {
+    document.addEventListener('keydown', onKeydown)
+    document.addEventListener('wheel', onWheel, { passive: false })
+    document.addEventListener('dblclick', onDblClick)
+  }
+
+  await loadCurrentChapter()
+})
+
+// 同名路由仅换参数时 Vue Router 复用组件实例,onMounted 不会重跑——
+// 章节切换(工具栏/BottomNav/自动跳章)必须显式监听 chapterId 重载。
+watch(
+  () => route.params.chapterId,
+  (newId, oldId) => {
+    if (!newId || newId === oldId) return
+    // 清除防抖并提交旧章进度，避免新章加载后用旧页码写入阅读历史。
+    prepareProgressForChapterChange()
+    loadCurrentChapter()
+  },
+)
+
+onBeforeUnmount(() => {
+  if (fullscreenControlsTimer != null) clearTimeout(fullscreenControlsTimer)
+  document.documentElement.classList.remove('reader-document')
+  // 移动端未注册这些监听器，remove 为无害 no-op
+  document.removeEventListener('keydown', onKeydown)
+  document.removeEventListener('wheel', onWheel)
+  document.removeEventListener('dblclick', onDblClick)
+  preloadEngine.destroy()
+})
+
+watch(
+  isFullscreen,
+  (active) => {
+    fullscreenToolbarVisible.value = true
+    if (!active) {
+      if (mode.value === 'mobile') dispatch(ReaderAction.SwipeDown)
+    }
+    scheduleFullscreenControlsHide()
+  },
+  { immediate: true },
+)
+</script>
+
+<style scoped>
+.reader-page {
+  width: 100%;
+  height: 100vh;
+  height: var(--app-viewport-height, 100dvh);
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+}
+
+.progress-save-error {
+  position: fixed;
+  z-index: 20;
+  top: var(--space-sm);
+  left: 50%;
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  color: var(--text-primary);
+  background: var(--bg-surface);
+  border: 1px solid var(--warning);
+  border-radius: var(--radius-sm);
+  transform: translateX(-50%);
+}
+
+:global(html.reader-document) {
+  scroll-behavior: auto;
+}
+
+@media (max-width: 1024px) {
+  .reader-page {
+    height: auto;
+    min-height: 100dvh;
+    overflow: visible;
+  }
+}
+
+.reader-state {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-base);
+  color: var(--text);
+}
+
+.reader-state.error {
+  color: var(--danger);
+}
+</style>

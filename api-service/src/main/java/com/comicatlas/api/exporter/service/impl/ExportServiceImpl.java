@@ -1,6 +1,5 @@
 package com.comicatlas.api.exporter.service.impl;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.comicatlas.persistence.comic.entity.Comic;
 import com.comicatlas.persistence.comic.mapper.ComicMapper;
 import com.comicatlas.contract.common.constant.HttpStatusCodes;
@@ -8,11 +7,11 @@ import com.comicatlas.contract.common.enums.ComicStatus;
 import com.comicatlas.api.exporter.enums.ExportTaskStatus;
 import com.comicatlas.api.task.enums.TaskType;
 import com.comicatlas.contract.common.exception.BusinessException;
-import com.comicatlas.api.storage.ApiStorageProperties;
+import com.comicatlas.api.storage.config.ApiStorageProperties;
 import com.comicatlas.api.storage.PathTraversalException;
 import com.comicatlas.api.exporter.dto.ExportTaskVO;
-import com.comicatlas.api.exporter.entity.ExportTask;
-import com.comicatlas.api.exporter.mapper.ExportTaskMapper;
+import com.comicatlas.api.exporter.persistence.entity.ExportTask;
+import com.comicatlas.api.exporter.persistence.mapper.ExportTaskMapper;
 import com.comicatlas.api.exporter.service.ExportService;
 import com.comicatlas.api.task.dto.CreateManagementTaskRequest;
 import com.comicatlas.api.task.dto.ManagementTaskResponse;
@@ -31,6 +30,10 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.Objects;
+import java.util.Comparator;
 
 @Slf4j
 @Service
@@ -58,10 +61,10 @@ public class ExportServiceImpl implements ExportService {
     @Override
     @Transactional
     public ExportTaskVO createExportTask(Long comicId, String format) {
-        requireExportableComic(comicId);
+        String normalizedFormat = normalizeFormat(format);
+        Comic comic = requireExportableComic(comicId);
         rejectDuplicateActiveTask(comicId);
 
-        String normalizedFormat = normalizeFormat(format);
         ExportTask task = createExportTaskRecord(comicId, normalizedFormat);
 
         Long taskId = task.getId();
@@ -75,17 +78,55 @@ public class ExportServiceImpl implements ExportService {
     }
 
     @Override
+    @Transactional
+    public ExportTaskVO createBatchDirectoryExportTask(List<Long> requestedComicIds) {
+        if (requestedComicIds == null || requestedComicIds.isEmpty()) {
+            throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "至少选择一本漫画");
+        }
+        List<Long> comicIds = new ArrayList<>(new LinkedHashSet<>(requestedComicIds));
+        if (comicIds.size() != requestedComicIds.size() || comicIds.stream().anyMatch(Objects::isNull)) {
+            throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "漫画选择包含重复或空 ID");
+        }
+        comicIds.sort(Comparator.naturalOrder());
+        List<Comic> comics = new ArrayList<>(comicIds.size());
+        for (Long comicId : comicIds) {
+            Comic comic = requireExportableComic(comicId);
+            rejectDuplicateActiveTask(comicId);
+            comics.add(comic);
+        }
+
+        ExportTask task = new ExportTask();
+        task.setComicId(comicIds.getFirst());
+        task.setComicIds(comicIds.stream().map(String::valueOf).collect(java.util.stream.Collectors.joining(",")));
+        task.setFormat(ExportFormats.BATCH_DIRECTORY);
+        task.setStatus(ExportTaskStatus.PENDING);
+        task.setProgress(0);
+        exportTaskMapper.insert(task);
+
+        ManagementTaskResponse managementTaskResponse = createManagementTaskForExport(comicIds);
+        task.setManagementTaskId(managementTaskResponse.getId());
+        exportTaskMapper.updateById(task);
+        outboxService.enqueue(new ExportTaskCreatedEvent(UUID.randomUUID(), Instant.now(), task.getId(),
+                        comicIds.getFirst(), ExportFormats.BATCH_DIRECTORY, comicIds),
+                MqExchanges.EXPORT, MqRoutingKeys.TASK_CREATED);
+
+        for (Comic comic : comics) {
+            comic.setStatus(ComicStatus.EXPORTING);
+            comicMapper.updateById(comic);
+        }
+        log.info("批量文件夹导出任务创建: taskId={}, comicCount={}", task.getId(), comicIds.size());
+        return toVO(task);
+    }
+
+    @Override
     public List<ExportTaskVO> listExports(Long comicId) {
-        List<ExportTask> tasks = exportTaskMapper.selectList(new LambdaQueryWrapper<ExportTask>()
-            .eq(ExportTask::getComicId, comicId)
-            .orderByDesc(ExportTask::getCreatedAt));
+        List<ExportTask> tasks = exportTaskMapper.selectByComicIdOrderByCreatedAtDesc(comicId);
         return tasks.stream().map(this::toVO).toList();
     }
 
     @Override
     public List<ExportTaskVO> listAllExports() {
-        List<ExportTask> tasks = exportTaskMapper.selectList(new LambdaQueryWrapper<ExportTask>()
-            .orderByDesc(ExportTask::getCreatedAt));
+        List<ExportTask> tasks = exportTaskMapper.selectAllOrderByCreatedAtDesc();
         return tasks.stream().map(this::toVO).toList();
     }
 
@@ -98,20 +139,19 @@ public class ExportServiceImpl implements ExportService {
         return toVO(task);
     }
 
-    private void requireExportableComic(Long comicId) {
-        Comic comic = comicMapper.selectById(comicId);
+    private Comic requireExportableComic(Long comicId) {
+        Comic comic = comicMapper.selectByIdForUpdate(comicId);
         if (comic == null) {
             throw new BusinessException(HttpStatusCodes.NOT_FOUND, "漫画不存在");
         }
         if (comic.getStatus() != ComicStatus.READY) {
             throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "漫画状态不允许导出，当前状态: " + comic.getStatus());
         }
+        return comic;
     }
 
     private void rejectDuplicateActiveTask(Long comicId) {
-        ExportTask existing = exportTaskMapper.selectOne(new LambdaQueryWrapper<ExportTask>()
-            .eq(ExportTask::getComicId, comicId)
-            .and(wrapper -> wrapper.eq(ExportTask::getStatus, ExportTaskStatus.PENDING).or().eq(ExportTask::getStatus, ExportTaskStatus.RUNNING)));
+        ExportTask existing = exportTaskMapper.selectActiveByComicId(comicId);
         if (existing != null) {
             throw new BusinessException(HttpStatusCodes.CONFLICT, "该漫画已有进行中的导出任务，任务ID: " + existing.getId());
         }
@@ -144,15 +184,23 @@ public class ExportServiceImpl implements ExportService {
      * 同事务创建统一导出任务并返回其响应。
      */
     private ManagementTaskResponse createManagementTaskForExport(Long comicId) {
+        return createManagementTaskForExport(List.of(comicId));
+    }
+
+    private ManagementTaskResponse createManagementTaskForExport(List<Long> comicIds) {
         CreateManagementTaskRequest mgmtReq = new CreateManagementTaskRequest();
         mgmtReq.setTaskType(TaskType.EXPORT);
         mgmtReq.setOperation(EXPORT_OPERATION);
         mgmtReq.setTargetType(TARGET_TYPE_COMIC);
-        CreateManagementTaskRequest.TaskTarget target = new CreateManagementTaskRequest.TaskTarget();
-        target.setTargetType(TARGET_TYPE_COMIC);
-        target.setTargetId(comicId);
-        target.setOperationType(TaskType.EXPORT);
-        mgmtReq.setTargets(List.of(target));
+        List<CreateManagementTaskRequest.TaskTarget> targets = new ArrayList<>(comicIds.size());
+        for (Long comicId : comicIds) {
+            CreateManagementTaskRequest.TaskTarget target = new CreateManagementTaskRequest.TaskTarget();
+            target.setTargetType(TARGET_TYPE_COMIC);
+            target.setTargetId(comicId);
+            target.setOperationType(TaskType.EXPORT);
+            targets.add(target);
+        }
+        mgmtReq.setTargets(targets);
         return managementTaskService.createTask(mgmtReq, null, null);
     }
 
@@ -160,6 +208,7 @@ public class ExportServiceImpl implements ExportService {
         ExportTaskVO taskVO = new ExportTaskVO();
         taskVO.setId(task.getId());
         taskVO.setComicId(task.getComicId());
+        taskVO.setComicIds(parseComicIds(task));
         taskVO.setFormat(task.getFormat() == null ? ExportFormats.ZIP : task.getFormat());
         taskVO.setStatus(task.getStatus() == null ? null : task.getStatus().name());
         taskVO.setProgress(task.getProgress());
@@ -182,5 +231,13 @@ public class ExportServiceImpl implements ExportService {
             }
         }
         return taskVO;
+    }
+
+    private List<Long> parseComicIds(ExportTask task) {
+        if (task.getComicIds() == null || task.getComicIds().isBlank()) {
+            return task.getComicId() == null ? List.of() : List.of(task.getComicId());
+        }
+        return java.util.Arrays.stream(task.getComicIds().split(","))
+                .map(Long::valueOf).toList();
     }
 }

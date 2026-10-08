@@ -2,9 +2,11 @@ package com.comicatlas.api.task.controller;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.comicatlas.contract.common.Result;
+import com.comicatlas.contract.common.dto.PageResponse;
 import com.comicatlas.api.task.dto.CreateManagementTaskRequest;
 import com.comicatlas.api.task.dto.ManagementTaskItemResponse;
 import com.comicatlas.api.task.dto.ManagementTaskResponse;
+import com.comicatlas.api.task.dto.ManagementTaskStatusCountResponse;
 import com.comicatlas.api.task.service.ManagementTaskService;
 import com.comicatlas.api.task.enums.ManagementTaskStatus;
 import com.comicatlas.api.task.enums.TaskType;
@@ -34,12 +36,22 @@ public class ManagementTaskController {
 
     private final ManagementTaskService managementTaskService;
 
+    /** 查询任务状态全量统计，支持与任务列表相同的非状态筛选条件。 */
+    @GetMapping("/status-counts")
+    public Result<List<ManagementTaskStatusCountResponse>> getTaskStatusCounts(
+            @RequestParam(required = false) TaskType type,
+            @RequestParam(required = false) String batchId,
+            @RequestParam(required = false) String targetType,
+            @RequestParam(required = false) Long targetId) {
+        return Result.ok(managementTaskService.getTaskStatusCounts(type, batchId, targetType, targetId));
+    }
+
     /**
      * 分页查询任务列表。
      * 支持 type/status/batchId/targetType/targetId 过滤。
      */
     @GetMapping
-    public Result<IPage<ManagementTaskResponse>> listTasks(
+    public Result<PageResponse<ManagementTaskResponse>> listTasks(
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(required = false) TaskType type,
@@ -47,8 +59,10 @@ public class ManagementTaskController {
             @RequestParam(required = false) String batchId,
             @RequestParam(required = false) String targetType,
             @RequestParam(required = false) Long targetId) {
-        return Result.ok(managementTaskService.listTasks(page, size, type, status, batchId,
-                targetType, targetId));
+        IPage<ManagementTaskResponse> taskPage = managementTaskService.listTasks(page, size, type, status,
+                batchId, targetType, targetId);
+        return Result.ok(PageResponse.of(taskPage.getRecords(), taskPage.getTotal(),
+                taskPage.getCurrent(), taskPage.getSize()));
     }
 
     /**

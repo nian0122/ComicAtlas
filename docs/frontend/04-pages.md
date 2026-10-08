@@ -1,176 +1,45 @@
-# 04 — 页面规划
+# 前端页面与路由
 
-**更新日期：** 2026-08-16
-**状态：** 与 v2.0 路由结构同步
-**维护者：** ComicAtlas 前端组
+更新日期：2026-09-29。路由事实来源为 `frontend/src/app/router/index.ts`；页面职责和组件归属遵循 [前端 FSD 架构](08-frontend-architecture.md)。
 
-> 确定每个页面的路由、职责、核心组件和当前状态。路由定义见 `frontend/src/router/index.ts`（阅读端 6 条 + 管理端 8 条主页面路由）。
+## 阅读端
 
----
+| 路由 | 页面切片 | 主要职责 |
+| --- | --- | --- |
+| `/` | `pages/reading/home` | 继续阅读、最近内容和操作入口 |
+| `/library` | `pages/reading/library` | 浏览、搜索、筛选与排序 |
+| `/history` | `pages/reading/history` | 阅读记录与继续阅读 |
+| `/comic/:id` | `pages/reading/detail` | 漫画信息、目录与章节入口 |
+| `/reader/:chapterId` | `pages/reader` | 图片与视频混排阅读、进度和阅读设置 |
+| `/videos/:chapterId` | `pages/reader` | 章节视频页 |
 
-## 页面清单
+阅读页面使用 `widgets/reading-layout`，阅读器使用 `widgets/reader`。漫画卡片与目录树属于 `entities/comic`，视频播放与渐进加载属于 `entities/media`。
 
-### 阅读端
+漫画库滚动超过 600px 后显示右下角返回顶部按钮，移动端避开底部导航和安全区。点击后回到顶部筛选入口，保留筛选、页码和已加载列表；支持键盘操作，系统设置减少动态效果时立即回顶。
 
-| 路由 | 页面 | 说明 |
-|------|------|------|
-| `/` | Home（首页） | 最近阅读 / 最近导入 / 操作入口 |
-| `/library` | Library（漫画库） | 浏览、搜索、筛选、排序 |
-| `/comic/:id` | Comic Detail（漫画详情） | 信息、目录树、阅读/操作入口 |
-| `/reader/:chapterId` | Reader（阅读器） | 图片/视频混排阅读 |
-| `/history` | History（阅读记录） | 继续阅读入口 |
-| `/poster-test` | PosterTest（测试页） | 海报/封面渲染测试，非用户功能 |
+移动阅读器上下工具栏使用留出安全区和边距的深色浮动面板。顶部将返回、标题、设置与标记、全屏、沉浸阅读分行排列；底部以细进度线和页码入口展示阅读位置，章节切换与目录保持独立触控区域。页码弹窗避开导航面板，原有显隐手势和阅读行为保持一致。
 
-### 管理端
+桌面阅读工具栏在普通窗口与全屏下均覆盖阅读区域，不占据布局高度。隐藏时不保留顶部黑条，不改变图片尺寸、阅读视口或滚动进度，隐藏的控件不接受键盘焦点。
 
-| 路由 | 页面 | 说明 |
-|------|------|------|
-| `/manage/comics` | ComicListPage（漫画工作区） | 管理端列表、筛选、批量选择 |
-| `/manage/comics/:id/edit` | ComicEditPage（漫画编辑） | 元数据 / 标签 / 分类 / 封面（乐观锁） |
-| `/manage/import` | ImportPage（导入） | ZIP / DIRECTORY 导入（批量仅 DIRECTORY；EHENTAI 由 API 支持） |
-| `/manage/import/tasks` | TaskPage（任务中心） | 导入任务进度、取消、重试 |
-| `/manage/storage` | StoragePage（存储管理） | 存储统计、HQ/LQ 状态、批量操作 |
-| `/manage/storage/:id` | StorageDetailPage（章节明细） | 单本漫画的章节级 HQ/LQ 状态与操作 |
-| `/manage/metadata` | MetadataPage（元数据管理） | 分类与标签维护 |
-| `/manage/dlq` | DeadLetterPage（DLQ 管理） | 死信队列查看 / 重放 / 清空 |
-| `/manage/settings` | SettingsPage（设置） | 阅读默认画质等偏好 |
-| `/manage/intercept` | InterceptPage（拦截页） | 移动阅读设备访问管理端的提示页 |
+## 管理端
 
----
+| 路由 | 页面切片 | 主要职责 |
+| --- | --- | --- |
+| `/manage` | `pages/management/home` | 管理首页 |
+| `/manage/comics` | `pages/management/comics` | 漫画列表与批量操作入口 |
+| `/manage/comics/:id` | `pages/management/comic-workspace` | 单本漫画的编辑、结构和存储工作台 |
+| `/manage/import` | `pages/management/import` | 单项与批量导入 |
+| `/manage/upload` | `pages/management/upload` | 媒体上传和替换 |
+| `/manage/tasks` | `pages/management/tasks` | 管理任务进度、取消与重试 |
+| `/manage/trash` | `pages/management/trash` | 回收、恢复与永久清理 |
+| `/manage/storage` | `pages/management/storage` | 存储统计、筛选和漫画存储明细入口 |
+| `/manage/metadata` | `pages/management/metadata` | 分类和标签维护 |
+| `/manage/media-reactions` | `pages/management/media-reactions` | 媒体反馈管理 |
+| `/manage/ai-analysis` | `pages/management/ai-analysis` | AI 分析 |
+| `/manage/dlq` | `pages/management/dlq` | 死信查看、重放和清空 |
+| `/manage/settings` | `pages/management/settings` | 阅读与应用设置 |
+| `/manage/intercept` | `pages/management/intercept` | 移动设备管理端提示 |
 
-## Home（首页）
+管理页面使用 `widgets/management-layout`。`/manage/comics/:id/edit` 和 `/manage/storage/:id` 重定向到漫画工作台的相应标签；旧的 `/manage/import/tasks` 重定向到统一任务中心。`/manage/workbench`、`/manage/operations` 和 `/manage/status` 保留为列表页兼容跳转。移动阅读设备访问管理路由时由路由守卫转到 `/manage/intercept`。
 
-**路由**：`/`
-
-**职责**：
-- Hero 展示继续阅读入口
-- 最近阅读（HomeRow → `/history`）
-- 最近导入（HomeRow → `/library`）
-- 操作入口网格（HomeActionGrid）
-
-**关键组件**：`components/reading/home/HomeHero.vue`、`HomeRow.vue`、`HomeActionGrid.vue`
-
----
-
-## Library（漫画库）
-
-**路由**：`/library`
-
-**职责**：
-- 展示所有漫画（封面网格）
-- 搜索（keyword，防抖即时搜索）
-- 筛选（分类 / 多标签 AND-OR / 状态 / 来源类型）
-- 排序切换（createdAt / updatedAt / title / pageCount / lastReadTime）
-- 分页
-- 点击封面进入详情
-
-**关键组件**：`components/reading/comic/ComicCard.vue`、`ComicPoster.vue`
-
----
-
-## Comic Detail（漫画详情）
-
-**路由**：`/comic/:id`
-
-**职责**：
-- 展示漫画封面 + 基本信息
-- 展示标签
-- 操作按钮：继续阅读 / 从头开始 / 生成 LQ / 删除
-- 展示 Catalog 目录树
-- 点击章节 → Reader
-
-**关键组件**：`components/reading/comic/CatalogTree.vue`（+ `CatalogTreeNode.vue` 递归）、`ChapterRow.vue`、`MobileComicDetail.vue`
-
----
-
-## Reader（阅读器）
-
-**路由**：`/reader/:chapterId`
-
-**职责**：
-- 展示漫画内容（图片 HQ/LQ 渐进加载，视频 VideoPlayer 播放）
-- 页码显示 + 总页数
-- 上一章 / 下一章导航（按 global_order）
-- 自动记录阅读进度（chapterId + pageNumber）
-- 阅读设置抽屉（画质 HQ/LQ、滚动/翻页模式）
-- 双端工具栏（桌面 / 移动）
-
-**关键组件**：`views/reading/reader/components/`：`ReaderViewport.vue`、`ReaderPagedViewport.vue`、`ProgressiveImage.vue`、`ReaderImageItem.vue`、`VideoPlayer.vue`、`ReaderToolbar.vue`（+ Desktop/Mobile 变体）、`ReaderSettingsDrawer.vue`、`ReaderBottomNav.vue`
-
----
-
-## History（阅读记录）
-
-**路由**：`/history`
-
-**职责**：
-- 展示最近阅读的漫画（按时间分组）
-- 点击直接进入 Reader 恢复上次位置
-
-**关键组件**：`components/history/`
-
----
-
-## Import（导入，管理端）
-
-**路由**：`/manage/import`
-
-**职责**：
-- 选择来源类型（ZIP 文件 / DIRECTORY 本地目录；EHENTAI 由 API 支持，前端暂未提供选项）
-- 输入文件路径（ZIP 文件路径或本地目录路径）
-- 批量导入（多条本地目录路径）
-- 提交后跳转任务中心
-
----
-
-## 任务中心（管理端）
-
-**路由**：`/manage/import/tasks`
-
-**职责**：
-- 展示所有导入任务
-- 按状态分组：进行中 / 失败 / 已完成
-- 实时进度条
-- 失败任务重试
-- 进行中任务取消
-
-**关键组件**：`components/management/task/TaskCard.vue`
-
----
-
-## 存储管理（管理端）
-
-**路由**：`/manage/storage`、`/manage/storage/:id`
-
-**职责**：
-- 存储统计概览（HQ/LQ 总大小与状态）
-- 漫画级 HQ/LQ 状态列表、排序与筛选
-- 批量操作（LQ 生成 / HQ 删除）
-- 章节明细：逐章查看 HQ/LQ 状态、执行操作
-- 视频转码、导出、危险区
-
-**关键组件**：`views/management/storage/`：`StorageSummary.vue`、`StorageTable.vue`、`StorageToolbar.vue`、`StorageBatchBar.vue`、`StorageDetailPage.vue`、`StorageChapterDrawer.vue`、`StorageStatusTag.vue`
-
----
-
-## DLQ 管理（管理端）
-
-**路由**：`/manage/dlq`
-
-**职责**：查看死信队列积压，查看消息 payload，重放（replay）或清空（purge）。
-
-**关键组件**：`views/management/dlq/DlqAccessPanel.vue`、`DlqMessageDialog.vue`
-
----
-
-## 全局 Layout
-
-现有布局组件（`frontend/src/layouts/`）：
-
-```
-ReadingLayout       # 阅读端（Home/Library/Detail/History）
-ReaderLayout        # 阅读器（全屏）
-ManagementLayout    # 管理端（TopNav + 侧边栏 + <router-view>）
-```
-
-导航：`components/layout/TopNav.vue`。移动阅读设备访问 `/manage/*` 时由路由守卫重定向到 `/manage/intercept`（见 `router/index.ts` 的 `beforeEach`）。
+存储统计页使用完整管理内容区：全库、HQ、LQ 与缩略图为四张对齐的紧凑统计卡，窄屏保留两列。状态和更新时间独立显示，统计刷新仍异步核对容量。筛选在桌面排列为两行，字段、条件清除与排序保留原有行为，条件只影响漫画列表。表格将容量与媒体数量分列展示，点击记录进入漫画存储工作台。

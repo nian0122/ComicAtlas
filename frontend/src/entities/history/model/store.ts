@@ -1,0 +1,131 @@
+import { defineStore } from 'pinia'
+import { reactive, toRefs } from 'vue'
+import { getApiErrorMessage } from '@/shared/api/http'
+import { clientLogger } from '@/shared/lib/logger'
+import { historyApi } from '../api'
+import type { HistoryVO } from './types'
+
+export interface HistoryState {
+  list: HistoryVO[]
+  loading: boolean
+  error: string | null
+  total: number
+  page: number
+  pageSize: number
+  hasMore: boolean
+  loadingMore: boolean
+  loadMoreError: string | null
+}
+
+export const useHistoryStore = defineStore('history', () => {
+  const state = reactive<HistoryState>({
+    list: [],
+    loading: false,
+    error: null,
+    total: 0,
+    page: 1,
+    pageSize: 20,
+    hasMore: true,
+    loadingMore: false,
+    loadMoreError: null,
+  })
+
+  async function fetchFirstPage(): Promise<void> {
+    if (state.loading || state.loadingMore) return
+    state.loading = true
+    state.error = null
+    state.loadMoreError = null
+    state.page = 1
+    try {
+      const res = await historyApi.page(1, state.pageSize)
+      const data = res.data
+      state.list = data.records
+      state.total = data.total || 0
+      state.page = data.current || 1
+      state.hasMore = state.list.length < state.total
+    } catch (err: unknown) {
+      state.error = getApiErrorMessage(err, '加载阅读历史失败')
+      state.list = []
+      state.total = 0
+      state.hasMore = false
+    } finally {
+      state.loading = false
+    }
+  }
+
+  async function fetchNextPage(): Promise<void> {
+    if (state.loading || state.loadingMore || !state.hasMore) return
+    state.loadingMore = true
+    state.loadMoreError = null
+    try {
+      const nextPage = state.page + 1
+      const res = await historyApi.page(nextPage, state.pageSize)
+      const data = res.data
+      const existingIds = new Set(state.list.map((item) => item.comicId))
+      state.list.push(...(data.records || []).filter((item) => !existingIds.has(item.comicId)))
+      state.total = data.total || state.total
+      state.page = data.current || nextPage
+      state.hasMore = state.list.length < state.total
+    } catch (err: unknown) {
+      state.loadMoreError = getApiErrorMessage(err, '加载更多阅读历史失败')
+    } finally {
+      state.loadingMore = false
+    }
+  }
+
+  /** 只更新当前已加载的历史项，避免每次翻页都重新请求整页数据。 */
+  function updateEntry(comicId: number, chapterId: number, pageNumber: number, totalPages?: number): void {
+    const index = state.list.findIndex((item) => item.comicId === comicId)
+    if (index < 0) return
+    const item = state.list[index]
+    const next = {
+      ...item,
+      chapterId,
+      pageNumber,
+      totalPages: totalPages ?? item.totalPages,
+      progressPercent:
+        (totalPages ?? item.totalPages) > 0
+          ? Math.min(100, Math.round((pageNumber / (totalPages ?? item.totalPages)) * 100))
+          : item.progressPercent,
+      updatedAt: new Date().toISOString(),
+    }
+    state.list.splice(index, 1)
+    state.list.unshift(next)
+  }
+
+  /** 阅读器保存成功后同步已加载的本地项，不触发全量刷新。 */
+  async function recordProgress(
+    comicId: number,
+    chapterId: number,
+    pageNumber: number,
+    totalPages?: number,
+  ): Promise<void> {
+    await historyApi.update(comicId, { chapterId, pageNumber })
+    updateEntry(comicId, chapterId, pageNumber, totalPages)
+  }
+
+  /** 页面离开时使用 keepalive 请求，避免浏览器卸载中断普通 XHR。 */
+  function recordProgressKeepalive(progress: { comicId: number; chapterId: number; pageNumber: number }): void {
+    fetch(`/api/history/${progress.comicId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chapterId: progress.chapterId, pageNumber: progress.pageNumber }),
+      keepalive: true,
+    }).catch((error: unknown) => {
+      clientLogger.error('页面离开时阅读进度上报失败', {
+        operation: 'history.update.keepalive',
+        comicId: progress.comicId,
+        chapterId: progress.chapterId,
+        reason: error instanceof Error ? error.name : 'unknown',
+      })
+    })
+  }
+
+  return {
+    ...toRefs(state),
+    fetchFirstPage,
+    fetchNextPage,
+    recordProgress,
+    recordProgressKeepalive,
+  }
+})

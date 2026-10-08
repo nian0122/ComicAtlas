@@ -1,7 +1,7 @@
-# scripts/db
+# 数据库维护
 
-数据库维护脚本目录。当前暂无脚本，未来按此归位：
+应用启动时由管理服务执行 Flyway 迁移，不需要用户运行开发或 QA 初始化脚本。
 
-- 数据库备份 / 恢复
-- 迁移脚本执行
-- 数据对账与修复工具
+- [迁移说明](../../api-service/src/main/resources/db/README.md)
+- [账号与备份](../../docs/operations/management.md)
+- [远端备份工具](../../tools/maintenance/backup-remote-mysql.ps1)

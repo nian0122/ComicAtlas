@@ -74,7 +74,7 @@ public class ZipExtractor implements ArchiveExtractor, ArchiveReader {
         Set<Path> createdDirs = new HashSet<>();
         try {
             return extractEntries(volumes, archive, safeDest, createdFiles, createdDirs);
-        } catch (Exception e) {
+        } catch (IOException | RuntimeException e) {
             cleanupPartial(createdFiles, createdDirs);
             throw e;
         }

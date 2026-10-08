@@ -7,6 +7,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.io.File;
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
@@ -72,11 +73,13 @@ public class CoverGenerator {
                     "-chapter-id", COVER_CHAPTER_ID,
                     "-chapter-no", COVER_CHAPTER_NO,
                     "-quality", String.valueOf(config.getCover().getQuality()),
+                    "-max-long-edge", String.valueOf(config.getCover().getMaxLongEdge()),
                     "-workers", String.valueOf(config.getCover().getWorkers()),
                     "-json"
             ));
 
-            log.info("生成封面: comicId={}, quality={}", comicId, config.getCover().getQuality());
+            log.info("生成封面: comicId={}, quality={}, maxLongEdge={}",
+                    comicId, config.getCover().getQuality(), config.getCover().getMaxLongEdge());
 
             ProcessBuilder processBuilder = new ProcessBuilder(command);
             ExternalProcessRunner.ExternalProcessResult result =
@@ -107,7 +110,7 @@ public class CoverGenerator {
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new RuntimeException("封面优化被中断: comicId=" + comicId, e);
-        } catch (Exception e) {
+        } catch (IOException | RuntimeException e) {
             throw new RuntimeException("封面优化失败: comicId=" + comicId + ", " + e.getMessage(), e);
         } finally {
             cleanupTempDir(tempDir);
@@ -157,7 +160,7 @@ public class CoverGenerator {
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new RuntimeException("视频封面生成被中断: comicId=" + comicId, e);
-        } catch (Exception e) {
+        } catch (IOException | RuntimeException e) {
             if (e instanceof RuntimeException runtimeException) {
                 throw runtimeException;
             }
@@ -183,7 +186,7 @@ public class CoverGenerator {
                             .forEach(File::delete);
                 }
             }
-        } catch (Exception e) {
+        } catch (IOException | SecurityException e) {
             log.warn("清理临时目录失败: {}", tempDir, e);
         }
     }

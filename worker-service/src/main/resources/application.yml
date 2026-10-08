@@ -10,9 +10,6 @@ spring:
         server-addr: ${NACOS_ADDR}
         username: ${NACOS_USER}
         password: ${NACOS_PASS}
-      config:
-        import-check:
-          enabled: false
   rabbitmq:
     host: ${RABBITMQ_HOST}
     port: ${RABBITMQ_PORT}
@@ -49,6 +46,13 @@ mybatis-plus:
     db-config:
       id-type: auto
 
+logging:
+  level:
+    com.comicatlas.persistence: INFO
+    com.comicatlas.worker.persistence: INFO
+    com.baomidou.mybatisplus: INFO
+    org.mybatis: INFO
+
 worker:
   manga-root: ${MANGA_ROOT:F:/manga}
   temp-dir: ${MANGA_ROOT:F:/manga}/temp
@@ -59,8 +63,8 @@ worker:
   image-optimizer-path: ${IMAGE_OPTIMIZER_PATH:tools/image-optimizer/image-optimizer.exe}
   seven-zip-path: ${SEVEN_ZIP_PATH:7z}
   tools-base-dir: ${TOOLS_BASE_DIR:}
-  lq-quality: ${LQ_QUALITY:15}
-  lq-workers: ${LQ_WORKERS:4}
+  lq-quality: ${LQ_QUALITY:70}
+  lq-workers: ${LQ_WORKERS:8}
   hq-delete-timeout-seconds: ${HQ_DELETE_TIMEOUT_SECONDS:60}
   ffprobe-enabled: ${FFPROBE_ENABLED:true}
   torrent:
@@ -74,6 +78,7 @@ worker:
     socks-port: ${SOCKS_PORT:7897}
   cover:
     quality: ${COVER_QUALITY:25}
+    max-long-edge: ${COVER_MAX_LONG_EDGE:400}
     timeout-seconds: ${COVER_TIMEOUT_SECONDS:600}
     frame-timeout-seconds: ${COVER_FRAME_TIMEOUT_SECONDS:120}
     workers: ${COVER_WORKERS:1}
@@ -88,8 +93,9 @@ worker:
     timeout-seconds: ${TRANSCODE_TIMEOUT_SECONDS:600}
     encoder-probe-timeout-seconds: ${TRANSCODE_ENCODER_PROBE_TIMEOUT_SECONDS:15}
   image:
-    lq-timeout-seconds: ${LQ_TIMEOUT_SECONDS:600}
-    max-inflight-pixels: ${LQ_MAX_INFLIGHT_PIXELS:80000000}
+    lq-timeout-seconds: ${LQ_TIMEOUT_SECONDS:3600}
+    max-long-edge: ${LQ_MAX_LONG_EDGE:3840}
+    max-inflight-pixels: ${LQ_MAX_INFLIGHT_PIXELS:160000000}
   media:
     ffprobe-timeout-seconds: ${FFPROBE_TIMEOUT_SECONDS:15}
   download:
@@ -104,6 +110,8 @@ worker:
     cancellation-ttl-days: ${CANCELLATION_TTL_DAYS:7}
     metadata-refresh-attempt-ttl-days: ${METADATA_REFRESH_ATTEMPT_TTL_DAYS:7}
   zip:
+    compression-level: ${ZIP_COMPRESSION_LEVEL:1}
+    media-compression-level: ${ZIP_MEDIA_COMPRESSION_LEVEL:0}
     max-entries: ${ZIP_MAX_ENTRIES:100000}
     max-depth: ${ZIP_MAX_DEPTH:200}
     split-size: ${ZIP_SPLIT_SIZE:2147483648}
@@ -118,24 +126,16 @@ worker:
 storage:
   roots:
     HQ:
-      type: FILESYSTEM
       path: ${MANGA_ROOT:F:/manga}/hq
     LQ:
-      type: FILESYSTEM
       path: ${MANGA_ROOT:F:/manga}/lq
     THUMBS:
-      type: FILESYSTEM
       path: ${MANGA_ROOT:F:/manga}/thumbs
     METADATA:
-      type: FILESYSTEM
       path: ${MANGA_ROOT:F:/manga}/metadata
     STAGING:
-      type: FILESYSTEM
       path: ${MANGA_ROOT:F:/manga}/staging
-      readOnly: false
     TRASH:
-      type: FILESYSTEM
       path: ${MANGA_ROOT:F:/manga}/trash
     EXPORT:
-      type: FILESYSTEM
       path: ${MANGA_ROOT:F:/manga}/export

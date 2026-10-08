@@ -1,118 +1,134 @@
 package com.comicatlas.api.dlq.service;
 
-import com.comicatlas.api.dlq.service.DlqBrokerClient;
-import com.comicatlas.common.constant.MqExchanges;
-import com.comicatlas.common.constant.MqQueues;
-import com.comicatlas.common.constant.MqRoutingKeys;
-import com.comicatlas.contract.common.constant.HttpStatusCodes;
-import com.comicatlas.contract.common.exception.BusinessException;
-import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
-
 import java.util.List;
-import java.util.Map;
 
-import static java.util.Map.entry;
+/** DLQ 管理应用服务契约。 */
+public interface DlqService {
+    List<DlqQueueVO> listQueues();
 
-@Service
-@RequiredArgsConstructor
-public class DlqService {
+    List<DlqBrokerClient.DlqMessage> getMessages(String queueName, int count);
 
-    /** RabbitMQ 队列命名约定：DLQ 队列名 = 主队列名 + 本后缀。 */
-    private static final String DLQ_NAME_SUFFIX = ".dlq";
-    /** 由 DLQ 名推导主队列名时替换为的后缀。 */
-    private static final String ORIGINAL_QUEUE_SUFFIX = ".queue";
+    ReplayResult replay(String queueName, int maxMessages);
 
-    private static final Map<String, DlqRoute> DLQ_ROUTES = Map.ofEntries(
-        entry(MqQueues.IMPORT_TASK_DLQ, new DlqRoute(MqExchanges.IMPORT, MqRoutingKeys.TASK_CREATED)),
-        entry(MqQueues.EXPORT_TASK_DLQ, new DlqRoute(MqExchanges.EXPORT, MqRoutingKeys.TASK_CREATED)),
-        entry(MqQueues.IMPORT_RESULT_DLQ, new DlqRoute(MqExchanges.IMPORT, MqRoutingKeys.TASK_COMPLETED)),
-        entry(MqQueues.IMPORT_FAILED_DLQ, new DlqRoute(MqExchanges.IMPORT, MqRoutingKeys.TASK_FAILED)),
-        entry(MqQueues.EXPORT_STARTED_RESULT_DLQ, new DlqRoute(MqExchanges.EXPORT, MqRoutingKeys.TASK_STARTED)),
-        entry(MqQueues.EXPORT_COMPLETED_RESULT_DLQ, new DlqRoute(MqExchanges.EXPORT, MqRoutingKeys.TASK_COMPLETED)),
-        entry(MqQueues.EXPORT_FAILED_RESULT_DLQ, new DlqRoute(MqExchanges.EXPORT, MqRoutingKeys.TASK_FAILED))
-    );
+    PurgeResult purge(String queueName);
 
-    private final DlqBrokerClient brokerClient;
+   @lombok.Getter
 
-    public List<DlqQueueVO> listQueues() {
-        return DLQ_ROUTES.entrySet().stream()
-            .sorted(Map.Entry.comparingByKey())
-            .map(routeEntry -> toQueueView(routeEntry.getKey(), routeEntry.getValue()))
-            .toList();
-    }
-
-    public List<DlqBrokerClient.DlqMessage> getMessages(String queueName, int count) {
-        requireRoute(queueName);
-        return brokerClient.peek(queueName, count);
-    }
-
-    public ReplayResult replay(String queueName, int maxMessages) {
-        DlqRoute route = requireRoute(queueName);
-        DlqBrokerClient.ReplayBatch result = brokerClient.replay(
-            queueName,
-            route.exchange(),
-            route.routingKey(),
-            maxMessages
-        );
-        return new ReplayResult(
-            queueName,
-            result.attempted(),
-            result.replayed(),
-            result.remaining(),
-            result.completed(),
-            result.error()
-        );
-    }
-
-    public PurgeResult purge(String queueName) {
-        requireRoute(queueName);
-        return new PurgeResult(queueName, brokerClient.purge(queueName));
-    }
-
-    private DlqQueueVO toQueueView(String name, DlqRoute route) {
-        DlqBrokerClient.QueueStats stats = brokerClient.queueStats(name);
-        return new DlqQueueVO(
-            name,
-            route.exchange(),
-            route.routingKey(),
-            name.replace(DLQ_NAME_SUFFIX, ORIGINAL_QUEUE_SUFFIX),
-            stats.messages(),
-            stats.consumers()
-        );
-    }
-
-    private static DlqRoute requireRoute(String queueName) {
-        DlqRoute route = DLQ_ROUTES.get(queueName);
-        if (route == null) {
-            throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "未知 DLQ: " + queueName);
+    class DlqRoute {
+        private final String exchange;
+        private final String routingKey;
+        public DlqRoute(String exchange, String routingKey) {
+            this.exchange = exchange;
+            this.routingKey = routingKey;
         }
-        return route;
+        public String exchange() { return exchange; }
+        public String routingKey() { return routingKey; }
+        @Override
+        public boolean equals(Object other) {
+            if (this == other) { return true; }
+            if (!(other instanceof DlqRoute)) { return false; }
+            DlqRoute that = (DlqRoute) other;
+            return java.util.Objects.equals(exchange, that.exchange) && java.util.Objects.equals(routingKey, that.routingKey);
+        }
+        @Override
+        public int hashCode() { return java.util.Objects.hash(exchange, routingKey); }
+        @Override
+        public String toString() { return "DlqRoute[" + "exchange=" + exchange + ", " + "routingKey=" + routingKey + "]"; }
     }
 
-    public record DlqRoute(String exchange, String routingKey) {
+   @lombok.Getter
+
+    class DlqQueueVO {
+        private final String name;
+        private final String exchange;
+        private final String routingKey;
+        private final String originalQueue;
+        private final int messages;
+        private final int consumers;
+        public DlqQueueVO(String name, String exchange, String routingKey, String originalQueue, int messages, int consumers) {
+            this.name = name;
+            this.exchange = exchange;
+            this.routingKey = routingKey;
+            this.originalQueue = originalQueue;
+            this.messages = messages;
+            this.consumers = consumers;
+        }
+        public String name() { return name; }
+        public String exchange() { return exchange; }
+        public String routingKey() { return routingKey; }
+        public String originalQueue() { return originalQueue; }
+        public int messages() { return messages; }
+        public int consumers() { return consumers; }
+        @Override
+        public boolean equals(Object other) {
+            if (this == other) { return true; }
+            if (!(other instanceof DlqQueueVO)) { return false; }
+            DlqQueueVO that = (DlqQueueVO) other;
+            return java.util.Objects.equals(name, that.name) && java.util.Objects.equals(exchange, that.exchange) && java.util.Objects.equals(routingKey, that.routingKey) && java.util.Objects.equals(originalQueue, that.originalQueue) && java.util.Objects.equals(messages, that.messages) && java.util.Objects.equals(consumers, that.consumers);
+        }
+        @Override
+        public int hashCode() { return java.util.Objects.hash(name, exchange, routingKey, originalQueue, messages, consumers); }
+        @Override
+        public String toString() { return "DlqQueueVO[" + "name=" + name + ", " + "exchange=" + exchange + ", " + "routingKey=" + routingKey + ", " + "originalQueue=" + originalQueue + ", " + "messages=" + messages + ", " + "consumers=" + consumers + "]"; }
     }
 
-    public record DlqQueueVO(
-        String name,
-        String exchange,
-        String routingKey,
-        String originalQueue,
-        int messages,
-        int consumers
-    ) {
+   @lombok.Getter
+
+    class ReplayResult {
+        private final String queue;
+        private final int attempted;
+        private final int replayed;
+        private final int remaining;
+        private final boolean completed;
+        private final String error;
+        public ReplayResult(String queue, int attempted, int replayed, int remaining, boolean completed, String error) {
+            this.queue = queue;
+            this.attempted = attempted;
+            this.replayed = replayed;
+            this.remaining = remaining;
+            this.completed = completed;
+            this.error = error;
+        }
+        public String queue() { return queue; }
+        public int attempted() { return attempted; }
+        public int replayed() { return replayed; }
+        public int remaining() { return remaining; }
+        public boolean completed() { return completed; }
+        public String error() { return error; }
+        @Override
+        public boolean equals(Object other) {
+            if (this == other) { return true; }
+            if (!(other instanceof ReplayResult)) { return false; }
+            ReplayResult that = (ReplayResult) other;
+            return java.util.Objects.equals(queue, that.queue) && java.util.Objects.equals(attempted, that.attempted) && java.util.Objects.equals(replayed, that.replayed) && java.util.Objects.equals(remaining, that.remaining) && java.util.Objects.equals(completed, that.completed) && java.util.Objects.equals(error, that.error);
+        }
+        @Override
+        public int hashCode() { return java.util.Objects.hash(queue, attempted, replayed, remaining, completed, error); }
+        @Override
+        public String toString() { return "ReplayResult[" + "queue=" + queue + ", " + "attempted=" + attempted + ", " + "replayed=" + replayed + ", " + "remaining=" + remaining + ", " + "completed=" + completed + ", " + "error=" + error + "]"; }
     }
 
-    public record ReplayResult(
-        String queue,
-        int attempted,
-        int replayed,
-        int remaining,
-        boolean completed,
-        String error
-    ) {
-    }
+   @lombok.Getter
 
-    public record PurgeResult(String queue, int purged) {
+    class PurgeResult {
+        private final String queue;
+        private final int purged;
+        public PurgeResult(String queue, int purged) {
+            this.queue = queue;
+            this.purged = purged;
+        }
+        public String queue() { return queue; }
+        public int purged() { return purged; }
+        @Override
+        public boolean equals(Object other) {
+            if (this == other) { return true; }
+            if (!(other instanceof PurgeResult)) { return false; }
+            PurgeResult that = (PurgeResult) other;
+            return java.util.Objects.equals(queue, that.queue) && java.util.Objects.equals(purged, that.purged);
+        }
+        @Override
+        public int hashCode() { return java.util.Objects.hash(queue, purged); }
+        @Override
+        public String toString() { return "PurgeResult[" + "queue=" + queue + ", " + "purged=" + purged + "]"; }
     }
 }

@@ -4,7 +4,7 @@ package com.comicatlas.worker.importer.exception;
  * 目录解析确定的失败类型。
  * <p>
  * 真实导入中这些错误直接抛出（typed-fail）；目录预览场景由上层
- * 捕获后转为结构化阻断 warning（见 TODO 1/10 对接）。
+ * 捕获后转为结构化阻断 warning，供目录预览与导入流程统一处理。
  */
 public enum DirectoryParseError {
     /** 路径不存在或不是目录 */

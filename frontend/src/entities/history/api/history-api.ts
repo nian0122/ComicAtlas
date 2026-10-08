@@ -1,0 +1,8 @@
+import { api } from '@/shared/api/http'
+import type { HistoryPageVO, HistoryVO } from '@/entities/history/model/types'
+
+export const historyApi = {
+  page: (page: number, size: number) => api.get<HistoryPageVO>('/history/page', { params: { page, size } }),
+  get: (comicId: number) => api.get<HistoryVO | null>(`/history/${comicId}`),
+  update: (comicId: number, data: { chapterId: number; pageNumber: number }) => api.put(`/history/${comicId}`, data),
+}

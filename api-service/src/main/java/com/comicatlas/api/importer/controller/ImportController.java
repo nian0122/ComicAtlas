@@ -1,6 +1,7 @@
 package com.comicatlas.api.importer.controller;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.comicatlas.contract.common.dto.PageResponse;
 import com.comicatlas.contract.common.Result;
 import com.comicatlas.api.importer.service.ImportService;
 import lombok.RequiredArgsConstructor;
@@ -60,12 +61,14 @@ public class ImportController {
      * @return 导入任务分页结果
      */
     @GetMapping
-    public Result<IPage<ImportTaskVO>> listTasks(
+    public Result<PageResponse<ImportTaskVO>> listTasks(
             @RequestParam(defaultValue = "1") Integer page,
             @RequestParam(defaultValue = "20") Integer size,
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String batchId) {
-        return Result.ok(importService.listTasks(page, size, status, batchId));
+        IPage<ImportTaskVO> taskPage = importService.listTasks(page, size, status, batchId);
+        return Result.ok(PageResponse.of(taskPage.getRecords(), taskPage.getTotal(),
+                taskPage.getCurrent(), taskPage.getSize()));
     }
 
     /**

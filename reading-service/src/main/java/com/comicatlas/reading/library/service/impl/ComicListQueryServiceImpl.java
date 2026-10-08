@@ -1,9 +1,7 @@
 package com.comicatlas.reading.library.service.impl;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.comicatlas.contract.comic.cache.ComicReferenceCache;
 import com.comicatlas.reading.library.dto.ComicListPage;
 import com.comicatlas.contract.comic.dto.ComicListQuery;
 import com.comicatlas.reading.library.dto.ComicListVO;
@@ -16,17 +14,16 @@ import com.comicatlas.persistence.storage.FileUrlResolver;
 import com.comicatlas.persistence.reader.entity.ReadingHistory;
 import com.comicatlas.persistence.reader.mapper.ReadingHistoryMapper;
 import com.comicatlas.reading.library.service.ComicListQueryService;
-import com.comicatlas.reading.library.ComicListQueryNormalizer;
+import com.comicatlas.reading.library.cache.ComicListCacheService;
+import com.comicatlas.reading.library.support.ReadingComicFilterNormalizer;
 import lombok.RequiredArgsConstructor;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.time.ZoneOffset;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
@@ -38,45 +35,28 @@ public class ComicListQueryServiceImpl implements ComicListQueryService {
     private final CategoryMapper categoryMapper;
     private final ReadingHistoryMapper historyMapper;
     private final FileUrlResolver fileUrlResolver;
+    private final ComicListCacheService comicListCacheService;
 
-    @Override
-    public IPage<ComicListVO> listComics(ComicListQuery query) {
-        ComicListQueryNormalizer.normalize(query);
-        // 直接委托 loadPage（缓存方法）。注意：本方法内部调用不触发 @Cacheable（自调用绕过代理），
-        // 缓存生效路径由 ComicQueryServiceImpl 通过代理调用 loadPage 触发。
-        ComicListPage comicListPage = loadPage(query);
-        Page<ComicListVO> page = new Page<>(comicListPage.getCurrent(), comicListPage.getSize(), comicListPage.getTotal());
-        page.setRecords(comicListPage.getRecords());
-        return page;
+    /** 查询一页漫画并组装为阅读端分页 DTO。 */
+    public ComicListPage listComics(ComicListQuery query) {
+        ReadingComicFilterNormalizer.normalize(query);
+        String cacheKey = comicListCacheService.buildKey(query);
+        ComicListPage cachedPage = comicListCacheService.get(cacheKey);
+        if (cachedPage != null) {
+            return addReadingProgress(cachedPage);
+        }
+
+        ComicListPage basePage = queryBasePage(query);
+        comicListCacheService.put(cacheKey, basePage);
+        return addReadingProgress(basePage);
     }
 
-    /**
-     * 查询一页漫画并缓存纯数据 DTO。
-     * <p>
-     * 缓存的是 ComicListPage（records + 分页元数据），而非 MyBatis-Plus IPage，
-     * 避免把分页对象内部执行状态序列化进 Redis。
-     */
-    @Cacheable(
-        cacheNames = ComicReferenceCache.COMIC_LIST,
-        key = "#root.target.cacheKey(#query)",
-        unless = "#result == null || #result.getRecords().isEmpty()")
-    public ComicListPage loadPage(ComicListQuery query) {
-        ComicListQueryNormalizer.normalize(query);
+    private ComicListPage queryBasePage(ComicListQuery query) {
         Page<Comic> page = new Page<>(query.getPage(), query.getSize());
         IPage<Comic> result = comicMapper.selectPage(page, query);
-        long lastPage = result.getTotal() == 0
-                ? 1
-                : (result.getTotal() + query.getSize() - 1) / query.getSize();
-        if (query.getPage() > lastPage) {
-            query.setPage((int) lastPage);
-            page = new Page<>(lastPage, query.getSize());
-            result = comicMapper.selectPage(page, query);
-        }
         List<Comic> comics = result.getRecords();
         if (comics.isEmpty()) {
-            IPage<ComicListVO> emptyPage = result.convert(comic ->
-                    toListVO(comic, new HashMap<>(), new HashMap<>()));
-            return ComicListPage.of(emptyPage.getRecords(), emptyPage.getTotal(), emptyPage.getCurrent(), emptyPage.getSize());
+            return ComicListPage.of(new ArrayList<>(), result.getTotal(), result.getCurrent(), result.getSize());
         }
 
         List<Long> categoryIds = comics.stream()
@@ -89,80 +69,66 @@ public class ComicListQueryServiceImpl implements ComicListQueryService {
                 : categoryMapper.selectBatchIds(categoryIds).stream()
                         .collect(Collectors.toMap(Category::getId, Category::getName));
 
-        List<Long> comicIds = comics.stream().map(Comic::getId).toList();
-        Map<Long, ReadingHistory> histories = historyMapper.selectList(
-                        new LambdaQueryWrapper<ReadingHistory>()
-                            .select(ReadingHistory::getComicId, ReadingHistory::getChapterId, ReadingHistory::getPageNumber)
-                            .in(ReadingHistory::getComicId, comicIds))
+        IPage<ComicListVO> comicListPage = result.convert(
+                comic -> toListVO(comic, categoryNames));
+        return ComicListPage.of(comicListPage.getRecords(), comicListPage.getTotal(),
+                comicListPage.getCurrent(), comicListPage.getSize());
+    }
+
+    private ComicListPage addReadingProgress(ComicListPage basePage) {
+        if (basePage.getRecords().isEmpty()) {
+            return basePage;
+        }
+        List<Long> comicIds = basePage.getRecords().stream().map(ComicListVO::getId).toList();
+        Map<Long, ReadingHistory> histories = historyMapper.selectByComicIds(comicIds)
                 .stream()
-                .collect(Collectors.toMap(ReadingHistory::getComicId, history -> history));
-
-        IPage<ComicListVO> voPage = result.convert(
-                comic -> toListVO(comic, categoryNames, histories));
-        return ComicListPage.of(voPage.getRecords(), voPage.getTotal(), voPage.getCurrent(), voPage.getSize());
+                .collect(Collectors.toMap(ReadingHistory::getComicId, readingHistory -> readingHistory));
+        List<ComicListVO> records = basePage.getRecords().stream()
+                .map(comicListView -> addReadingProgress(comicListView, histories))
+                .toList();
+        return ComicListPage.of(records, basePage.getTotal(), basePage.getCurrent(), basePage.getSize());
     }
 
-    /**
-     * 生成查询缓存键：规范化全部查询条件后取 MD5 摘要，避免超长 key。
-     * 同条件同键、不同条件不同键；loadPage 的 @Cacheable 引用此方法。
-     */
-    public String cacheKey(ComicListQuery query) {
-        String raw = "v3|" + String.join("|",
-                nz(query.getKeyword()),
-                nz(query.getTag()),
-                query.getTags() == null ? "" : String.join(",", query.getTags()),
-                nz(query.getTagMode()),
-                nz(query.getStatus()),
-                nz(query.getCategory()),
-                nz(query.getSourceType()),
-                nz(query.getSort()),
-                nz(query.getOrder()),
-                String.valueOf(query.getPage()),
-                String.valueOf(query.getSize()));
-        return md5(raw);
-    }
-
-    private static String nz(String s) {
-        return s == null ? "" : s.trim();
-    }
-
-    private static String md5(String input) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("MD5");
-            byte[] bytes = digest.digest(input.getBytes(StandardCharsets.UTF_8));
-            StringBuilder sb = new StringBuilder(bytes.length * 2);
-            for (byte b : bytes) {
-                sb.append(Character.forDigit((b >> 4) & 0xF, 16));
-                sb.append(Character.forDigit(b & 0xF, 16));
-            }
-            return sb.toString();
-        } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException("MD5 不可用", e);
+    private ComicListVO addReadingProgress(
+            ComicListVO baseView, Map<Long, ReadingHistory> histories) {
+        ComicListVO comicListView = copyView(baseView);
+        ReadingHistory history = histories.get(comicListView.getId());
+        if (history != null && comicListView.getPageCount() != null && comicListView.getPageCount() > 0) {
+            comicListView.setLastReadChapterId(history.getChapterId());
+            comicListView.setLastReadPage(history.getPageNumber());
+            comicListView.setProgressPercent(history.getPageNumber() * 100 / comicListView.getPageCount());
         }
+        return comicListView;
     }
 
-    private ComicListVO toListVO(
-            Comic comic,
-            Map<Long, String> categoryNames,
-            Map<Long, ReadingHistory> histories) {
-        ComicListVO vo = new ComicListVO();
-        vo.setId(comic.getId());
-        vo.setTitle(comic.getTitle());
-        vo.setAuthor(comic.getAuthor());
-        vo.setCoverUrl(fileUrlResolver.resolveCover(comic.getId()));
-        vo.setPageCount(comic.getTotalPages());
-        vo.setCategoryId(comic.getCategoryId());
-        vo.setCategoryName(categoryNames.get(comic.getCategoryId()));
-        vo.setStatus(toStatus(comic.getStatus() == null ? null : comic.getStatus().name()));
-        vo.setCreatedAt(comic.getCreatedAt());
+    private ComicListVO toListVO(Comic comic, Map<Long, String> categoryNames) {
+        ComicListVO comicListView = new ComicListVO();
+        comicListView.setId(comic.getId());
+        comicListView.setTitle(comic.getTitle());
+        comicListView.setAuthor(comic.getAuthor());
+        comicListView.setCoverUrl(fileUrlResolver.resolveCover(comic.getId()));
+        comicListView.setPageCount(comic.getTotalPages());
+        comicListView.setCategoryId(comic.getCategoryId());
+        comicListView.setCategoryName(categoryNames.get(comic.getCategoryId()));
+        comicListView.setStatus(toStatus(comic.getStatus() == null ? null : comic.getStatus().name()));
+        comicListView.setCreatedAt(comic.getCreatedAt());
+        comicListView.setReaction(comic.getReaction());
+        comicListView.setReactionAt(comic.getReactionAt() == null ? null : comic.getReactionAt().toInstant(ZoneOffset.UTC));
+        return comicListView;
+    }
 
-        ReadingHistory history = histories.get(comic.getId());
-        if (history != null && comic.getTotalPages() != null && comic.getTotalPages() > 0) {
-            vo.setLastReadChapterId(history.getChapterId());
-            vo.setLastReadPage(history.getPageNumber());
-            vo.setProgressPercent(history.getPageNumber() * 100 / comic.getTotalPages());
-        }
-        return vo;
+    private static ComicListVO copyView(ComicListVO source) {
+        ComicListVO target = new ComicListVO();
+        target.setId(source.getId());
+        target.setTitle(source.getTitle());
+        target.setAuthor(source.getAuthor());
+        target.setCoverUrl(source.getCoverUrl());
+        target.setPageCount(source.getPageCount());
+        target.setCategoryId(source.getCategoryId());
+        target.setCategoryName(source.getCategoryName());
+        target.setStatus(source.getStatus());
+        target.setCreatedAt(source.getCreatedAt());
+        return target;
     }
 
     private static ComicStatus toStatus(String status) {
@@ -171,7 +137,7 @@ public class ComicListQueryServiceImpl implements ComicListQueryService {
         }
         try {
             return ComicStatus.valueOf(status);
-        } catch (IllegalArgumentException e) {
+        } catch (IllegalArgumentException exception) {
             return null;
         }
     }

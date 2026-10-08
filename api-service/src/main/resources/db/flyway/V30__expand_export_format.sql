@@ -1,0 +1,3 @@
+-- DIRECTORY（文件夹导出）长度为 9，需大于旧的 VARCHAR(8) 限制。
+ALTER TABLE export_task
+    MODIFY COLUMN format VARCHAR(16) NOT NULL DEFAULT 'ZIP';

@@ -1,6 +1,7 @@
 package com.comicatlas.reading.library.dto;
 
 import com.comicatlas.contract.common.enums.ComicStatus;
+import com.comicatlas.contract.common.enums.MediaReaction;
 import lombok.Data;
 import java.time.LocalDateTime;
 
@@ -25,4 +26,6 @@ public class ComicListVO {
     private Long lastReadChapterId;
     private Integer lastReadPage;
     private LocalDateTime createdAt;
+    private MediaReaction reaction;
+    private java.time.Instant reactionAt;
 }

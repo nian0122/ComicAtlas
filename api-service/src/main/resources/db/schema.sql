@@ -1,6 +1,7 @@
 CREATE TABLE IF NOT EXISTS comic (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     title VARCHAR(255) NOT NULL,
+    title_sort_key VARBINARY(16384) NOT NULL COMMENT 'ICU 78.3 中文数字排序键',
     title_jpn VARCHAR(255),
     author VARCHAR(255),
     description TEXT,
@@ -20,6 +21,8 @@ CREATE TABLE IF NOT EXISTS comic (
     trashed_at DATETIME COMMENT '进入 TRASHED 的时间（7 天保留期起点）',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    reaction VARCHAR(16) NOT NULL DEFAULT 'NONE',
+    reaction_at DATETIME DEFAULT NULL,
     version INT NOT NULL DEFAULT 1,
     UNIQUE INDEX idx_source (source_type, source_gallery_id),
     INDEX idx_status (status),
@@ -52,6 +55,8 @@ CREATE TABLE IF NOT EXISTS chapter (
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     status VARCHAR(16) NOT NULL DEFAULT 'READY',
     trashed_at DATETIME COMMENT '进入 TRASHED 的时间（7 天保留期起点）',
+    reaction VARCHAR(16) NOT NULL DEFAULT 'NONE',
+    reaction_at DATETIME DEFAULT NULL,
     version INT NOT NULL DEFAULT 1,
     UNIQUE INDEX uk_chapter_comic_id (comic_id, id),
     UNIQUE INDEX uk_catalog_chapter (comic_id, catalog_id, chapter_no),
@@ -82,12 +87,15 @@ CREATE TABLE IF NOT EXISTS page (
     container VARCHAR(32) DEFAULT NULL,
     video_codec VARCHAR(32) DEFAULT NULL,
     audio_codec VARCHAR(32) DEFAULT NULL,
+    reaction VARCHAR(16) NOT NULL DEFAULT 'NONE',
+    reaction_at DATETIME DEFAULT NULL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     status VARCHAR(16) NOT NULL DEFAULT 'READY',
     trashed_at DATETIME COMMENT '进入 TRASHED 的时间（7 天保留期起点）',
     version INT NOT NULL DEFAULT 1,
     UNIQUE INDEX uk_chapter_page (chapter_id, page_number),
     INDEX idx_media_type (media_type),
+    INDEX idx_page_reaction_time (reaction, reaction_at),
     FOREIGN KEY (chapter_id) REFERENCES chapter(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
@@ -179,7 +187,8 @@ CREATE TABLE IF NOT EXISTS export_task (
     id          BIGINT AUTO_INCREMENT PRIMARY KEY,
     management_task_id BIGINT COMMENT '关联 management_task.id 一对一扩展',
     comic_id    BIGINT      NOT NULL,
-    format      VARCHAR(8)  NOT NULL DEFAULT 'ZIP',
+    comic_ids   TEXT        NULL COMMENT '批量文件夹导出的漫画 ID，逗号分隔',
+    format      VARCHAR(32) NOT NULL DEFAULT 'ZIP',
     status      VARCHAR(20) NOT NULL DEFAULT 'PENDING',
     progress    SMALLINT    NOT NULL DEFAULT 0,
     output_root VARCHAR(20),
@@ -330,7 +339,7 @@ CREATE TABLE IF NOT EXISTS upload_file (
     content_type    VARCHAR(128) NOT NULL COMMENT '客户端声明 Content-Type',
     size_bytes      BIGINT       NOT NULL COMMENT '声明文件大小',
     sha256          VARCHAR(64)  NOT NULL COMMENT '声明文件总 SHA-256',
-    storage_name    VARCHAR(255) NOT NULL COMMENT '服务端生成文件名 uuid.ext',
+    storage_name    VARCHAR(255) NOT NULL COMMENT '校验后的原始文件名',
     received_bytes  BIGINT       NOT NULL DEFAULT 0 COMMENT '已接收最大末端字节',
     received_ranges TEXT         NULL     COMMENT '已接收区间串 0-65535;131072-196607',
     media_id        BIGINT       NULL     COMMENT 'complete 预建 STAGING media row id',
@@ -353,3 +362,17 @@ CREATE TABLE IF NOT EXISTS trash_manifest (
     PRIMARY KEY (task_id),
     INDEX idx_target (target_type, target_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='TRASH 资产清单（API 写 DB，Worker 只读 DB + 操作文件）';
+
+-- 最近成功的缩略图目录容量；扫描失败或重启不丢失历史结果。
+CREATE TABLE IF NOT EXISTS storage_capacity_snapshot (
+    root_key VARCHAR(32) PRIMARY KEY,
+    root_fingerprint VARCHAR(64) NULL,
+    total_bytes BIGINT NOT NULL DEFAULT 0,
+    file_count BIGINT NOT NULL DEFAULT 0,
+    scanned_at DATETIME(6) NULL,
+    attempted_at DATETIME(6) NULL,
+    requested_at DATETIME(6) NOT NULL,
+    requested_version BIGINT NOT NULL DEFAULT 1,
+    completed_version BIGINT NOT NULL DEFAULT 0,
+    refresh_status VARCHAR(16) NOT NULL DEFAULT 'PENDING'
+);

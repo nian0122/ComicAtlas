@@ -1,6 +1,5 @@
 package com.comicatlas.api.importer.service.impl;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.comicatlas.api.importer.dto.BatchImportRequest;
@@ -9,14 +8,14 @@ import com.comicatlas.api.importer.dto.FailedItem;
 import com.comicatlas.api.importer.dto.ImportRequest;
 import com.comicatlas.api.importer.dto.ImportStatusVO;
 import com.comicatlas.api.importer.dto.ImportTaskVO;
-import com.comicatlas.api.importer.entity.ImportTask;
-import com.comicatlas.api.importer.mapper.ImportTaskMapper;
+import com.comicatlas.api.importer.persistence.entity.ImportTask;
+import com.comicatlas.api.importer.persistence.mapper.ImportTaskMapper;
 import com.comicatlas.api.importer.service.ImportRetryCoordinator;
 import com.comicatlas.api.importer.service.ImportService;
 import com.comicatlas.api.task.dto.CreateManagementTaskRequest;
 import com.comicatlas.api.task.dto.ManagementTaskResponse;
-import com.comicatlas.api.task.entity.ManagementTask;
-import com.comicatlas.api.task.entity.ManagementTaskItem;
+import com.comicatlas.api.task.persistence.entity.ManagementTask;
+import com.comicatlas.api.task.persistence.entity.ManagementTaskItem;
 import com.comicatlas.api.task.service.ManagementTaskService;
 import com.comicatlas.api.outbox.service.OutboxService;
 import com.comicatlas.common.constant.MqExchanges;
@@ -34,13 +33,15 @@ import com.comicatlas.api.shared.exception.ConflictException;
 import com.comicatlas.api.shared.crypto.DigestService;
 import com.comicatlas.persistence.comic.entity.Comic;
 import com.comicatlas.persistence.comic.mapper.ComicMapper;
-import com.comicatlas.api.storage.ApiStorageProperties;
+import com.comicatlas.api.storage.config.ApiStorageProperties;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.dao.DataAccessException;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.RedisSystemException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -109,8 +110,7 @@ public class ImportServiceImpl implements ImportService {
                 if (!expectedHash.equals(existing.getIdempotencyPayloadHash())) {
                     throw new ConflictException("幂等键 " + idempotencyKey + " 已存在但 payload 不匹配");
                 }
-                ImportTask existingImport = taskMapper.selectOne(new LambdaQueryWrapper<ImportTask>()
-                        .eq(ImportTask::getManagementTaskId, existing.getId()));
+                ImportTask existingImport = taskMapper.selectByManagementTaskId(existing.getId());
                 if (existingImport != null) {
                     log.info("导入幂等命中 idempotencyKey={}, 返回已有任务 {}", idempotencyKey, existingImport.getId());
                     return toVO(existingImport);
@@ -146,9 +146,7 @@ public class ImportServiceImpl implements ImportService {
                     throw new BusinessException(HttpStatusCodes.CONFLICT, "该漫画已存在或正在导入中");
                 }
                 // DB 去重
-                Comic existingComic = comicMapper.selectOne(new LambdaQueryWrapper<Comic>()
-                        .eq(Comic::getSourceType, SourceType.EHENTAI)
-                        .eq(Comic::getSourceGalleryId, galleryId));
+                Comic existingComic = comicMapper.selectBySourceTypeAndGalleryId(SourceType.EHENTAI.name(), galleryId);
                 if (existingComic != null) {
                     throw new BusinessException(HttpStatusCodes.CONFLICT, "该漫画已导入 - 漫画ID: " + existingComic.getId());
                 }
@@ -205,13 +203,9 @@ public class ImportServiceImpl implements ImportService {
     @Override
     public IPage<ImportTaskVO> listTasks(Integer page, Integer size, String status, String batchId) {
         ImportTaskStatus statusEnum = status != null ? parseImportStatus(status) : null;
-        LambdaQueryWrapper<ImportTask> wrapper = new LambdaQueryWrapper<ImportTask>()
-                .eq(statusEnum != null, ImportTask::getStatus, statusEnum)
-                .eq(batchId != null, ImportTask::getBatchId, batchId)
-                .orderByDesc(ImportTask::getCreatedAt);
         Page<ImportTask> pageRequest = new Page<>(
                 page != null ? page : DEFAULT_PAGE_NUMBER, size != null ? size : DEFAULT_PAGE_SIZE);
-        return taskMapper.selectPage(pageRequest, wrapper).convert(this::toVO);
+        return taskMapper.selectPageByConditions(pageRequest, statusEnum, batchId).convert(this::toVO);
     }
 
     @Override
@@ -267,7 +261,7 @@ public class ImportServiceImpl implements ImportService {
                 ImportTask task = taskMapper.selectById(taskId);
                 succeeded.add(toVO(task));
 
-            } catch (Exception ex) {
+            } catch (BusinessException | DataAccessException ex) {
                 log.error("批量导入单任务失败: path={}", path, ex);
                 FailedItem item = new FailedItem();
                 item.setSourcePath(path);
@@ -302,11 +296,11 @@ public class ImportServiceImpl implements ImportService {
         if (task == null) {
             throw new BusinessException(HttpStatusCodes.NOT_FOUND, "任务不存在");
         }
-        ImportStatusVO vo = new ImportStatusVO();
-        vo.setTaskId(task.getId());
-        vo.setStatus(statusName(task.getStatus()));
-        vo.setProgress(task.getProgress());
-        return vo;
+        ImportStatusVO statusView = new ImportStatusVO();
+        statusView.setTaskId(task.getId());
+        statusView.setStatus(statusName(task.getStatus()));
+        statusView.setProgress(task.getProgress());
+        return statusView;
     }
 
     @Override
@@ -347,7 +341,7 @@ public class ImportServiceImpl implements ImportService {
                         try {
                             redisTemplate.opsForValue().set(
                                     IMPORT_CANCEL_KEY_PREFIX + taskId, "1", REDIS_MARK_TTL);
-                        } catch (RuntimeException ex) {
+                        } catch (RedisSystemException ex) {
                             log.warn("取消标记写入失败（非关键）: taskId={}", taskId, ex);
                         }
                     }
@@ -434,26 +428,26 @@ public class ImportServiceImpl implements ImportService {
     }
 
     private ImportTaskVO toVO(ImportTask task) {
-        ImportTaskVO vo = new ImportTaskVO();
-        vo.setId(task.getId());
-        vo.setComicId(task.getComicId());
-        vo.setSourceRef(task.getSourceRef());
-        vo.setSourceType(resolveSourceType(task));
-        vo.setSourcePath(task.getSourcePath());
-        vo.setBatchId(task.getBatchId());
-        vo.setStatus(statusName(task.getStatus()));
-        vo.setProgress(task.getProgress());
-        vo.setTotalPages(task.getTotalPages());
-        vo.setDownloadedPages(task.getDownloadedPages());
-        vo.setDownloadMethod(task.getDownloadMethod());
-        vo.setDownloadSpeed(task.getDownloadSpeed());
-        vo.setEtaSeconds(task.getEtaSeconds());
-        vo.setErrorMessage(task.getErrorMessage());
-        vo.setRetryCount(task.getRetryCount());
-        vo.setDurationMs(task.getDurationMs());
-        vo.setStartTime(task.getStartTime());
-        vo.setEndTime(task.getEndTime());
-        vo.setCreatedAt(task.getCreatedAt());
-        return vo;
+        ImportTaskVO taskView = new ImportTaskVO();
+        taskView.setId(task.getId());
+        taskView.setComicId(task.getComicId());
+        taskView.setSourceRef(task.getSourceRef());
+        taskView.setSourceType(resolveSourceType(task));
+        taskView.setSourcePath(task.getSourcePath());
+        taskView.setBatchId(task.getBatchId());
+        taskView.setStatus(statusName(task.getStatus()));
+        taskView.setProgress(task.getProgress());
+        taskView.setTotalPages(task.getTotalPages());
+        taskView.setDownloadedPages(task.getDownloadedPages());
+        taskView.setDownloadMethod(task.getDownloadMethod());
+        taskView.setDownloadSpeed(task.getDownloadSpeed());
+        taskView.setEtaSeconds(task.getEtaSeconds());
+        taskView.setErrorMessage(task.getErrorMessage());
+        taskView.setRetryCount(task.getRetryCount());
+        taskView.setDurationMs(task.getDurationMs());
+        taskView.setStartTime(task.getStartTime());
+        taskView.setEndTime(task.getEndTime());
+        taskView.setCreatedAt(task.getCreatedAt());
+        return taskView;
     }
 }

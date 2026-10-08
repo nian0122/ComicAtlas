@@ -1,12 +1,12 @@
 package com.comicatlas.api.importer.service.impl;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.comicatlas.api.catalog.cache.CatalogCacheInvalidator;
-import com.comicatlas.api.importer.entity.ImportTask;
+import com.comicatlas.api.importer.persistence.entity.ImportTask;
 import com.comicatlas.api.importer.exception.ImportMetadataException;
-import com.comicatlas.api.importer.mapper.ImportTaskMapper;
+import com.comicatlas.api.importer.persistence.mapper.ImportTaskMapper;
 import com.comicatlas.api.importer.service.ImportPersistenceService;
-import com.comicatlas.api.task.entity.ManagementTaskItem;
+import com.comicatlas.api.importer.service.ImportFinalizationService;
+import com.comicatlas.api.task.persistence.entity.ManagementTaskItem;
 import com.comicatlas.api.task.service.ManagementTaskService;
 import com.comicatlas.api.task.state.ManagementStateMachine;
 import com.comicatlas.api.outbox.service.OutboxService;
@@ -30,19 +30,22 @@ import com.comicatlas.contract.common.enums.MediaLifecycleStatus;
 import com.comicatlas.api.task.enums.TaskType;
 import com.comicatlas.contract.common.enums.TranscodeStatus;
 import com.comicatlas.persistence.comic.entity.Catalog;
+import com.comicatlas.persistence.comic.entity.Category;
 import com.comicatlas.persistence.comic.entity.Chapter;
 import com.comicatlas.persistence.comic.entity.Comic;
 import com.comicatlas.persistence.comic.entity.Media;
 import com.comicatlas.persistence.comic.entity.ComicTag;
 import com.comicatlas.persistence.comic.entity.Tag;
 import com.comicatlas.persistence.comic.mapper.CatalogMapper;
+import com.comicatlas.persistence.comic.mapper.CategoryMapper;
 import com.comicatlas.persistence.comic.mapper.ChapterMapper;
 import com.comicatlas.persistence.comic.mapper.ComicMapper;
 import com.comicatlas.persistence.comic.mapper.MediaMapper;
 import com.comicatlas.persistence.comic.mapper.ComicTagMapper;
 import com.comicatlas.persistence.comic.mapper.TagMapper;
-import com.comicatlas.api.storage.ApiStorageProperties;
+import com.comicatlas.api.storage.config.ApiStorageProperties;
 import com.comicatlas.api.metadata.service.MetadataUpdateCoordinator;
+import com.comicatlas.api.metadata.service.AutomaticMetadataClassifier;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -86,6 +89,7 @@ import java.util.UUID;
 @Slf4j
 @Service
 @RequiredArgsConstructor
+@lombok.Getter
 public class ImportPersistenceServiceImpl implements ImportPersistenceService {
 
     /** 终态集合：到达这些状态后不可回退到非终态（含 CANCELLED 真正终态）。 */
@@ -123,6 +127,7 @@ public class ImportPersistenceServiceImpl implements ImportPersistenceService {
     private final TransactionTemplate transactionTemplate;
     private final ComicMapper comicMapper;
     private final CatalogMapper catalogMapper;
+    private final CategoryMapper categoryMapper;
     private final ChapterMapper chapterMapper;
     private final MediaMapper mediaMapper;
     private final ComicTagMapper comicTagMapper;
@@ -133,6 +138,7 @@ public class ImportPersistenceServiceImpl implements ImportPersistenceService {
     private final OutboxService outboxService;
     private final ApiStorageProperties storageProperties;
     private final MetadataUpdateCoordinator metadataUpdateCoordinator;
+    private final ImportFinalizationService importFinalizationService;
 
     @Value("${MANGA_ROOT:}")
     private String mangaRoot;
@@ -176,9 +182,8 @@ public class ImportPersistenceServiceImpl implements ImportPersistenceService {
                     comicId, comic.getStatus());
             return List.of();
         }
-        Long existingChapters = chapterMapper.selectCount(
-                new LambdaQueryWrapper<Chapter>().eq(Chapter::getComicId, comicId));
-        if (existingChapters != null && existingChapters > 0) {
+        long existingChapters = chapterMapper.countByComicId(comicId);
+        if (existingChapters > 0) {
             log.warn("completed 事件重复投递（章节结构已存在），跳过插入: comicId={}", comicId);
             return List.of();
         }
@@ -197,8 +202,17 @@ public class ImportPersistenceServiceImpl implements ImportPersistenceService {
         comic.setTitleJpn((String) comicData.get("titleJpn"));
         comic.setAuthor((String) comicData.get("author"));
         comic.setDescription((String) comicData.get("description"));
-        comic.setCategory((String) comicData.get("category"));
-        persistComicInfoTags(comicId, comicData.get("tags"));
+        String explicitCategory = (String) comicData.get("category");
+        List<String> importedTags = stringValues(comicData.get("tags"));
+        AutomaticMetadataClassifier.Enrichment enrichment = AutomaticMetadataClassifier.classify(
+                explicitCategory, safeCategories(), (String) comicData.get("title"),
+                (String) comicData.get("titleJpn"), (String) comicData.get("author"),
+                (String) comicData.get("description"), importedTags);
+        comic.setCategory(enrichment.category() == null ? explicitCategory : enrichment.category().getName());
+        if (enrichment.category() != null) {
+            comic.setCategoryId(enrichment.category().getId());
+        }
+        persistComicInfoTags(comicId, importedTags, enrichment.inferredTags(), enrichment.inferredTagType());
         if (comicData.get("sourceGalleryId") != null) {
             comic.setSourceGalleryId(comicData.get("sourceGalleryId").toString());
         }
@@ -256,25 +270,25 @@ public class ImportPersistenceServiceImpl implements ImportPersistenceService {
     }
 
     /** 将 ComicInfo 的 Genre/Tags 合并结果写入标签表，并保持漫画标签关联幂等。 */
-    private void persistComicInfoTags(Long comicId, Object rawTags) {
-        if (!(rawTags instanceof List<?> values)) {
+    private void persistComicInfoTags(Long comicId, List<String> importedTags,
+                                      List<String> inferredTags, String inferredTagType) {
+        List<Long> currentTagIds = comicTagMapper.selectTagIdsByComicId(comicId);
+        Set<Long> existingTagIds = new HashSet<>(currentTagIds == null ? List.of() : currentTagIds);
+        persistTags(comicId, existingTagIds, importedTags, "COMICINFO");
+        persistTags(comicId, existingTagIds, inferredTags, inferredTagType);
+    }
+
+    private void persistTags(Long comicId, Set<Long> existingTagIds, List<String> tagNames, String tagType) {
+        if (tagNames == null || tagNames.isEmpty()) {
             return;
         }
-        Set<Long> existingTagIds = new HashSet<>(comicTagMapper.selectList(
-                new LambdaQueryWrapper<ComicTag>().eq(ComicTag::getComicId, comicId))
-                .stream().map(ComicTag::getTagId).toList());
-        for (Object rawTag : values) {
-            if (!(rawTag instanceof String tagName) || tagName.isBlank()) {
-                continue;
-            }
+        for (String tagName : tagNames) {
             String normalizedName = tagName.trim();
-            Tag tag = tagMapper.selectOne(new LambdaQueryWrapper<Tag>()
-                    .eq(Tag::getName, normalizedName)
-                    .eq(Tag::getType, "COMICINFO"));
+            Tag tag = tagMapper.selectByNameAndType(normalizedName, tagType);
             if (tag == null) {
                 tag = new Tag();
                 tag.setName(normalizedName);
-                tag.setType("COMICINFO");
+                tag.setType(tagType);
                 tagMapper.insert(tag);
             }
             if (existingTagIds.add(tag.getId())) {
@@ -284,6 +298,19 @@ public class ImportPersistenceServiceImpl implements ImportPersistenceService {
                 comicTagMapper.insert(comicTag);
             }
         }
+    }
+
+    private List<Category> safeCategories() {
+        List<Category> categories = categoryMapper.selectAllOrderedBySortOrder();
+        return categories == null ? List.of() : categories;
+    }
+
+    private List<String> stringValues(Object rawValues) {
+        if (!(rawValues instanceof List<?> values)) {
+            return List.of();
+        }
+        return values.stream().filter(String.class::isInstance).map(String.class::cast)
+                .filter(value -> !value.isBlank()).map(String::trim).toList();
     }
 
     private Map<Integer, Long> insertCatalogs(List<Map<String, Object>> catalogsData, Long comicId) {
@@ -460,9 +487,13 @@ public class ImportPersistenceServiceImpl implements ImportPersistenceService {
 
     @Override
     public void applyFinalizeCompleted(ImportStorageFinalizeCompletedEvent event) {
+        importFinalizationService.applyCompleted(event);
+        return;
+        /*
         // HQ 前缀计算在事务外完成（纯路径运算），事务内不做任何文件 IO
         String hqPrefix = hqRelativePrefix();
         transactionTemplate.executeWithoutResult(status -> applyFinalizeCompletedInTxn(event, hqPrefix));
+        */
     }
 
     private void applyFinalizeCompletedInTxn(ImportStorageFinalizeCompletedEvent event, String hqPrefix) {
@@ -497,8 +528,7 @@ public class ImportPersistenceServiceImpl implements ImportPersistenceService {
             return;
         }
 
-        List<Chapter> chapters = chapterMapper.selectList(
-                new LambdaQueryWrapper<Chapter>().eq(Chapter::getComicId, comicId));
+        List<Chapter> chapters = chapterMapper.selectByComicId(comicId);
         if (chapters.isEmpty()) {
             log.warn("finalize completed 时无章节结构，跳过: comicId={}", comicId);
             return;
@@ -514,9 +544,7 @@ public class ImportPersistenceServiceImpl implements ImportPersistenceService {
         // 2) 检查该 comic 下是否还有 PENDING media：全部章节最终化完成（全 READY）才收尾
         //    comic/task，否则仅提交本章 READY
         List<Long> chapterIds = chapters.stream().map(Chapter::getId).toList();
-        long pendingCount = mediaMapper.selectCount(new LambdaQueryWrapper<Media>()
-                .in(Media::getChapterId, chapterIds)
-                .ne(Media::getHqStatus, HqStatus.READY));
+        long pendingCount = mediaMapper.countByChapterIdsAndHqStatusNot(chapterIds, HqStatus.READY.name());
         if (pendingCount > 0) {
             log.info("仍有章节未最终化，仅提交本章 READY: comicId={}, taskId={}, chapterId={}, pending={}",
                     comicId, taskId, chapterId, pendingCount);
@@ -545,8 +573,7 @@ public class ImportPersistenceServiceImpl implements ImportPersistenceService {
     /** 全部章节 READY → 收尾：comic READY（重算统计）、task SUCCESS、管理任务 SUCCEEDED、缓存失效。 */
     private void finalizeComicAndTask(Comic comic, ImportTask task, Long comicId, Long taskId,
                                       List<Long> chapterIds) {
-        List<Media> allMedia = mediaMapper.selectList(
-                new LambdaQueryWrapper<Media>().in(Media::getChapterId, chapterIds));
+        List<Media> allMedia = mediaMapper.selectAllByChapterIds(chapterIds);
         long totalSize = 0;
         for (Media media : allMedia) {
             if (media.getHqSize() != null) {
@@ -588,7 +615,11 @@ public class ImportPersistenceServiceImpl implements ImportPersistenceService {
 
     @Override
     public void applyFinalizeFailed(ImportStorageFinalizeFailedEvent event) {
+        importFinalizationService.applyFailed(event);
+        return;
+        /*
         transactionTemplate.executeWithoutResult(status -> applyFinalizeFailedInTxn(event));
+        */
     }
 
     private void applyFinalizeFailedInTxn(ImportStorageFinalizeFailedEvent event) {
@@ -767,9 +798,36 @@ public class ImportPersistenceServiceImpl implements ImportPersistenceService {
     }
 
     /** 单章插入结果：章节实体 + 页数/尺寸汇总 + 最终化映射 + 待批量落库媒体。 */
-    private record ChapterInsertResult(Chapter chapter, int pages, long size,
-                                       List<FinalizeMediaMapping> mappings,
-                                       List<Media> mediaList) {
+    @lombok.Getter
+    private class ChapterInsertResult {
+        private final Chapter chapter;
+        private final int pages;
+        private final long size;
+        private final List<FinalizeMediaMapping> mappings;
+        private final List<Media> mediaList;
+        public ChapterInsertResult(Chapter chapter, int pages, long size, List<FinalizeMediaMapping> mappings, List<Media> mediaList) {
+            this.chapter = chapter;
+            this.pages = pages;
+            this.size = size;
+            this.mappings = mappings;
+            this.mediaList = mediaList;
+        }
+        public Chapter chapter() { return chapter; }
+        public int pages() { return pages; }
+        public long size() { return size; }
+        public List<FinalizeMediaMapping> mappings() { return mappings; }
+        public List<Media> mediaList() { return mediaList; }
+        @Override
+        public boolean equals(Object other) {
+            if (this == other) { return true; }
+            if (!(other instanceof ChapterInsertResult)) { return false; }
+            ChapterInsertResult that = (ChapterInsertResult) other;
+            return java.util.Objects.equals(chapter, that.chapter) && java.util.Objects.equals(pages, that.pages) && java.util.Objects.equals(size, that.size) && java.util.Objects.equals(mappings, that.mappings) && java.util.Objects.equals(mediaList, that.mediaList);
+        }
+        @Override
+        public int hashCode() { return java.util.Objects.hash(chapter, pages, size, mappings, mediaList); }
+        @Override
+        public String toString() { return "ChapterInsertResult[" + "chapter=" + chapter + ", " + "pages=" + pages + ", " + "size=" + size + ", " + "mappings=" + mappings + ", " + "mediaList=" + mediaList + "]"; }
     }
 
     /**

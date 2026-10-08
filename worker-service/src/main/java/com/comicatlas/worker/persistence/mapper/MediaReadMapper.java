@@ -40,6 +40,20 @@ public interface MediaReadMapper {
     """)
     List<MediaRecord> selectByComicIdWithVersionAndStatus(Long comicId);
 
+    /** 章节级元数据刷新：只读取一个章节的媒体基线。 */
+    @Select("""
+        SELECT id, chapter_id, page_number, media_type,
+               hq_root, hq_path, hq_status,
+               lq_root, lq_path, lq_status, lq_size,
+               hq_size, width, height,
+               duration, container, video_codec, audio_codec,
+               status, version
+        FROM page
+        WHERE chapter_id = #{chapterId}
+        ORDER BY page_number ASC
+    """)
+    List<MediaRecord> selectByChapterIdWithVersionAndStatus(Long chapterId);
+
     @Select("""
         SELECT p.id, p.chapter_id, p.page_number, p.media_type,
                p.hq_root, p.hq_path, p.hq_status,
@@ -51,6 +65,38 @@ public interface MediaReadMapper {
         ORDER BY p.page_number ASC
     """)
     List<MediaRecord> selectByChapterId(Long chapterId);
+
+    /** LQ 专用候选查询：活动章节中的活动图片页一次取齐。 */
+    @Select("""
+        SELECT media_page.id, media_page.chapter_id, media_page.page_number, media_page.media_type,
+               media_page.hq_root, media_page.hq_path, media_page.hq_status,
+               media_page.lq_root, media_page.lq_path, media_page.lq_status, media_page.lq_size,
+               media_page.hq_size, media_page.width, media_page.height, media_page.status
+        FROM page media_page
+        JOIN chapter chapter ON chapter.id = media_page.chapter_id
+        JOIN comic comic ON comic.id = chapter.comic_id
+        WHERE media_page.chapter_id = #{chapterId}
+          AND comic.status = 'READY' AND chapter.status = 'READY' AND media_page.status = 'READY'
+          AND media_page.media_type = 'IMAGE' AND media_page.hq_status <> 'DELETED'
+        ORDER BY media_page.page_number ASC
+    """)
+    List<MediaRecord> selectLqCandidatesByChapterId(Long chapterId);
+
+    /** 漫画级 LQ 批处理一次读取全部活动候选页，避免逐章节查询。 */
+    @Select("""
+        SELECT media_page.id, media_page.chapter_id, media_page.page_number, media_page.media_type,
+               media_page.hq_root, media_page.hq_path, media_page.hq_status,
+               media_page.lq_root, media_page.lq_path, media_page.lq_status, media_page.lq_size,
+               media_page.hq_size, media_page.width, media_page.height, media_page.status
+        FROM page media_page
+        JOIN chapter chapter ON chapter.id = media_page.chapter_id
+        JOIN comic comic ON comic.id = chapter.comic_id
+        WHERE chapter.comic_id = #{comicId}
+          AND comic.status = 'READY' AND chapter.status = 'READY' AND media_page.status = 'READY'
+          AND media_page.media_type = 'IMAGE' AND media_page.hq_status <> 'DELETED'
+        ORDER BY chapter.global_order ASC, media_page.page_number ASC
+    """)
+    List<MediaRecord> selectLqCandidatesByComicId(Long comicId);
 
     @Select("""
         SELECT id, chapter_id, page_number, media_type,
