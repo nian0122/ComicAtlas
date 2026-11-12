@@ -2,7 +2,7 @@
 .env.*
 !.env.example
 .runtime/
-storage/
+/storage/
 *.log
 node_modules/
 dist/
