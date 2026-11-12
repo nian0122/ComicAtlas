@@ -18,7 +18,7 @@ func readSnapshot(ctx context.Context, tx *sql.Tx, id string) (librarydomain.Sna
 		return value, err
 	}
 	rows, err := tx.QueryContext(ctx, `SELECT m.id,m.chapter_id,m.page_number,m.file_name,m.relative_path,m.sha256,m.media_type,m.content_type,m.size,m.width,m.height,m.video_metadata,m.hq_state,CASE WHEN m.hq_state='released' THEN 'released' WHEN obs.source_sha256=m.sha256 THEN obs.status ELSE 'unknown' END,
- l.relative_path,l.sha256,COALESCE(l.source_sha256,''),COALESCE(l.task_id,''),l.size,l.width,l.height,l.max_long_edge,l.quality,l.valid,l.origin,l.source_reference,l.original_state
+ l.relative_path,l.sha256,COALESCE(l.task_id,''),l.size,l.width,l.height,l.max_long_edge,l.quality,l.valid,l.origin,l.source_reference,l.original_state
 	 FROM active_media m JOIN active_chapters ch ON ch.id=m.chapter_id LEFT JOIN image_lq l ON l.media_id=m.id LEFT JOIN media_observations obs ON obs.media_id=m.id WHERE ch.comic_id=? ORDER BY ch.global_order,m.page_number,m.id LIMIT ?`, id, librarydomain.MaxSnapshotMedia+1)
 	if err != nil {
 		return value, err
@@ -26,12 +26,12 @@ func readSnapshot(ctx context.Context, tx *sql.Tx, id string) (librarydomain.Sna
 	defer rows.Close()
 	for rows.Next() {
 		var item librarydomain.StoredMedia
-		var video, lqPath, lqHash, lqSource, lqTask *string
+		var video, lqPath, lqHash, lqTask *string
 		var size *int64
 		var width, height, edge, quality *int
 		var valid *bool
 		var origin, reference, originalState *string
-		err = rows.Scan(&item.ID, &item.ChapterID, &item.PageNumber, &item.FileName, &item.StoragePath, &item.Hash, &item.MediaType, &item.ContentType, &item.Size, &item.Width, &item.Height, &video, &item.HQState, &item.StorageState, &lqPath, &lqHash, &lqSource, &lqTask, &size, &width, &height, &edge, &quality, &valid, &origin, &reference, &originalState)
+		err = rows.Scan(&item.ID, &item.ChapterID, &item.PageNumber, &item.FileName, &item.StoragePath, &item.Hash, &item.MediaType, &item.ContentType, &item.Size, &item.Width, &item.Height, &video, &item.HQState, &item.StorageState, &lqPath, &lqHash, &lqTask, &size, &width, &height, &edge, &quality, &valid, &origin, &reference, &originalState)
 		if err != nil {
 			return value, err
 		}
@@ -43,7 +43,7 @@ func readSnapshot(ctx context.Context, tx *sql.Tx, id string) (librarydomain.Sna
 			}
 		}
 		if lqPath != nil {
-			item.LQFile = &librarydomain.StoredLQ{LQRecord: mediadomain.LQRecord{MediaID: item.ID, TaskID: *lqTask, Size: *size, Width: *width, Height: *height, Valid: *valid}, StoragePath: *lqPath, Hash: *lqHash, SourceHash: *lqSource}
+			item.LQFile = &librarydomain.StoredLQ{LQRecord: mediadomain.LQRecord{MediaID: item.ID, TaskID: *lqTask, Size: *size, Width: *width, Height: *height, Valid: *valid}, StoragePath: *lqPath, Hash: *lqHash}
 			if edge != nil && quality != nil {
 				item.LQFile.Spec = &mediadomain.ImageSpec{MaxLongEdge: *edge, Quality: *quality}
 			}
@@ -59,7 +59,6 @@ func readSnapshot(ctx context.Context, tx *sql.Tx, id string) (librarydomain.Sna
 		}
 		if item.LQFile != nil {
 			record := item.LQFile.LQRecord
-			record.SourceSHA256 = item.LQFile.SourceHash
 			item.StorageState = mediadomain.OriginalStorageState(item.Hash, item.StorageState, &record)
 		}
 		value.Media = append(value.Media, item)

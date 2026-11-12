@@ -12,7 +12,6 @@ type StoredLQ struct {
 	mediadomain.LQRecord
 	StoragePath string `json:"storagePath"`
 	Hash        string `json:"hash"`
-	SourceHash  string `json:"sourceHash,omitempty"`
 }
 type StoredMedia struct {
 	Media

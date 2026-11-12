@@ -23,7 +23,6 @@ type LQItemPage struct {
 }
 type LQRecord struct {
 	MediaID       string `json:"mediaId"`
-	SourceSHA256  string `json:"-"`
 	Path          string `json:"-"`
 	SHA256        string `json:"-"`
 	TaskID        string `json:"taskId,omitempty"`

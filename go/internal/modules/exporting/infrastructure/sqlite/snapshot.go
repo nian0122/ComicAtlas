@@ -89,7 +89,7 @@ func loadSnapshot(ctx context.Context, tx *sql.Tx, id string, request exportdoma
 	if err != nil {
 		return result, err
 	}
-	rows, err = tx.QueryContext(ctx, `SELECT m.id,m.chapter_id,m.page_number,m.file_name,m.media_type,m.relative_path,m.sha256,m.size,m.hq_state,COALESCE(l.relative_path,''),COALESCE(l.sha256,''),COALESCE(l.size,0),COALESCE(l.valid=1 AND l.source_matches=1,0) FROM active_media m JOIN active_chapters ch ON ch.id=m.chapter_id LEFT JOIN image_lq_state l ON l.media_id=m.id WHERE ch.comic_id=? ORDER BY ch.global_order,m.page_number,m.id LIMIT ?`, id, exportdomain.MaxMedia+1)
+	rows, err = tx.QueryContext(ctx, `SELECT m.id,m.chapter_id,m.page_number,m.file_name,m.media_type,m.relative_path,m.sha256,m.size,m.hq_state,COALESCE(l.relative_path,''),COALESCE(l.sha256,''),COALESCE(l.size,0),COALESCE(l.valid=1,0) FROM active_media m JOIN active_chapters ch ON ch.id=m.chapter_id LEFT JOIN image_lq l ON l.media_id=m.id WHERE ch.comic_id=? ORDER BY ch.global_order,m.page_number,m.id LIMIT ?`, id, exportdomain.MaxMedia+1)
 	if err != nil {
 		return result, err
 	}

@@ -25,14 +25,14 @@ func (repo *repository) ImportedLQWrite(record mediadomain.LQRecord, recordedAt 
 			return mediadomain.ErrLQValidation
 		}
 		var err error
-		var source, hqState string
-		if err = tx.QueryRowContext(ctx, "SELECT sha256,hq_state FROM active_media WHERE id=? AND media_type='image'", record.MediaID).Scan(&source, &hqState); err != nil {
+		var hqState string
+		if err = tx.QueryRowContext(ctx, "SELECT hq_state FROM active_media WHERE id=? AND media_type='image'", record.MediaID).Scan(&hqState); err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
 				return mediadomain.ErrLQNotFound
 			}
 			return err
 		}
-		if mediadomain.ValidateImportedLQSource(record, source, hqState) != nil {
+		if mediadomain.ValidateImportedLQSource(record, hqState) != nil {
 			return mediadomain.ErrLQConflict
 		}
 		var exists bool
@@ -46,15 +46,12 @@ func (repo *repository) ImportedLQWrite(record mediadomain.LQRecord, recordedAt 
 		if record.Spec != nil {
 			edge, quality = record.Spec.MaxLongEdge, record.Spec.Quality
 		}
-		var sourceHash, originalState any
-		if record.SourceSHA256 != "" {
-			sourceHash = record.SourceSHA256
-		}
+		var originalState any
 		if record.Provenance.OriginalState != "" {
 			originalState = record.Provenance.OriginalState
 		}
-		_, err = tx.ExecContext(ctx, `INSERT INTO image_lq(media_id,source_sha256,relative_path,sha256,size,width,height,max_long_edge,quality,valid,task_id,updated_at,origin,source_reference,original_state)
- VALUES(?,?,?,?,?,?,?,?,?,1,NULL,?,'imported',?,?)`, record.MediaID, sourceHash, record.Path, record.SHA256, record.Size, record.Width, record.Height, edge, quality, recordedAt, record.Provenance.ReferenceSHA256, originalState)
+		_, err = tx.ExecContext(ctx, `INSERT INTO image_lq(media_id,relative_path,sha256,size,width,height,max_long_edge,quality,valid,task_id,updated_at,origin,source_reference,original_state)
+ VALUES(?,?,?,?,?,?,?,?,1,NULL,?,'imported',?,?)`, record.MediaID, record.Path, record.SHA256, record.Size, record.Width, record.Height, edge, quality, recordedAt, record.Provenance.ReferenceSHA256, originalState)
 		if err != nil {
 			return err
 		}

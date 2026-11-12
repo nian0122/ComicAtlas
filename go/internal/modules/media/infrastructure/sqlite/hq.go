@@ -13,18 +13,18 @@ import (
 
 var _ mediaports.HQRepository = (*repository)(nil)
 
-const hqCurrentColumns = "m.hq_state,m.relative_path,m.sha256,m.size,COALESCE(l.source_sha256,''),l.relative_path,l.sha256,l.size,l.valid,COALESCE(l.task_id,''),l.origin,l.source_reference,l.original_state"
+const hqCurrentColumns = "m.hq_state,m.relative_path,m.sha256,m.size,l.relative_path,l.sha256,l.size,l.valid,COALESCE(l.task_id,''),l.origin,l.source_reference,l.original_state"
 
 func scanHQCurrent(scanner interface{ Scan(...any) error }) (mediadomain.HQCurrent, error) {
 	var current mediadomain.HQCurrent
-	var source, path, hash *string
+	var path, hash *string
 	var size *int64
 	var valid *bool
 	var task string
 	var origin, reference, originalState *string
-	err := scanner.Scan(&current.State, &current.SourcePath, &current.SourceSHA256, &current.Size, &source, &path, &hash, &size, &valid, &task, &origin, &reference, &originalState)
+	err := scanner.Scan(&current.State, &current.SourcePath, &current.SourceSHA256, &current.Size, &path, &hash, &size, &valid, &task, &origin, &reference, &originalState)
 	if err == nil && path != nil {
-		current.LQ = &mediadomain.LQRecord{SourceSHA256: *source, Path: *path, SHA256: *hash, Size: *size, Valid: *valid, TaskID: task}
+		current.LQ = &mediadomain.LQRecord{Path: *path, SHA256: *hash, Size: *size, Valid: *valid, TaskID: task}
 		if origin != nil && *origin != "generated" {
 			current.LQ.Provenance = &mediadomain.LQProvenance{Origin: *origin}
 			if reference != nil {
@@ -138,7 +138,7 @@ const hqItemColumns = "media_id,position,status,original_bytes,outcome,error_cod
 func scanHQItem(scanner interface{ Scan(...any) error }) (mediadomain.HQReleaseItem, error) {
 	var item mediadomain.HQReleaseItem
 	err := scanner.Scan(&item.MediaID, &item.Position, &item.Status, &item.OriginalBytes, &item.Outcome, &item.ErrorCode, &item.SourcePath, &item.SourceSHA256, &item.LQ.Path, &item.LQ.SHA256, &item.LQ.Size)
-	item.LQ.SourceSHA256, item.LQ.Valid = item.SourceSHA256, true
+	item.LQ.Valid = true
 	if item.ErrorCode != nil {
 		task := jobsdomain.WithDiagnostics(jobsdomain.Task{Status: "failed", ErrorCode: item.ErrorCode})
 		item.ErrorCode = task.ErrorCode

@@ -14,6 +14,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -117,6 +118,25 @@ func (files *Files) Build(ctx context.Context, id string, snapshot exportdomain.
 	if !exportdomain.TaskID(id) {
 		return nil, exportdomain.ErrValidation
 	}
+	if err := exportdomain.ValidateSnapshot(snapshot); err != nil {
+		return nil, err
+	}
+	snapshot.Sources = slices.Clone(snapshot.Sources)
+	var buffer []byte
+	for index := range snapshot.Sources {
+		source := &snapshot.Sources[index]
+		if source.SHA256 != "" {
+			continue
+		}
+		if buffer == nil {
+			buffer = make([]byte, 256<<10)
+		}
+		digest, err := files.measureSource(ctx, *source, buffer)
+		if err != nil {
+			return nil, err
+		}
+		source.SHA256 = digest
+	}
 	plan, err := exportdomain.Entries(snapshot)
 	if err != nil {
 		return nil, err
@@ -172,6 +192,27 @@ func (files *Files) Build(ctx context.Context, id string, snapshot exportdomain.
 	files.archiveTask, files.archiveVerified = id, receipts
 	files.archiveMutex.Unlock()
 	return result, nil
+}
+
+func (files *Files) measureSource(ctx context.Context, source exportdomain.Source, buffer []byte) (digest string, err error) {
+	file, err := files.openSource(ctx, source)
+	if err != nil {
+		return "", err
+	}
+	defer func() { err = errors.Join(err, file.Close()) }()
+	opened, err := file.Stat()
+	if err != nil || opened.Size() != source.Size {
+		return "", exportdomain.ErrSource
+	}
+	digest, err = fileDigest(ctx, file, source.Size, buffer, exportdomain.ErrSource)
+	if err != nil {
+		return "", err
+	}
+	current, err := files.root.Lstat(source.Path)
+	if err != nil || !os.SameFile(opened, current) || current.Size() != opened.Size() || !current.ModTime().Equal(opened.ModTime()) {
+		return "", exportdomain.ErrSource
+	}
+	return digest, nil
 }
 func (files *Files) Cleanup(ctx context.Context, id string) error {
 	_, err := files.cleanup(ctx, id)
@@ -342,7 +383,7 @@ func (files *Files) verify(ctx context.Context, directory string, artifacts []ex
 		}
 		files.archiveMutex.Lock()
 		var receipt os.FileInfo
-		if files.archiveTask == path.Base(directory) {
+		if directory == "staging/exports/"+files.archiveTask {
 			receipt = files.archiveVerified[artifact.FileName+"\x00"+artifact.SHA256]
 		}
 		files.archiveMutex.Unlock()
@@ -379,28 +420,11 @@ func verifyArtifact(ctx context.Context, root *os.Root, artifact exportdomain.Ar
 	if !os.SameFile(opened, before) || opened.Size() != artifact.Size {
 		return exportdomain.ErrManifest
 	}
-	hash := sha256.New()
-	var count int64
-	for {
-		if err = ctx.Err(); err != nil {
-			return err
-		}
-		n, readErr := file.Read(buffer)
-		if n > 0 {
-			count += int64(n)
-			if count > artifact.Size {
-				return exportdomain.ErrManifest
-			}
-			hash.Write(buffer[:n])
-		}
-		if errors.Is(readErr, io.EOF) {
-			break
-		}
-		if readErr != nil {
-			return readErr
-		}
+	digest, err := fileDigest(ctx, file, artifact.Size, buffer, exportdomain.ErrManifest)
+	if err != nil {
+		return err
 	}
-	if count != artifact.Size || hex.EncodeToString(hash.Sum(nil)) != artifact.SHA256 {
+	if digest != artifact.SHA256 {
 		return exportdomain.ErrManifest
 	}
 	after, err := file.Stat()
@@ -411,4 +435,32 @@ func verifyArtifact(ctx context.Context, root *os.Root, artifact exportdomain.Ar
 		return exportdomain.ErrManifest
 	}
 	return nil
+}
+
+func fileDigest(ctx context.Context, file *os.File, size int64, buffer []byte, sizeError error) (string, error) {
+	hash := sha256.New()
+	var count int64
+	for {
+		if err := ctx.Err(); err != nil {
+			return "", err
+		}
+		n, readErr := file.Read(buffer)
+		if n > 0 {
+			count += int64(n)
+			if count > size {
+				return "", sizeError
+			}
+			hash.Write(buffer[:n])
+		}
+		if errors.Is(readErr, io.EOF) {
+			break
+		}
+		if readErr != nil {
+			return "", readErr
+		}
+	}
+	if count != size {
+		return "", sizeError
+	}
+	return hex.EncodeToString(hash.Sum(nil)), nil
 }

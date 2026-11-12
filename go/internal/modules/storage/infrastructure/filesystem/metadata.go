@@ -232,7 +232,12 @@ func (files *MetadataFiles) ObserveMetadata(ctx context.Context, snapshot librar
 			if err != nil && !errors.Is(err, os.ErrNotExist) {
 				return nil, err
 			}
-			valid := err == nil && size == lq.Size && hash == lq.Hash && lq.MatchesSource(media.Hash) && item.Status != "changed"
+			originalChanged := item.Inspection != nil && (media.Hash != "" && media.Hash != item.SHA256 ||
+				media.Size > 0 && media.Size != item.Size ||
+				media.Width != nil && *media.Width != item.Inspection.Width ||
+				media.Height != nil && *media.Height != item.Inspection.Height ||
+				media.ContentType != "" && media.ContentType != item.Inspection.ContentType)
+			valid := lq.Valid && err == nil && size == lq.Size && (lq.Hash == "" || hash == lq.Hash) && !originalChanged
 			item.LQValid = &valid
 		}
 		item.Position = len(items) + 1

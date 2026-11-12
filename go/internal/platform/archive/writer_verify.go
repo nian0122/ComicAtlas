@@ -64,7 +64,7 @@ func (verifier *payloadVerifier) Write(data []byte) (int, error) {
 	verifier.position += uint64(len(data))
 	return count, nil
 }
-func verifyWritten(ctx context.Context, root *os.Root, name string, parts []writeSegment, records []writeRecord, buffer []byte) (result []Artifact, err error) {
+func verifyWritten(ctx context.Context, root *os.Root, name string, parts []finishedSegment, records []writeRecord, buffer []byte) (result []Artifact, err error) {
 	reader, err := Open(ctx, root, name)
 	if err != nil {
 		return nil, err
@@ -75,7 +75,7 @@ func verifyWritten(ctx context.Context, root *os.Root, name string, parts []writ
 			result = nil
 		}
 	}()
-	if len(reader.Files) != len(records) {
+	if len(reader.Files) != len(records) || len(reader.volumes) != len(parts) {
 		return nil, ErrOutputChanged
 	}
 	for index, file := range reader.Files {
@@ -95,7 +95,7 @@ func verifyWritten(ctx context.Context, root *os.Root, name string, parts []writ
 	}
 	verifier := &payloadVerifier{records: records}
 	for index, part := range parts {
-		artifact, readErr := verifyPart(ctx, root, part, verifier, buffer)
+		artifact, readErr := verifyPart(ctx, root, part, reader.volumes[index], verifier, buffer)
 		if readErr != nil {
 			return nil, readErr
 		}
@@ -110,37 +110,22 @@ func verifyWritten(ctx context.Context, root *os.Root, name string, parts []writ
 	}
 	return result, reader.Unchanged()
 }
-func verifyPart(ctx context.Context, root *os.Root, part writeSegment, verifier *payloadVerifier, buffer []byte) (artifact Artifact, err error) {
-	info, err := root.Lstat(part.name)
-	if err != nil {
-		return artifact, err
-	}
-	if !info.Mode().IsRegular() || !os.SameFile(info, part.identity) || info.Size() != part.size {
-		return artifact, ErrOutputChanged
-	}
-	file, err := root.Open(part.name)
-	if err != nil {
-		return artifact, err
-	}
-	defer func() { err = errors.Join(err, file.Close()) }()
-	opened, err := file.Stat()
-	if err != nil {
-		return artifact, err
-	}
-	if !os.SameFile(opened, info) || opened.Size() != part.size {
-		return artifact, ErrOutputChanged
+func verifyPart(ctx context.Context, root *os.Root, part finishedSegment, opened volume, verifier *payloadVerifier, buffer []byte) (Artifact, error) {
+	if opened.info.Size() != part.size {
+		return Artifact{}, ErrOutputChanged
 	}
 	hash := sha256.New()
-	n, err := io.CopyBuffer(io.MultiWriter(hash, verifier), checkedReader{ctx, file}, buffer)
+	content := io.NewSectionReader(opened.file, 0, part.size)
+	n, err := io.CopyBuffer(io.MultiWriter(hash, verifier), checkedReader{ctx, content}, buffer)
 	if err != nil {
-		return artifact, err
+		return Artifact{}, err
 	}
-	finished, err := file.Stat()
+	finished, err := root.Lstat(part.name)
 	if err != nil {
-		return artifact, err
+		return Artifact{}, err
 	}
-	if n != part.size || finished.Size() != opened.Size() || !finished.ModTime().Equal(opened.ModTime()) {
-		return artifact, ErrOutputChanged
+	if n != part.size || !os.SameFile(finished, opened.info) || finished.Size() != part.size || !finished.ModTime().Equal(opened.info.ModTime()) {
+		return Artifact{}, ErrOutputChanged
 	}
 	return Artifact{FileName: part.name, Size: n, SHA256: hex.EncodeToString(hash.Sum(nil)), VerifiedInfo: &WriteReceipt{Info: finished}}, nil
 }

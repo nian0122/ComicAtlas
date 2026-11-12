@@ -31,6 +31,5 @@ type ImageArtifact struct {
 	Height             int    `json:"height"`
 	Size               int64  `json:"size"`
 	SHA256             string `json:"-"`
-	SourceSHA256       string `json:"-"`
 	JPEGScale          int    `json:"-"`
 }

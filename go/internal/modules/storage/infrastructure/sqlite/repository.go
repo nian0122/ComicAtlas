@@ -27,19 +27,19 @@ func metricsAggregate(where string) string {
 	return `SELECT c.id AS comic_id,COUNT(DISTINCT ch.id) AS chapters,
 	 COALESCE(SUM(m.media_type='image'),0) AS images,COALESCE(SUM(m.media_type='video'),0) AS videos,
 	 COALESCE(SUM(m.hq_state<>'released'),0) AS hq_files,COALESCE(SUM(CASE WHEN m.hq_state<>'released' THEN m.size ELSE 0 END),0) AS hq_bytes,
-	 COUNT(l.media_id) AS lq_files,COALESCE(SUM(l.size),0) AS lq_bytes,COALESCE(SUM(l.valid=1 AND l.source_matches=1),0) AS current_lq,
+	 COUNT(l.media_id) AS lq_files,COALESCE(SUM(l.size),0) AS lq_bytes,COALESCE(SUM(l.valid=1),0) AS current_lq,
 	 COALESCE(SUM(m.media_type='image' AND m.hq_state='available'),0) AS available_images,
 	 COALESCE(SUM(m.media_type='image' AND m.hq_state='released'),0) AS released_images,
 	 COALESCE(SUM(m.media_type='image' AND m.hq_state='releasing'),0) AS releasing_images,
 	 COALESCE(SUM(m.media_type='image' AND m.hq_state='available' AND m.sha256=''),0) AS missing_source_sha256_images,
-	 COALESCE(SUM(m.media_type='image' AND m.hq_state='available' AND (l.media_id IS NULL OR l.valid<>1 OR l.source_matches<>1)),0) AS missing_lq,
+	 COALESCE(SUM(m.media_type='image' AND m.hq_state='available' AND (l.media_id IS NULL OR l.valid<>1)),0) AS missing_lq,
 	 COALESCE(SUM(CASE WHEN m.media_type='image' AND m.hq_state='available' THEN m.size ELSE 0 END),0) AS available_bytes,
 	 (SELECT COUNT(*) FROM comic_covers cv WHERE cv.comic_id=c.id) AS cover_files,
 	 (SELECT COALESCE(SUM(cv.size),0) FROM comic_covers cv WHERE cv.comic_id=c.id) AS cover_bytes
 	 FROM comics c
 	 LEFT JOIN chapters ch ON ch.comic_id=c.id AND ch.lifecycle_state='active'
 	 LEFT JOIN media m ON m.chapter_id=ch.id AND m.lifecycle_state='active'
-	 LEFT JOIN image_lq_state l ON l.media_id=m.id
+	 LEFT JOIN image_lq l ON l.media_id=m.id
 	 WHERE ` + where + `
 	 GROUP BY c.id`
 }
@@ -136,14 +136,14 @@ func (repo *repository) chapterInventory(ctx context.Context, id string) (storag
 		return storagedomain.Inventory{}, storagedomain.ErrNotFound
 	}
 	if err = tx.QueryRowContext(ctx, `SELECT COALESCE(SUM(m.hq_state<>'released'),0),COALESCE(SUM(CASE WHEN m.hq_state<>'released' THEN m.size ELSE 0 END),0),COALESCE(SUM(m.media_type='image'),0),COALESCE(SUM(m.media_type='video'),0),
-	 COUNT(l.media_id),COALESCE(SUM(l.size),0),COALESCE(SUM(l.valid=1 AND l.source_matches=1),0),
+	 COUNT(l.media_id),COALESCE(SUM(l.size),0),COALESCE(SUM(l.valid=1),0),
 	 COALESCE(SUM(m.media_type='image' AND m.hq_state='available'),0),
 	 COALESCE(SUM(CASE WHEN m.media_type='image' AND m.hq_state='available' THEN m.size ELSE 0 END),0),
-	 COALESCE(SUM(m.media_type='image' AND m.hq_state='available' AND (l.media_id IS NULL OR l.valid<>1 OR l.source_matches<>1)),0),
+	 COALESCE(SUM(m.media_type='image' AND m.hq_state='available' AND (l.media_id IS NULL OR l.valid<>1)),0),
 	 COALESCE(SUM(m.media_type='image' AND m.hq_state='available' AND m.sha256=''),0),
 	 COALESCE(SUM(m.media_type='image' AND m.hq_state='released'),0),
 	 COALESCE(SUM(m.media_type='image' AND m.hq_state='releasing'),0)
-	 FROM active_media m JOIN active_chapters ch ON ch.id=m.chapter_id LEFT JOIN image_lq_state l ON l.media_id=m.id WHERE ch.id=?`, id).Scan(
+	 FROM active_media m JOIN active_chapters ch ON ch.id=m.chapter_id LEFT JOIN image_lq l ON l.media_id=m.id WHERE ch.id=?`, id).Scan(
 		&result.HQ.Files, &result.HQ.Bytes, &result.Images, &result.Videos, &result.LQ.Files, &result.LQ.Bytes, &result.CurrentLQImages,
 		&result.AvailableImages, &result.AvailableBytes, &result.MissingLQ, &result.MissingSourceSHA256Images, &result.ReleasedImages, &result.ReleasingImages); err != nil {
 		return result, err

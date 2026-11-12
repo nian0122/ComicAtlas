@@ -27,13 +27,13 @@ func selectHQFacts(ctx context.Context, tx *sql.Tx, items []librarydomain.Select
 	}
 	rows, err := tx.QueryContext(ctx, `SELECT c.id,COUNT(m.id),COALESCE(SUM(m.hq_state='available'),0),COALESCE(SUM(m.hq_state='released'),0),
  COALESCE(SUM(m.hq_state='releasing'),0),COALESCE(SUM(m.hq_state='available' AND m.sha256=''),0),
- COALESCE(SUM(m.hq_state='available' AND (COALESCE(l.valid,0)=0 OR COALESCE(l.source_matches,0)=0)),0),
+ COALESCE(SUM(m.hq_state='available' AND (COALESCE(l.valid,0)=0)),0),
  COALESCE(SUM(CASE WHEN m.hq_state='available' THEN m.size ELSE 0 END),0),
  EXISTS(SELECT 1 FROM tasks t WHERE t.comic_id=c.id AND t.type IN('image_lq','hq_release','archive_export','video_transcode','media_upload','metadata_refresh') AND t.status IN('queued','running','cancelling')),
  EXISTS(SELECT 1 FROM upload_sessions u WHERE u.comic_id=c.id AND u.status IN('submitted','activated')),
  EXISTS(SELECT 1 FROM video_transcode_items v JOIN tasks t ON t.id=v.task_id WHERE t.comic_id=c.id AND v.status='prepared')
  FROM json_each(?) selected JOIN active_comics c ON c.id=selected.value LEFT JOIN active_chapters ch ON ch.comic_id=c.id
- LEFT JOIN active_media m ON m.chapter_id=ch.id AND m.media_type='image' LEFT JOIN image_lq_state l ON l.media_id=m.id GROUP BY c.id`, string(data))
+ LEFT JOIN active_media m ON m.chapter_id=ch.id AND m.media_type='image' LEFT JOIN image_lq l ON l.media_id=m.id GROUP BY c.id`, string(data))
 	if err != nil {
 		return err
 	}

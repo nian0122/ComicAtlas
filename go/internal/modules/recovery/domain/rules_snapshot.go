@@ -116,7 +116,7 @@ func validateSnapshot(comic string, value librarydomain.Snapshot) error {
 		pages[media.ChapterID][media.PageNumber] = true
 		paths[strings.ToLower(media.StoragePath)] = true
 		if lq := media.LQFile; lq != nil {
-			if media.MediaType != "image" || lq.MediaID != media.ID || (lq.TaskID == "" && (lq.Provenance == nil || lq.Provenance.Origin != "imported")) || lq.TaskID != "" && !Key(lq.TaskID) || mediadomain.ValidateLQProvenance(lq.Provenance, lq.TaskID) != nil || !sourcePath(lq.StoragePath, "lq") || !validHash(lq.Hash) || (!validHash(lq.SourceHash) && (lq.SourceHash != "" || !lq.MatchesSource(""))) || lq.Size < 0 || lq.Size > 20<<30 || lq.Width < 1 || lq.Height < 1 {
+			if media.MediaType != "image" || lq.MediaID != media.ID || (lq.TaskID == "" && (lq.Provenance == nil || lq.Provenance.Origin != "imported")) || lq.TaskID != "" && !Key(lq.TaskID) || mediadomain.ValidateLQProvenance(lq.Provenance, lq.TaskID) != nil || !sourcePath(lq.StoragePath, "lq") || !validHash(lq.Hash) || lq.Size < 0 || lq.Size > 20<<30 || lq.Width < 1 || lq.Height < 1 {
 				return ErrMetadata
 			}
 		}

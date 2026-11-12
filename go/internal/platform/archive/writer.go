@@ -105,10 +105,11 @@ func writeArchive(ctx context.Context, parent *os.Root, directory string, option
 			return nil, err
 		}
 	}
-	if err = segments.finishNames(options.Name); err != nil {
+	finished, err := segments.finishNames(options.Name)
+	if err != nil {
 		return nil, err
 	}
-	result, err = verifyWritten(ctx, root, options.Name, segments.parts, records, buffer)
+	result, err = verifyWritten(ctx, root, options.Name, finished, records, buffer)
 	if err != nil {
 		return nil, err
 	}

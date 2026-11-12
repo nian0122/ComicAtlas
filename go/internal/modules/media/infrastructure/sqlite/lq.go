@@ -121,13 +121,13 @@ func (repo *repository) Current(ctx context.Context, id string) (*mediadomain.LQ
 	var record mediadomain.LQRecord
 	var source string
 	var path *string
-	var storedSHA, hash, taskID *string
+	var hash, taskID *string
 	var size *int64
 	var width, height, edge, quality *int
 	var valid *bool
 	var origin, reference, originalState *string
-	err := repo.database.Reader.QueryRowContext(ctx, `SELECT m.sha256,l.relative_path,COALESCE(l.source_sha256,''),l.sha256,COALESCE(l.task_id,''),l.size,l.width,l.height,l.max_long_edge,l.quality,l.valid,l.origin,l.source_reference,l.original_state
-	 FROM active_media m LEFT JOIN image_lq l ON l.media_id=m.id WHERE m.id=? AND m.media_type='image'`, id).Scan(&source, &path, &storedSHA, &hash, &taskID, &size, &width, &height, &edge, &quality, &valid, &origin, &reference, &originalState)
+	err := repo.database.Reader.QueryRowContext(ctx, `SELECT m.sha256,l.relative_path,l.sha256,COALESCE(l.task_id,''),l.size,l.width,l.height,l.max_long_edge,l.quality,l.valid,l.origin,l.source_reference,l.original_state
+	 FROM active_media m LEFT JOIN image_lq l ON l.media_id=m.id WHERE m.id=? AND m.media_type='image'`, id).Scan(&source, &path, &hash, &taskID, &size, &width, &height, &edge, &quality, &valid, &origin, &reference, &originalState)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, "", mediadomain.ErrLQNotFound
 	}
@@ -137,7 +137,7 @@ func (repo *repository) Current(ctx context.Context, id string) (*mediadomain.LQ
 	if path == nil {
 		return nil, source, nil
 	}
-	record = mediadomain.LQRecord{MediaID: id, Path: *path, SourceSHA256: *storedSHA, SHA256: *hash, TaskID: *taskID, Size: *size, Width: *width, Height: *height, Valid: *valid}
+	record = mediadomain.LQRecord{MediaID: id, Path: *path, SHA256: *hash, TaskID: *taskID, Size: *size, Width: *width, Height: *height, Valid: *valid}
 	if edge != nil && quality != nil {
 		record.Spec = &mediadomain.ImageSpec{MaxLongEdge: *edge, Quality: *quality}
 	}
@@ -153,7 +153,7 @@ func (repo *repository) Current(ctx context.Context, id string) (*mediadomain.LQ
 	return &record, source, nil
 }
 
-// Record 核对原件路径及摘要，在同一事务内写入新测得的摘要、产物与逐项结果。
+// Record 核对任务冻结的原件路径和摘要，在同一事务内登记产物与逐项结果。
 func (repo *repository) Record(ctx context.Context, taskID string, item mediadomain.LQItem, record *mediadomain.LQRecord, code string) error {
 	if err := mediadomain.ValidateLQResult(item.Status, record != nil, code); err != nil {
 		return err
@@ -180,20 +180,15 @@ func (repo *repository) Record(ctx context.Context, taskID string, item mediadom
 			return mediadomain.ErrLQConflict
 		}
 		generated := item.Status == "generated"
-		if sourcePath != item.SourcePath || !mediadomain.LQSourceMayBeRecorded(item.SourceSHA256, source, record.SourceSHA256, generated) {
+		if sourcePath != item.SourcePath || source != item.SourceSHA256 {
 			return mediadomain.ErrLQConflict
 		}
 		if generated {
-			if source == "" {
-				if _, err = tx.ExecContext(ctx, "UPDATE media SET sha256=? WHERE id=?", record.SourceSHA256, item.MediaID); err != nil {
-					return err
-				}
-			}
 			if _, err = tx.ExecContext(ctx, "INSERT OR IGNORE INTO image_lq_garbage SELECT relative_path FROM image_lq WHERE media_id=? AND relative_path<>?", item.MediaID, record.Path); err != nil {
 				return err
 			}
-			if _, err = tx.ExecContext(ctx, `INSERT INTO image_lq(media_id,source_sha256,relative_path,sha256,size,width,height,max_long_edge,quality,task_id,updated_at,valid)
-			 VALUES(?,?,?,?,?,?,?,?,?,?,?,1) ON CONFLICT(media_id) DO UPDATE SET source_sha256=excluded.source_sha256,relative_path=excluded.relative_path,sha256=excluded.sha256,size=excluded.size,width=excluded.width,height=excluded.height,max_long_edge=excluded.max_long_edge,quality=excluded.quality,task_id=excluded.task_id,updated_at=excluded.updated_at,valid=1,origin='generated',source_reference=NULL,original_state=NULL`, item.MediaID, record.SourceSHA256, record.Path, record.SHA256, record.Size, record.Width, record.Height, record.Spec.MaxLongEdge, record.Spec.Quality, taskID, time.Now().UTC().Format(jobsdomain.TimestampFormat)); err != nil {
+			if _, err = tx.ExecContext(ctx, `INSERT INTO image_lq(media_id,relative_path,sha256,size,width,height,max_long_edge,quality,task_id,updated_at,valid)
+			 VALUES(?,?,?,?,?,?,?,?,?,?,1) ON CONFLICT(media_id) DO UPDATE SET relative_path=excluded.relative_path,sha256=excluded.sha256,size=excluded.size,width=excluded.width,height=excluded.height,max_long_edge=excluded.max_long_edge,quality=excluded.quality,task_id=excluded.task_id,updated_at=excluded.updated_at,valid=1,origin='generated',source_reference=NULL,original_state=NULL`, item.MediaID, record.Path, record.SHA256, record.Size, record.Width, record.Height, record.Spec.MaxLongEdge, record.Spec.Quality, taskID, time.Now().UTC().Format(jobsdomain.TimestampFormat)); err != nil {
 				return err
 			}
 		}

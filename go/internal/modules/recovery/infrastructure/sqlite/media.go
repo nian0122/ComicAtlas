@@ -13,7 +13,7 @@ func restoreMedia(ctx context.Context, tx *sql.Tx, plan recoverydomain.RestorePl
 		return err
 	}
 	defer media.Close()
-	lq, err := tx.PrepareContext(ctx, `INSERT INTO image_lq(media_id,source_sha256,relative_path,sha256,size,width,height,max_long_edge,quality,valid,task_id,updated_at,origin,source_reference,original_state) VALUES(?,?,?,?,?,?,?,?,?,1,?,?,?,?,?)`)
+	lq, err := tx.PrepareContext(ctx, `INSERT INTO image_lq(media_id,relative_path,sha256,size,width,height,max_long_edge,quality,valid,task_id,updated_at,origin,source_reference,original_state) VALUES(?,?,?,?,?,?,?,?,1,?,?,?,?,?)`)
 	if err != nil {
 		return err
 	}
@@ -36,10 +36,7 @@ func restoreMedia(ctx context.Context, tx *sql.Tx, plan recoverydomain.RestorePl
 			if prepareErr != nil {
 				return prepareErr
 			}
-			var edge, quality, task, sourceHash, originalState any
-			if file.SourceHash != "" {
-				sourceHash = file.SourceHash
-			}
+			var edge, quality, task, originalState any
 			if registration.Provenance.OriginalState != "" {
 				originalState = registration.Provenance.OriginalState
 			}
@@ -49,7 +46,7 @@ func restoreMedia(ctx context.Context, tx *sql.Tx, plan recoverydomain.RestorePl
 			if registration.TaskID != "" {
 				task = registration.TaskID
 			}
-			if _, err = lq.ExecContext(ctx, item.ID, sourceHash, file.StoragePath, file.Hash, file.Size, file.Width, file.Height, edge, quality, task, plan.RecordedAt, registration.Provenance.Origin, registration.Provenance.ReferenceSHA256, originalState); err != nil {
+			if _, err = lq.ExecContext(ctx, item.ID, file.StoragePath, file.Hash, file.Size, file.Width, file.Height, edge, quality, task, plan.RecordedAt, registration.Provenance.Origin, registration.Provenance.ReferenceSHA256, originalState); err != nil {
 				return err
 			}
 		}

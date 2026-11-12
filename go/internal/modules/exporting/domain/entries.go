@@ -103,8 +103,12 @@ func Entries(snapshot Snapshot) ([]Entry, error) {
 	}
 	portable := snapshot
 	portable.Sources = append([]Source(nil), snapshot.Sources...)
+	missingDigestBytes := 0
 	for index := range snapshot.Sources {
 		source := snapshot.Sources[index]
+		if source.SHA256 == "" {
+			missingDigestBytes += 64
+		}
 		directory, ok := chapters[source.ChapterID]
 		if !ok {
 			return nil, ErrValidation
@@ -137,7 +141,7 @@ func Entries(snapshot Snapshot) ([]Entry, error) {
 	if err != nil {
 		return nil, err
 	}
-	if len(metadata) > MaxSnapshotBytes {
+	if len(metadata)+missingDigestBytes > MaxSnapshotBytes {
 		return nil, ErrValidation
 	}
 	entries = append([]Entry{{Name: "ComicInfo.xml", Data: append([]byte(xml.Header), xmlData...)}, {Name: "metadata.json", Data: metadata}}, entries...)

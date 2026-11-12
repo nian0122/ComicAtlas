@@ -154,7 +154,7 @@ func loadDetail(ctx context.Context, tx *sql.Tx, id string) (librarydomain.Detai
 	return result, nil
 }
 
-const mediaColumns = "m.id,m.chapter_id,m.page_number,m.file_name,m.relative_path,m.media_type,m.content_type,m.size,m.width,m.height,m.sha256,m.video_metadata,COALESCE(l.source_sha256,''),l.width,l.height,l.size,l.valid,latest.task_id,lt.status,li.status,li.error_code,m.hq_state,CASE WHEN m.hq_state='released' THEN 'released' WHEN obs.source_sha256=m.sha256 THEN obs.status ELSE 'unknown' END,l.origin,l.source_reference,l.original_state,COALESCE(l.task_id,''),EXISTS(SELECT 1 FROM legacy_page_sources source WHERE source.media_id=m.id AND json_extract(source.source_json,'$.metadataOnly')=1)"
+const mediaColumns = "m.id,m.chapter_id,m.page_number,m.file_name,m.relative_path,m.media_type,m.content_type,m.size,m.width,m.height,m.sha256,m.video_metadata,l.width,l.height,l.size,l.valid,latest.task_id,lt.status,li.status,li.error_code,m.hq_state,CASE WHEN m.hq_state='released' THEN 'released' WHEN obs.source_sha256=m.sha256 THEN obs.status ELSE 'unknown' END,l.origin,l.source_reference,l.original_state,COALESCE(l.task_id,''),EXISTS(SELECT 1 FROM legacy_page_sources source WHERE source.media_id=m.id AND json_extract(source.source_json,'$.metadataOnly')=1)"
 const mediaLQJoins = " LEFT JOIN media_observations obs ON obs.media_id=m.id LEFT JOIN image_lq l ON l.media_id=m.id LEFT JOIN image_lq_latest latest ON latest.media_id=m.id LEFT JOIN tasks lt ON lt.id=latest.task_id LEFT JOIN image_lq_items li ON li.task_id=latest.task_id AND li.media_id=m.id "
 
 func (service *sqliteRepository) Media(ctx context.Context, id string) (librarydomain.Media, error) {
@@ -324,13 +324,13 @@ func (service *sqliteRepository) InsertTx(ctx context.Context, tx *sql.Tx, plan 
 func scanMedia(scanner interface{ Scan(...any) error }) (librarydomain.Media, error) {
 	var item librarydomain.Media
 	var video *string
-	var lqSHA, taskID, taskStatus, itemStatus, errorCode *string
+	var taskID, taskStatus, itemStatus, errorCode *string
 	var width, height *int
 	var size *int64
 	var valid *bool
 	var origin, reference, originalState *string
 	var registrationTask string
-	err := scanner.Scan(&item.ID, &item.ChapterID, &item.PageNumber, &item.FileName, &item.RelativePath, &item.MediaType, &item.ContentType, &item.Size, &item.Width, &item.Height, &item.SHA256, &video, &lqSHA, &width, &height, &size, &valid, &taskID, &taskStatus, &itemStatus, &errorCode, &item.HQState, &item.StorageState, &origin, &reference, &originalState, &registrationTask, &item.MetadataOnly)
+	err := scanner.Scan(&item.ID, &item.ChapterID, &item.PageNumber, &item.FileName, &item.RelativePath, &item.MediaType, &item.ContentType, &item.Size, &item.Width, &item.Height, &item.SHA256, &video, &width, &height, &size, &valid, &taskID, &taskStatus, &itemStatus, &errorCode, &item.HQState, &item.StorageState, &origin, &reference, &originalState, &registrationTask, &item.MetadataOnly)
 	if err == nil && video != nil {
 		item.Video = &mediadomain.Video{}
 		err = json.Unmarshal([]byte(*video), item.Video)
@@ -340,7 +340,7 @@ func scanMedia(scanner interface{ Scan(...any) error }) (librarydomain.Media, er
 	if err == nil && item.MediaType == "image" {
 		var record *mediadomain.LQRecord
 		if size != nil {
-			record = &mediadomain.LQRecord{MediaID: item.ID, TaskID: registrationTask, SourceSHA256: *lqSHA, Width: *width, Height: *height, Size: *size, Valid: *valid}
+			record = &mediadomain.LQRecord{MediaID: item.ID, TaskID: registrationTask, Width: *width, Height: *height, Size: *size, Valid: *valid}
 			if origin != nil && *origin != "generated" {
 				record.Provenance = &mediadomain.LQProvenance{Origin: *origin}
 				if reference != nil {
@@ -358,7 +358,7 @@ func scanMedia(scanner interface{ Scan(...any) error }) (librarydomain.Media, er
 			normalized := jobsdomain.WithDiagnostics(jobsdomain.Task{Status: "failed", ErrorCode: errorCode})
 			errorCode = normalized.ErrorCode
 		}
-		info := mediadomain.LQState(item.ID, item.SHA256, record, taskID, taskStatus, itemStatus, errorCode)
+		info := mediadomain.LQState(item.ID, record, taskID, taskStatus, itemStatus, errorCode)
 		item.LQ = &info
 	}
 	return item, err

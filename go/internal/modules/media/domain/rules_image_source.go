@@ -12,11 +12,7 @@ func SelectImageSource(candidate ImageCandidate) (ImageSource, error) {
 	if candidate.HQState == "available" && source.OriginalSHA256 != "" {
 		return source, nil
 	}
-	record := LQRecord{TaskID: candidate.LQTaskID, Provenance: candidate.LQProvenance}
-	if candidate.LQSourceSHA256 != nil {
-		record.SourceSHA256 = *candidate.LQSourceSHA256
-	}
-	if candidate.LQValid != nil && *candidate.LQValid && LQMatchesSource(&record, source.OriginalSHA256) && candidate.LQPath != nil && candidate.LQSHA256 != nil && candidate.LQSize != nil {
+	if candidate.LQValid != nil && *candidate.LQValid && candidate.LQPath != nil && candidate.LQSHA256 != nil && candidate.LQSize != nil {
 		source.Path, source.SHA256, source.Size = *candidate.LQPath, *candidate.LQSHA256, *candidate.LQSize
 		return source, nil
 	}

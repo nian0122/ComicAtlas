@@ -42,25 +42,14 @@ func ValidateImportedLQRegistration(value LQRecord, recordedAt string) error {
 	if err != nil || stamp.UTC().Format(time.RFC3339Nano) != recordedAt {
 		return ErrLQValidation
 	}
-	return ValidateImportedLQ(value, value.SourceSHA256)
+	return ValidateImportedLQ(value)
 }
 
-// LQMatchesSource 区分已核对摘要和明确的快照关联，不把空字符串相等当成摘要匹配。
-func LQMatchesSource(record *LQRecord, sourceSHA string) bool {
-	if record == nil {
-		return false
-	}
-	if record.SourceSHA256 != "" {
-		return sourceSHA != "" && record.SourceSHA256 == sourceSHA && (record.Provenance == nil || record.Provenance.OriginalState == "")
-	}
-	return sourceSHA == "" && record.Provenance != nil && record.Provenance.OriginalState != "" && record.Provenance.ReferenceSHA256 != "" && ValidateLQProvenance(record.Provenance, record.TaskID) == nil
-}
-
-func ValidateImportedLQSource(value LQRecord, sourceSHA, hqState string) error {
-	if ValidateImportedLQ(value, sourceSHA) != nil {
+func ValidateImportedLQSource(value LQRecord, hqState string) error {
+	if ValidateImportedLQ(value) != nil {
 		return ErrLQConflict
 	}
-	if sourceSHA == "" && (value.Provenance.OriginalState == "released") != (hqState == "released") {
+	if state := value.Provenance.OriginalState; state != "" && (state == "released") != (hqState == "released") {
 		return ErrLQConflict
 	}
 	if hqState != "available" && hqState != "released" {
@@ -69,12 +58,11 @@ func ValidateImportedLQSource(value LQRecord, sourceSHA, hqState string) error {
 	return nil
 }
 
-// ValidateImportedLQ 要求可靠摘要或带明确原件状态的快照关联。
-func ValidateImportedLQ(value LQRecord, sourceSHA string) error {
+func ValidateImportedLQ(value LQRecord) error {
 	if !utf8.ValidString(value.Path) || strings.ContainsFunc(value.Path, unicode.IsControl) {
 		return ErrLQValidation
 	}
-	if value.MediaID == "" || len(value.MediaID) > 128 || !value.Valid || value.TaskID != "" || value.Provenance == nil || value.Provenance.Origin != "imported" || ValidateLQProvenance(value.Provenance, value.TaskID) != nil || !LQMatchesSource(&value, sourceSHA) || sourceSHA != "" && !lqDigest(sourceSHA) || !lqDigest(value.SHA256) || value.Size < 1 || value.Size > 20<<30 || value.Width < 1 || value.Height < 1 || !ValidLQPath(value.Path) || path.Clean(value.Path) != value.Path || strings.ContainsAny(value.Path, ":\x00") || len(value.Path) > 2048 || path.Ext(value.Path) != ".webp" {
+	if value.MediaID == "" || len(value.MediaID) > 128 || !value.Valid || value.TaskID != "" || value.Provenance == nil || value.Provenance.Origin != "imported" || ValidateLQProvenance(value.Provenance, value.TaskID) != nil || !lqDigest(value.SHA256) || value.Size < 1 || value.Size > 20<<30 || value.Width < 1 || value.Height < 1 || !ValidLQPath(value.Path) || path.Clean(value.Path) != value.Path || strings.ContainsAny(value.Path, ":\x00") || len(value.Path) > 2048 || path.Ext(value.Path) != ".webp" {
 		return ErrLQValidation
 	}
 	if value.Spec != nil && ValidateImageSpec(*value.Spec) != nil {

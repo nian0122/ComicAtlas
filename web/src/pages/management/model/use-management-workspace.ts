@@ -1129,6 +1129,7 @@ export function useManagementWorkspace() {
   }
 
   async function run(action: () => Promise<void>, inDialog = false) {
+    const archiveExport = inDialog && dialog.value === 'export'
     if (busy.value) return
     busy.value = true
     if (inDialog) dialogError.value = ''
@@ -1136,7 +1137,7 @@ export function useManagementWorkspace() {
     try {
       await action()
     } catch (e) {
-      if (inDialog) dialogError.value = message(e)
+      if (inDialog) dialogError.value = archiveExport ? getApiErrorMessage(e, '创建归档失败，请重试') : message(e)
       else error.value = message(e)
     } finally {
       busy.value = false

@@ -2,7 +2,7 @@ name: comicatlas
 
 services:
   backend:
-    image: comicatlas-go:3.0.0-rc.2
+    image: comicatlas-go:3.0.0-rc.3
     pull_policy: never
     build:
       context: ./go
@@ -32,7 +32,7 @@ services:
       start_period: 5s
 
   web:
-    image: comicatlas-web:3.0.0-rc.2
+    image: comicatlas-web:3.0.0-rc.3
     pull_policy: never
     build:
       context: ./web
@@ -62,7 +62,7 @@ services:
 
   ai:
     profiles: [ai]
-    image: comicatlas-ai:3.0.0-rc.2
+    image: comicatlas-ai:3.0.0-rc.3
     pull_policy: never
     build:
       context: ./go/services/ai

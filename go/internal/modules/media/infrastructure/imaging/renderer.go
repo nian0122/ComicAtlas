@@ -75,12 +75,8 @@ func (renderer *Renderer) Render(ctx context.Context, request mediadomain.ImageR
 	if err != nil {
 		return artifact, err
 	}
-	digest, err := sourceDigest(ctx, input)
-	if err != nil {
+	if err = verifySourceDigest(ctx, input, request.SourceSHA256); err != nil {
 		return artifact, err
-	}
-	if request.SourceSHA256 != "" && !strings.EqualFold(digest, request.SourceSHA256) {
-		return artifact, mediadomain.ErrImageChanged
 	}
 	if renderer.cwebp == "" || !filepath.IsAbs(renderer.cwebp) || (plan.JPEGScale < 8 && (renderer.djpeg == "" || !filepath.IsAbs(renderer.djpeg))) {
 		return artifact, mediadomain.ErrImageUnavailable
@@ -147,20 +143,12 @@ func (renderer *Renderer) Render(ctx context.Context, request mediadomain.ImageR
 	if err != nil || currentErr != nil || !os.SameFile(before, current) || before.Size() != after.Size() || !before.ModTime().Equal(after.ModTime()) {
 		return artifact, mediadomain.ErrImageChanged
 	}
-	finalDigest, err := sourceDigest(ctx, input)
-	if err != nil {
+	if err = verifySourceDigest(ctx, input, request.SourceSHA256); err != nil {
 		return artifact, err
-	}
-	if finalDigest != digest {
-		return artifact, mediadomain.ErrImageChanged
 	}
 	artifact, err = inspectArtifact(ctx, output, workspace, plan)
 	if err != nil {
 		return artifact, err
-	}
-	artifact.SourceSHA256 = digest
-	if request.SourceSHA256 != "" {
-		artifact.SourceSHA256 = request.SourceSHA256
 	}
 	// 临时中间文件不随产物保留，发布者只需处理一个 WebP。
 	for _, name := range []string{normalized, filepath.Join(workspace, "scaled.ppm")} {
@@ -283,6 +271,20 @@ func normalize(ctx context.Context, source, target string, plan mediadomain.Imag
 	}
 	if encodeErr != nil || closeErr != nil {
 		return mediadomain.ErrImageIO
+	}
+	return nil
+}
+
+func verifySourceDigest(ctx context.Context, file *os.File, expected string) error {
+	if expected == "" {
+		return ctx.Err()
+	}
+	digest, err := sourceDigest(ctx, file)
+	if err != nil {
+		return err
+	}
+	if !strings.EqualFold(digest, expected) {
+		return mediadomain.ErrImageChanged
 	}
 	return nil
 }

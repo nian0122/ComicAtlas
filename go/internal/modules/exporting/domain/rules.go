@@ -53,17 +53,21 @@ func SelectSource(candidate Candidate) (Source, error) {
 	if candidate.HQState == "releasing" {
 		return value, ErrConflict
 	}
-	if candidate.HQState != "available" || value.SHA256 == "" {
-		if value.MediaType != "image" || (candidate.HQState != "released" && candidate.HQState != "available") || !candidate.LQCurrent {
+	if candidate.HQState != "available" {
+		if value.MediaType != "image" || candidate.HQState != "released" || !candidate.LQCurrent {
 			return value, ErrSource
 		}
 		value.Path, value.SHA256, value.Size, value.Quality = candidate.LQPath, candidate.LQSHA, candidate.LQSize, "lq"
 	}
-	if !sourcePath(value.Path, value.Quality) || !digest(value.SHA256) || value.Size < 0 || value.Size > 20<<30 {
+	if !validSource(value) {
 		return value, ErrSource
 	}
 	return value, nil
 }
+func validSource(source Source) bool {
+	return sourcePath(source.Path, source.Quality) && (source.SHA256 == "" || digest(source.SHA256)) && source.Size >= 0 && source.Size <= 20<<30
+}
+
 func ValidateSnapshot(snapshot Snapshot) error {
 	request, err := Normalize(snapshot.Request)
 	if err != nil || request != snapshot.Request || snapshot.Version != 1 || snapshot.Comic.ID == "" || len(snapshot.Sources) > MaxMedia || len(snapshot.Catalogs)+len(snapshot.Chapters) > MaxNodes {
@@ -73,7 +77,7 @@ func ValidateSnapshot(snapshot Snapshot) error {
 	seen := map[string]bool{}
 	media := map[string]Source{}
 	for _, source := range snapshot.Sources {
-		if source.MediaID == "" || seen[source.MediaID] || source.ChapterID == "" || source.PageNumber < 1 || (source.MediaType != "image" && source.MediaType != "video") || (source.Quality != "hq" && source.Quality != "lq") || !sourcePath(source.Path, source.Quality) || !digest(source.SHA256) || source.Size < 0 || source.Size > 20<<30 {
+		if source.MediaID == "" || seen[source.MediaID] || source.ChapterID == "" || source.PageNumber < 1 || (source.MediaType != "image" && source.MediaType != "video") || (source.Quality != "hq" && source.Quality != "lq") || !validSource(source) {
 			return ErrValidation
 		}
 		seen[source.MediaID] = true

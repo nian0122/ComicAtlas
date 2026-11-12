@@ -190,7 +190,7 @@ func ApplyObservations(baseline librarydomain.Snapshot, items []MediaObservation
 		media.StorageState = item.Status
 		if media.LQFile != nil {
 			copy := *media.LQFile
-			copy.Valid = item.LQValid != nil && *item.LQValid && copy.MatchesSource(media.Hash)
+			copy.Valid = item.LQValid != nil && *item.LQValid
 			media.LQFile = &copy
 		}
 	}

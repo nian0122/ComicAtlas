@@ -143,7 +143,7 @@ func (storage *Storage) Generate(ctx context.Context, taskID string, item mediad
 	if err = storage.syncDirectory(path.Dir(filepath.ToSlash(relative))); err != nil {
 		return record, err
 	}
-	return mediadomain.LQRecord{MediaID: item.MediaID, SourceSHA256: artifact.SourceSHA256, Path: target, SHA256: artifact.SHA256, Size: artifact.Size, Width: artifact.Width, Height: artifact.Height, Spec: &spec, TaskID: taskID, Valid: true}, nil
+	return mediadomain.LQRecord{MediaID: item.MediaID, Path: target, SHA256: artifact.SHA256, Size: artifact.Size, Width: artifact.Width, Height: artifact.Height, Spec: &spec, TaskID: taskID, Valid: true}, nil
 }
 
 func (storage *Storage) directory(path string, mode os.FileMode) error {
@@ -199,6 +199,10 @@ func (storage *Storage) Verify(ctx context.Context, record mediadomain.LQRecord)
 		return false, nil
 	}
 	defer file.Close()
+	if record.SHA256 == "" {
+		info, err := file.Stat()
+		return err == nil && info.Size() == record.Size, ctx.Err()
+	}
 	hash := sha256.New()
 	buffer := make([]byte, 64<<10)
 	var total int64

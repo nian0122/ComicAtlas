@@ -75,5 +75,5 @@ func MatchLQMeasurement(file librarydomain.StoredLQ, value Measurement) error {
 
 // CurrentLQ 不将旧来源或已失效的派生文件重新标为可读。
 func CurrentLQ(media librarydomain.StoredMedia) bool {
-	return media.LQFile != nil && media.LQFile.Valid && media.LQFile.MatchesSource(media.Hash)
+	return media.LQFile != nil && media.LQFile.Valid
 }

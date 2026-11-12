@@ -37,7 +37,7 @@ func AddHQPreview(preview *HQReleasePreview, current HQCurrent) {
 		if current.SourceSHA256 == "" {
 			counts.MissingSourceSHA256 = 1
 		}
-		if current.LQ == nil || !current.LQ.Valid || !LQMatchesSource(current.LQ, current.SourceSHA256) {
+		if current.LQ == nil || !current.LQ.Valid {
 			counts.MissingLQ = 1
 		}
 	default:
@@ -88,7 +88,7 @@ func appendHQBlocker(preview *HQReleasePreview, code string) {
 	preview.Blockers = append(preview.Blockers, code)
 }
 func MatchHQSnapshot(item HQReleaseItem, current HQCurrent) bool {
-	return current.SourceSHA256 != "" && (current.State == "available" || current.State == "releasing") && current.SourcePath == item.SourcePath && current.SourceSHA256 == item.SourceSHA256 && current.Size == item.OriginalBytes && current.LQ != nil && current.LQ.Valid && current.LQ.SourceSHA256 == item.SourceSHA256 && current.LQ.Path == item.LQ.Path && current.LQ.SHA256 == item.LQ.SHA256 && current.LQ.Size == item.LQ.Size
+	return current.SourceSHA256 != "" && (current.State == "available" || current.State == "releasing") && current.SourcePath == item.SourcePath && current.SourceSHA256 == item.SourceSHA256 && current.Size == item.OriginalBytes && current.LQ != nil && current.LQ.Valid && current.LQ.Path == item.LQ.Path && current.LQ.SHA256 == item.LQ.SHA256 && current.LQ.Size == item.LQ.Size
 }
 func ValidHQPath(value string) bool {
 	return strings.HasPrefix(value, "hq/") && path.Clean(value) == value && !strings.ContainsAny(value, "\\:")

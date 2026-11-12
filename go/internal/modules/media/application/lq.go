@@ -103,7 +103,7 @@ func (service *LQService) process(ctx context.Context, id string, item mediadoma
 	if err == nil && source != item.SourceSHA256 {
 		err = mediadomain.ErrImageChanged
 	}
-	if err == nil && record != nil && record.Valid && mediadomain.LQMatchesSource(record, source) {
+	if err == nil && record != nil && record.Valid {
 		valid, verifyErr := service.storage.Verify(ctx, *record)
 		if verifyErr != nil {
 			return "", verifyErr
@@ -195,11 +195,11 @@ func (service *LQService) Items(ctx context.Context, id string, page, size int) 
 	return service.repository.Items(ctx, id, page, size)
 }
 func (service *LQService) Open(ctx context.Context, id string) (*os.File, error) {
-	record, source, err := service.repository.Current(ctx, id)
+	record, _, err := service.repository.Current(ctx, id)
 	if err != nil {
 		return nil, err
 	}
-	if record == nil || !record.Valid || !mediadomain.LQMatchesSource(record, source) {
+	if record == nil || !record.Valid {
 		return nil, mediadomain.ErrLQNotFound
 	}
 	file, err := service.storage.Open(*record)

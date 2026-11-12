@@ -6,14 +6,12 @@ type ImageSource struct {
 }
 
 type ImageCandidate struct {
-	MetadataOnly                     bool
-	Source                           ImageSource
-	HQState                          string
-	LQPath, LQSHA256, LQSourceSHA256 *string
-	LQSize                           *int64
-	LQValid                          *bool
-	LQTaskID                         string
-	LQProvenance                     *LQProvenance
+	MetadataOnly     bool
+	Source           ImageSource
+	HQState          string
+	LQPath, LQSHA256 *string
+	LQSize           *int64
+	LQValid          *bool
 }
 
 type CoverRecord struct {

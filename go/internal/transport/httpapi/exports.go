@@ -3,6 +3,7 @@ package httpapi
 import (
 	exportdomain "comicatlas.local/backend/internal/modules/exporting/domain"
 	jobsdomain "comicatlas.local/backend/internal/modules/jobs/domain"
+	"errors"
 	"net/http"
 )
 
@@ -32,6 +33,12 @@ func (application *Application) serveExports(response http.ResponseWriter, reque
 			return 400, true
 		}
 		task, err := application.Exports.Submit(request.Context(), resource[1], body, request.Header.Get("Idempotency-Key"))
+		if errors.Is(err, exportdomain.ErrSource) {
+			return fail(response, 409, "EXPORT_SOURCE_UNAVAILABLE", "存在无法用于归档的媒体，请检查原件或轻量副本的状态。"), true
+		}
+		if errors.Is(err, exportdomain.ErrConflict) {
+			return fail(response, 409, "EXPORT_MEDIA_CONFLICT", "这部漫画有冲突的媒体任务，请在任务结束后重试。"), true
+		}
 		if err != nil {
 			return applicationError(response, err), true
 		}

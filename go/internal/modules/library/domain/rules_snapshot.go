@@ -1,25 +1,18 @@
 package domain
 
 import (
-	mediadomain "comicatlas.local/backend/internal/modules/media/domain"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"reflect"
 )
 
-func (file StoredLQ) MatchesSource(hash string) bool {
-	record := file.LQRecord
-	record.SourceSHA256 = file.SourceHash
-	return mediadomain.LQMatchesSource(&record, hash)
-}
-
 // OriginalAvailability 保留缺失、释放与无来源关联的区别；未知摘要必须有明确快照证据。
 func OriginalAvailability(media StoredMedia) string {
 	if media.Hash != "" {
 		return media.HQState
 	}
-	if media.MediaType != "image" || media.LQFile == nil || !media.LQFile.MatchesSource("") {
+	if media.MediaType != "image" || media.LQFile == nil || media.LQFile.Provenance == nil || media.LQFile.Provenance.OriginalState == "" {
 		return "unknown"
 	}
 	state := media.LQFile.Provenance.OriginalState

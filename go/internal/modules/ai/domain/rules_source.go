@@ -2,7 +2,6 @@ package domain
 
 import (
 	librarydomain "comicatlas.local/backend/internal/modules/library/domain"
-	mediadomain "comicatlas.local/backend/internal/modules/media/domain"
 	"encoding/hex"
 	"path"
 	"strings"
@@ -17,8 +16,7 @@ func SourceFrom(choice SourceChoice) (SourceImage, error) {
 	if choice.HQState == "available" && choice.HQSHA256 != "" {
 		value.Path, value.SHA256 = choice.HQPath, choice.HQSHA256
 	} else {
-		record := mediadomain.LQRecord{SourceSHA256: choice.LQSourceSHA256, TaskID: choice.LQTaskID, Provenance: choice.LQProvenance}
-		if !choice.LQValid || !mediadomain.LQMatchesSource(&record, choice.HQSHA256) {
+		if !choice.LQValid {
 			return value, ErrSource
 		}
 		value.Path, value.SHA256 = choice.LQPath, choice.LQSHA256

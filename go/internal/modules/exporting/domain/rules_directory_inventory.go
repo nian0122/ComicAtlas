@@ -177,7 +177,7 @@ func DirectoryInventoryStamp(value DirectoryInventory) (string, int, error) {
 			}
 		}
 		if lq := item.LQFile; lq != nil {
-			if item.MediaType != "image" || lq.MediaID != item.ID || !directorySource(lq.StoragePath) || !sourcePath(lq.StoragePath, "lq") || !digest(lq.Hash) || (!digest(lq.SourceHash) && (lq.SourceHash != "" || !lq.MatchesSource(""))) || (lq.TaskID == "" && (lq.Provenance == nil || lq.Provenance.Origin != "imported")) || lq.TaskID != "" && !directoryID(lq.TaskID) || mediadomain.ValidateLQProvenance(lq.Provenance, lq.TaskID) != nil || lq.Size < 1 || lq.Size > 20<<30 {
+			if item.MediaType != "image" || lq.MediaID != item.ID || !directorySource(lq.StoragePath) || !sourcePath(lq.StoragePath, "lq") || !digest(lq.Hash) || (lq.TaskID == "" && (lq.Provenance == nil || lq.Provenance.Origin != "imported")) || lq.TaskID != "" && !directoryID(lq.TaskID) || mediadomain.ValidateLQProvenance(lq.Provenance, lq.TaskID) != nil || lq.Size < 1 || lq.Size > 20<<30 {
 				return "", bytes, ErrValidation
 			}
 			files++

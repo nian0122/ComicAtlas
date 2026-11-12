@@ -277,17 +277,17 @@ func chapterMetrics(source string) string {
 	return `SELECT o.id AS id,COUNT(DISTINCT o.id) AS chapters,
 	 COALESCE(SUM(m.media_type='image'),0) AS images,COALESCE(SUM(m.media_type='video'),0) AS videos,
 	 COALESCE(SUM(m.hq_state<>'released'),0) AS hq_files,COALESCE(SUM(CASE WHEN m.hq_state<>'released' THEN m.size ELSE 0 END),0) AS hq_bytes,
-	 COUNT(l.media_id) AS lq_files,COALESCE(SUM(l.size),0) AS lq_bytes,COALESCE(SUM(l.valid=1 AND l.source_matches=1),0) AS current_lq,
+	 COUNT(l.media_id) AS lq_files,COALESCE(SUM(l.size),0) AS lq_bytes,COALESCE(SUM(l.valid=1),0) AS current_lq,
 	 COALESCE(SUM(m.media_type='image' AND m.hq_state='available'),0) AS available_images,
 	 COALESCE(SUM(m.media_type='image' AND m.hq_state='released'),0) AS released_images,
 	 COALESCE(SUM(m.media_type='image' AND m.hq_state='releasing'),0) AS releasing_images,
 	 COALESCE(SUM(m.media_type='image' AND m.hq_state='available' AND m.sha256=''),0) AS missing_source_sha256_images,
-	 COALESCE(SUM(m.media_type='image' AND m.hq_state='available' AND (l.media_id IS NULL OR l.valid<>1 OR l.source_matches<>1)),0) AS missing_lq,
+	 COALESCE(SUM(m.media_type='image' AND m.hq_state='available' AND (l.media_id IS NULL OR l.valid<>1)),0) AS missing_lq,
 	 COALESCE(SUM(CASE WHEN m.media_type='image' AND m.hq_state='available' THEN m.size ELSE 0 END),0) AS available_bytes,
 	 0 AS cover_files,0 AS cover_bytes
 	 FROM ` + source + ` o
 	 LEFT JOIN active_media m ON m.chapter_id=o.id
-	 LEFT JOIN image_lq_state l ON l.media_id=m.id
+	 LEFT JOIN image_lq l ON l.media_id=m.id
 	 GROUP BY o.id`
 }
 

@@ -15,6 +15,12 @@ type writeSegment struct {
 	size     int64
 	identity os.FileInfo
 }
+
+type finishedSegment struct {
+	name string
+	size int64
+}
+
 type segmentWriter struct {
 	ctx   context.Context
 	root  *os.Root
@@ -142,26 +148,34 @@ func (writer *segmentWriter) patch(disk int, offset int64, data []byte) error {
 	}
 	return errors.Join(err, file.Close())
 }
-func (writer *segmentWriter) finishNames(name string) error {
+func (writer *segmentWriter) finishNames(name string) ([]finishedSegment, error) {
 	if err := writer.closeCurrent(); err != nil {
-		return err
+		return nil, err
 	}
-	for index := range writer.parts {
-		part := &writer.parts[index]
+	finished := make([]finishedSegment, 0, len(writer.parts))
+	for index, part := range writer.parts {
+		info, err := writer.root.Lstat(part.name)
+		if err != nil {
+			return nil, err
+		}
+		if !info.Mode().IsRegular() || !os.SameFile(info, part.identity) || info.Size() != part.size {
+			return nil, ErrOutputChanged
+		}
 		final := name
 		if index < len(writer.parts)-1 {
 			final = strings.TrimSuffix(name, path.Ext(name)) + fmt.Sprintf(".z%02d", index+1)
 		}
 		if _, err := writer.root.Lstat(final); !errors.Is(err, os.ErrNotExist) {
 			if err != nil {
-				return err
+				return nil, err
 			}
-			return ErrOutputChanged
+			return nil, ErrOutputChanged
 		}
 		if err := writer.root.Rename(part.name, final); err != nil {
-			return err
+			return nil, err
 		}
-		part.name = final
+		// 重命名可能改变 inode。后续只按正式卷名打开并验证归档内容。
+		finished = append(finished, finishedSegment{name: final, size: part.size})
 	}
-	return nil
+	return finished, nil
 }

@@ -30,7 +30,7 @@ func ValidateLQResult(status string, hasRecord bool, code string) error {
 func CanRecordLQ(status string) bool { return status == "running" || status == "cancelling" }
 
 func OriginalStorageState(sourceSHA, observed string, record *LQRecord) string {
-	if observed == "unknown" && sourceSHA == "" && LQMatchesSource(record, sourceSHA) {
+	if observed == "unknown" && sourceSHA == "" && record != nil && record.Provenance != nil && record.Provenance.OriginalState != "" {
 		if record.Provenance.OriginalState == "released" {
 			return "released"
 		}
@@ -38,25 +38,13 @@ func OriginalStorageState(sourceSHA, observed string, record *LQRecord) string {
 	}
 	return observed
 }
-func LQSourceMayBeRecorded(snapshot, current, produced string, generated bool) bool {
-	if current != snapshot {
-		return false
-	}
-	if generated && snapshot == "" {
-		return lqDigest(produced)
-	}
-	return produced == current
-}
-func LQState(mediaID, sourceSHA string, record *LQRecord, taskID, taskStatus, itemStatus, errorCode *string) LQInfo {
+func LQState(mediaID string, record *LQRecord, taskID, taskStatus, itemStatus, errorCode *string) LQInfo {
 	result := LQInfo{State: "missing", TaskID: taskID, TaskStatus: taskStatus, ErrorCode: errorCode}
 	if record != nil && record.Valid {
-		if LQMatchesSource(record, sourceSHA) {
-			url := "/api/v1/media/" + mediaID + "/content?quality=lq"
-			result.State, result.Available = "ready", true
-			result.Width, result.Height, result.Size, result.ContentURL = &record.Width, &record.Height, &record.Size, &url
-			return result
-		}
-		result.State = "stale"
+		url := "/api/v1/media/" + mediaID + "/content?quality=lq"
+		result.State, result.Available = "ready", true
+		result.Width, result.Height, result.Size, result.ContentURL = &record.Width, &record.Height, &record.Size, &url
+		return result
 	}
 	if taskStatus != nil {
 		switch *taskStatus {

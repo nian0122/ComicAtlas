@@ -61,7 +61,7 @@ func directoryBindings(value DirectoryInventory, chapters map[string]string) ([]
 		if item.HQState == "released" || item.Hash == "" {
 			absent[item.StoragePath] = true
 			primary = "lq"
-			if visible && (item.MediaType != "image" || item.LQFile == nil || !item.LQFile.Valid || !item.LQFile.MatchesSource(item.Hash)) {
+			if visible && (item.MediaType != "image" || item.LQFile == nil || !item.LQFile.Valid) {
 				return nil, nil, ErrSource
 			}
 		}

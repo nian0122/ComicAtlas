@@ -504,7 +504,7 @@ async function enterSelection() {
   w.selectionMode = true
   await nextTick()
   libraryControls.value
-    ?.querySelector<HTMLInputElement>('.mw-toolbar-selection input[aria-label="选择本页全部"]')
+    ?.querySelector<HTMLInputElement>('.mw-selection-controls input[type="checkbox"]')
     ?.focus({ preventScroll: true })
 }
 async function exitSelection() {
