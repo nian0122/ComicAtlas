@@ -1,0 +1,11 @@
+ALTER TABLE comics ADD COLUMN lifecycle_state TEXT NOT NULL DEFAULT 'active' CHECK(lifecycle_state IN('active','trashing','trashed','restoring','purging'));
+ALTER TABLE chapters ADD COLUMN lifecycle_state TEXT NOT NULL DEFAULT 'active' CHECK(lifecycle_state IN('active','trashing','trashed','restoring','purging'));
+ALTER TABLE media ADD COLUMN lifecycle_state TEXT NOT NULL DEFAULT 'active' CHECK(lifecycle_state IN('active','trashing','trashed','restoring','purging'));
+CREATE INDEX comics_active_title ON comics(title COLLATE COMIC_NATURAL,id) WHERE lifecycle_state='active';
+CREATE VIEW active_comics AS SELECT * FROM comics WHERE lifecycle_state='active';
+CREATE VIEW active_catalogs AS SELECT n.* FROM catalogs n JOIN active_comics c ON c.id=n.comic_id;
+CREATE VIEW active_chapters AS SELECT ch.* FROM chapters ch JOIN active_comics c ON c.id=ch.comic_id WHERE ch.lifecycle_state='active';
+CREATE VIEW active_media AS SELECT m.* FROM media m JOIN active_chapters ch ON ch.id=m.chapter_id WHERE m.lifecycle_state='active';
+ALTER TABLE reading_progress ADD COLUMN media_id TEXT REFERENCES media(id) ON DELETE SET NULL;
+UPDATE reading_progress SET media_id=(SELECT m.id FROM media m WHERE m.chapter_id=reading_progress.chapter_id AND m.page_number=reading_progress.page_number);
+CREATE INDEX reading_progress_media ON reading_progress(media_id);

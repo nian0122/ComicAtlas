@@ -1,0 +1,78 @@
+name: comicatlas
+
+services:
+  backend:
+    image: comicatlas-go:3.0.0-rc.1
+    build:
+      context: ./go
+      target: runtime
+    restart: unless-stopped
+    environment:
+      COMICATLAS_READING_HTTP_ADDR: "0.0.0.0:8081"
+      COMICATLAS_IMPORT_HOST_ROOT: "${COMICATLAS_STORAGE_ROOT:?请在 .env 中设置存储根目录}/imports"
+      COMICATLAS_AI_ENDPOINT: "${COMICATLAS_AI_ENDPOINT:-}"
+    volumes:
+      - database:/data
+      - type: bind
+        source: ${COMICATLAS_STORAGE_ROOT:?请在 .env 中设置存储根目录}
+        target: /volume
+        bind:
+          create_host_path: false
+    read_only: true
+    tmpfs: ["/tmp:rw,noexec,nosuid,size=32m"]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    stop_grace_period: 20s
+    healthcheck:
+      test: [CMD, /app/comicatlas, healthcheck]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+
+  web:
+    image: comicatlas-web:3.0.0-rc.1
+    build:
+      context: ./web
+      target: runtime
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${COMICATLAS_WEB_PORT:-18078}:80"
+      - "127.0.0.1:${COMICATLAS_ADMIN_PORT:-18079}:8080"
+    environment:
+      API_UPSTREAM: http://backend:8081
+      MANAGEMENT_UPSTREAM: http://backend:8080
+      MANAGEMENT_URL: http://127.0.0.1:${COMICATLAS_ADMIN_PORT:-18079}/manage
+    depends_on:
+      backend:
+        condition: service_healthy
+    read_only: true
+    tmpfs:
+      - /etc/nginx/conf.d:rw,noexec,nosuid,size=1m
+      - /var/cache/nginx:rw,noexec,nosuid,size=8m
+      - /var/run:rw,noexec,nosuid,size=1m
+    security_opt: [no-new-privileges:true]
+    healthcheck:
+      test: [CMD, wget, -q, --spider, http://127.0.0.1/]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  ai:
+    profiles: [ai]
+    image: comicatlas-ai:3.0.0-rc.1
+    build:
+      context: ./go/services/ai
+      target: runtime
+    environment:
+      COMICATLAS_AI_PROVIDER_URL: "${COMICATLAS_AI_PROVIDER_URL:-}"
+      COMICATLAS_AI_MODEL: "${COMICATLAS_AI_MODEL:-}"
+      COMICATLAS_AI_PROVIDER_KEY: "${COMICATLAS_AI_PROVIDER_KEY:-}"
+    read_only: true
+    tmpfs: ["/tmp:rw,noexec,nosuid,size=64m,mode=1777"]
+    mem_limit: 512m
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+
+volumes:
+  database:

@@ -1,0 +1,1018 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "ComicAtlas Go API",
+    "version": "1.0.0",
+    "description": "ComicAtlas-go 管理与阅读 HTTP API。此规范逐步覆盖已实现接口；尚未列出的模块接口仍以各 docs/* 协议页为准。新 API 不承诺兼容旧 Java 接口。"
+  },
+  "servers": [
+    { "url": "http://127.0.0.1:8080", "description": "本机管理入口" }
+  ],
+  "tags": [
+    { "name": "System" },
+    { "name": "Imports" },
+    { "name": "Tasks" },
+    { "name": "Library" },
+    { "name": "Reading" },
+    { "name": "Metadata" },
+    { "name": "Lifecycle" },
+    { "name": "Recovery" },
+    { "name": "Media" },
+    { "name": "Exports" },
+    { "name": "Files" },
+    { "name": "AI" }
+  ],
+  "paths": {
+    "/api/v1/comics/{id}/structure/move": {"parameters":[{"$ref":"#/components/parameters/Id"}],"put":{"tags":["Library"],"summary":"同一漫画内原子移动一组同级目录或章节","operationId":"moveComicStructure","requestBody":{"$ref":"#/components/requestBodies/StructureMove"},"responses":{"200":{"description":"新的结构版本","content":{"application/json":{"schema":{"$ref":"#/components/schemas/StructureResultResponse"}}}},"400":{"$ref":"#/components/responses/Error"},"409":{"$ref":"#/components/responses/Error"},"404":{"$ref":"#/components/responses/Error"}}}},
+    "/api/v1/comics/{id}/cover-selection": {"get": {"operationId": "getCoverSelection", "summary": "查询封面选择", "parameters": [{"name": "id", "in": "path", "required": true, "schema": {"type": "string"}}], "responses": {"200": {"description": "封面选择", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/CoverSelectionResponse"}}}}}}, "put": {"operationId": "setCoverSelection", "summary": "更换封面选择", "parameters": [{"name": "id", "in": "path", "required": true, "schema": {"type": "string"}}], "responses": {"200": {"description": "封面选择", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/CoverSelectionResponse"}}}}}, "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/CoverSelectionRequest"}}}}}},
+    "/health/live": {
+      "get": {
+        "tags": ["System"],
+        "summary": "检查进程存活",
+        "operationId": "getLiveHealth",
+        "responses": {
+          "200": { "description": "进程存活", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/StatusResponse" } } } }
+        }
+      }
+    },
+    "/health/ready": {
+      "get": {
+        "tags": ["System"],
+        "summary": "检查 SQLite 就绪状态",
+        "operationId": "getReadyHealth",
+        "responses": {
+          "200": { "description": "数据库可读", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/StatusResponse" } } } },
+          "503": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/api/v1/system": {
+      "get": {
+        "tags": ["System"],
+        "summary": "读取服务标识",
+        "operationId": "getSystemInfo",
+        "responses": {
+          "200": { "description": "服务名称与 API 版本", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SystemResponse" } } } }
+        }
+      }
+    },
+    "/api/v1/system/capabilities": {
+      "get": {
+        "tags": ["System"],
+        "summary": "按需检查固定媒体工具",
+        "operationId": "getMediaToolCapabilities",
+        "description": "仅返回 ffmpeg、ffprobe、cwebp、djpeg 是否配置、是否可运行及版本，不泄露路径或原始命令输出。",
+        "responses": {
+          "200": { "description": "媒体工具能力快照", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ToolCapabilitiesResponse" } } } },
+          "503": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/api/v1/imports/directories": {
+      "post": {
+        "tags": ["Imports"],
+        "summary": "受理目录导入",
+        "operationId": "createDirectoryImport",
+        "parameters": [{ "$ref": "#/components/parameters/IdempotencyKey" }],
+        "requestBody": { "$ref": "#/components/requestBodies/ImportRequest" },
+        "responses": {
+          "202": { "$ref": "#/components/responses/TaskAccepted" },
+          "400": { "$ref": "#/components/responses/Error" },
+          "409": { "$ref": "#/components/responses/Error" },
+          "503": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/api/v1/imports/archives": {
+      "post": {
+        "tags": ["Imports"],
+        "summary": "受理 ZIP/CBZ 导入",
+        "operationId": "createArchiveImport",
+        "parameters": [{ "$ref": "#/components/parameters/IdempotencyKey" }],
+        "requestBody": { "$ref": "#/components/requestBodies/ImportRequest" },
+        "responses": {
+          "202": { "$ref": "#/components/responses/TaskAccepted" },
+          "400": { "$ref": "#/components/responses/Error" },
+          "409": { "$ref": "#/components/responses/Error" },
+          "503": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/api/v1/directory-scans": {
+      "post": { "tags": ["Imports"], "summary": "扫描导入根并生成候选预览", "operationId": "createDirectoryScan", "parameters": [{ "$ref": "#/components/parameters/IdempotencyKey" }], "requestBody": { "$ref": "#/components/requestBodies/DirectoryScan" }, "responses": { "202": { "$ref": "#/components/responses/TaskAccepted" }, "400": { "$ref": "#/components/responses/Error" }, "409": { "$ref": "#/components/responses/Error" }, "503": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/api/v1/directory-scans/{taskId}/candidates": {
+      "parameters": [{ "$ref": "#/components/parameters/TaskId" }],
+      "get": { "tags": ["Imports"], "summary": "分页读取已完成扫描的导入候选", "operationId": "listDirectoryScanCandidates", "parameters": [{ "$ref": "#/components/parameters/Page" }, { "$ref": "#/components/parameters/PageSize" }], "responses": { "200": { "description": "候选预览分页", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ImportCandidatePageResponse" } } } }, "400": { "$ref": "#/components/responses/Error" }, "404": { "$ref": "#/components/responses/Error" }, "409": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/api/v1/imports/archives/batch": {"post": {"tags": ["Imports"], "summary": "批量导入指定 ZIP/CBZ 路径", "operationId": "createArchiveImportBatch", "parameters": [{"$ref": "#/components/parameters/IdempotencyKey"}], "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ArchiveBatchImportRequest"}}}}, "responses": {"202": {"description": "父任务和持久分派条目已受理，子任务按队列容量逐项创建", "headers": {"Location": {"schema": {"type": "string"}}}, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ImportBatchResponse"}}}}, "400": {"$ref": "#/components/responses/Error"}, "404": {"$ref": "#/components/responses/Error"}, "409": {"$ref": "#/components/responses/Error"}, "503": {"$ref": "#/components/responses/Error"}}}},
+    "/api/v1/directory-scans/{taskId}/imports": {
+      "parameters": [{ "$ref": "#/components/parameters/TaskId" }],
+      "post": { "tags": ["Imports"], "summary": "原子受理选中候选的导入批次", "operationId": "createDirectoryScanImportBatch", "parameters": [{ "$ref": "#/components/parameters/IdempotencyKey" }], "requestBody": { "$ref": "#/components/requestBodies/DirectoryScanImport" }, "responses": { "202": { "description": "父任务和持久分派条目已受理，子任务按队列容量逐项创建", "headers": { "Location": { "schema": { "type": "string" } } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ImportBatchResponse" } } } }, "400": { "$ref": "#/components/responses/Error" }, "404": { "$ref": "#/components/responses/Error" }, "409": { "$ref": "#/components/responses/Error" }, "503": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/api/v1/import-batches/{id}": {
+      "parameters": [{ "$ref": "#/components/parameters/Id" }],
+      "get": { "tags": ["Imports"], "summary": "读取批量导入任务关联", "operationId": "getImportBatch", "responses": { "200": { "description": "候选与真实导入任务 ID 的关联", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ImportBatchResponse" } } } }, "404": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/api/v1/comics/{id}/exports": {
+      "parameters": [{ "$ref": "#/components/parameters/Id" }],
+      "post": { "tags": ["Exports"], "summary": "受理漫画归档导出", "operationId": "createComicExport", "parameters": [{ "$ref": "#/components/parameters/IdempotencyKey" }], "requestBody": { "$ref": "#/components/requestBodies/ExportRequest" }, "responses": { "202": { "$ref": "#/components/responses/TaskAccepted" }, "400": { "$ref": "#/components/responses/Error" }, "404": { "$ref": "#/components/responses/Error" }, "409": { "$ref": "#/components/responses/Error" }, "503": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/api/v1/tasks/{id}/artifacts": {
+      "parameters": [{ "$ref": "#/components/parameters/Id" }],
+      "get": { "tags": ["Exports"], "summary": "读取归档导出产物登记", "operationId": "getTaskArtifacts", "responses": { "200": { "description": "产物状态及相对路径登记", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ArtifactViewResponse" } } } }, "404": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/api/v1/directory-move-previews": {
+      "post": { "tags": ["Files"], "summary": "受理漫画文件夹移出预检", "operationId": "createDirectoryMovePreview", "requestBody": { "$ref": "#/components/requestBodies/DirectoryMovePreview" }, "responses": { "202": { "description": "预检任务已受理", "headers": { "Location": { "schema": { "type": "string" } } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/DirectoryMovePreviewResponse" } } } }, "400": { "$ref": "#/components/responses/Error" }, "409": { "$ref": "#/components/responses/Error" }, "503": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/api/v1/directory-move-previews/{id}": {
+      "parameters": [{ "$ref": "#/components/parameters/Id" }],
+      "get": { "tags": ["Files"], "summary": "读取文件夹移出预检状态", "operationId": "getDirectoryMovePreview", "responses": { "200": { "description": "预检状态及确认可用性", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/DirectoryMovePreviewResponse" } } } }, "404": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/api/v1/directory-move-previews/{id}/confirm": {
+      "parameters": [{ "$ref": "#/components/parameters/Id" }],
+      "post": { "tags": ["Files"], "summary": "确认文件夹移出", "operationId": "confirmDirectoryMove", "parameters": [{ "$ref": "#/components/parameters/IdempotencyKey" }], "requestBody": { "$ref": "#/components/requestBodies/DirectoryMoveConfirmation" }, "responses": { "202": { "$ref": "#/components/responses/TaskAccepted" }, "400": { "$ref": "#/components/responses/Error" }, "404": { "$ref": "#/components/responses/Error" }, "409": { "$ref": "#/components/responses/Error" }, "503": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/api/v1/tasks/{id}/directory-move-results": {
+      "parameters": [{ "$ref": "#/components/parameters/Id" }],
+      "get": { "tags": ["Files"], "summary": "分页读取文件夹移出结果", "operationId": "listDirectoryMoveResults", "parameters": [{ "$ref": "#/components/parameters/Page" }, { "$ref": "#/components/parameters/PageSize" }], "responses": { "200": { "description": "文件移动核对结果分页", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/DirectoryMoveResultPageResponse" } } } }, "400": { "$ref": "#/components/responses/Error" }, "404": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/api/v1/batch-previews": {
+      "post": { "tags": ["Tasks"], "summary": "创建批量维护或资源命令预览", "operationId": "createBatchPreview", "requestBody": { "$ref": "#/components/requestBodies/BatchPreview" }, "responses": { "201": { "description": "预览快照已保存", "headers": { "Location": { "schema": { "type": "string" } } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/BatchPreviewResponse" } } } }, "400": { "$ref": "#/components/responses/Error" }, "409": { "$ref": "#/components/responses/Error" }, "503": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/api/v1/batch-previews/{id}": {
+      "parameters": [{ "$ref": "#/components/parameters/Id" }],
+      "get": { "tags": ["Tasks"], "summary": "读取批量预览与执行计数", "operationId": "getBatchPreview", "responses": { "200": { "description": "预览范围、补丁及当前批次计数", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/BatchPreviewResponse" } } } }, "404": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/api/v1/batch-previews/{id}/items": {
+      "parameters": [{ "$ref": "#/components/parameters/Id" }],
+      "get": { "tags": ["Tasks"], "summary": "分页读取批量预览逐项状态", "operationId": "listBatchPreviewItems", "parameters": [{ "$ref": "#/components/parameters/Page" }, { "$ref": "#/components/parameters/PageSize" }], "responses": { "200": { "description": "稳定顺序的目标及执行结果分页", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/BatchItemPageResponse" } } } }, "400": { "$ref": "#/components/responses/Error" }, "404": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/api/v1/batch-previews/{id}/confirm": {
+      "parameters": [{ "$ref": "#/components/parameters/Id" }],
+      "post": { "tags": ["Tasks"], "summary": "确认并受理批量操作", "operationId": "confirmBatchPreview", "parameters": [{ "$ref": "#/components/parameters/IdempotencyKey" }], "requestBody": { "$ref": "#/components/requestBodies/BatchConfirmation" }, "responses": { "202": { "$ref": "#/components/responses/TaskAccepted" }, "400": { "$ref": "#/components/responses/Error" }, "404": { "$ref": "#/components/responses/Error" }, "409": { "$ref": "#/components/responses/Error" }, "503": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/api/v1/tasks": {
+      "get": {
+        "tags": ["Tasks"],
+        "summary": "分页查询任务",
+        "operationId": "listTasks",
+        "parameters": [
+          { "$ref": "#/components/parameters/Page" },
+          { "$ref": "#/components/parameters/PageSize" },
+          { "name": "type", "in": "query", "schema": { "$ref": "#/components/schemas/TaskType" } },
+          { "name": "status", "in": "query", "schema": { "$ref": "#/components/schemas/TaskStatus" } },
+          { "name": "keyword", "in": "query", "schema": { "type": "string", "maxLength": 500 } },
+          { "name": "oldest", "in": "query", "schema": { "type": "boolean", "default": false } }
+        ],
+        "responses": {
+          "200": { "description": "任务分页", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/TaskPageResponse" } } } },
+          "400": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/api/v1/tasks/summary": {
+      "get": {
+        "tags": ["Tasks"],
+        "summary": "按任务类型和关键词汇总任务状态",
+        "operationId": "getTaskSummary",
+        "parameters": [
+          { "name": "type", "in": "query", "schema": { "$ref": "#/components/schemas/TaskType" } },
+          { "name": "keyword", "in": "query", "schema": { "type": "string", "maxLength": 500 } }
+        ],
+        "responses": {
+          "200": { "description": "任务状态汇总", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/TaskSummaryResponse" } } } },
+          "400": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/api/v1/tasks/{id}/events": {
+      "parameters": [{ "$ref": "#/components/parameters/Id" }],
+      "get": {
+        "tags": ["Tasks"], "summary": "按游标读取任务状态事件", "operationId": "listTaskEvents",
+        "parameters": [{ "name": "after", "in": "query", "schema": { "type": "integer", "minimum": 0, "default": 0 } }, { "name": "limit", "in": "query", "schema": { "type": "integer", "minimum": 1, "maximum": 100, "default": 50 } }],
+        "responses": { "200": { "description": "任务事件页，不包含路径或任意错误文本", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/TaskEventPageResponse" } } } }, "400": { "$ref": "#/components/responses/Error" }, "404": { "$ref": "#/components/responses/Error" } }
+      }
+    },
+    "/api/v1/recoveries": {
+      "post": {
+        "tags": ["Recovery"], "summary": "受理媒体目录扫盘恢复", "operationId": "createDiskRecovery",
+        "parameters": [{ "$ref": "#/components/parameters/IdempotencyKey" }],
+        "requestBody": { "$ref": "#/components/requestBodies/EmptyObject" },
+        "responses": { "202": { "$ref": "#/components/responses/TaskAccepted" }, "400": { "$ref": "#/components/responses/Error" }, "409": { "$ref": "#/components/responses/Error" }, "503": { "$ref": "#/components/responses/Error" } }
+      }
+    },
+    "/api/v1/tasks/{id}/recovery-results": {
+      "parameters": [{ "$ref": "#/components/parameters/Id" }],
+      "get": {
+        "tags": ["Recovery"], "summary": "分页读取扫盘恢复逐本结果", "operationId": "listRecoveryResults",
+        "parameters": [{ "name": "after", "in": "query", "schema": { "type": "string", "maxLength": 128 } }, { "name": "limit", "in": "query", "schema": { "type": "integer", "minimum": 1, "maximum": 128, "default": 20 } }],
+        "responses": { "200": { "description": "候选与逐本处理结果", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RecoveryResultPageResponse" } } } }, "400": { "$ref": "#/components/responses/Error" }, "404": { "$ref": "#/components/responses/Error" } }
+      }
+    },
+    "/api/v1/comics/{id}/recovery-placeholder": {
+      "parameters": [{ "$ref": "#/components/parameters/Id" }],
+      "get": { "tags": ["Recovery"], "summary": "读取缺元数据恢复占位", "operationId": "getRecoveryPlaceholder", "responses": { "200": { "description": "占位与实际发现的文件计数", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RecoveryPlaceholderResponse" } } } }, "404": { "$ref": "#/components/responses/Error" }, "503": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/api/v1/comics/{id}/recovery-placeholder/repair": {
+      "parameters": [{ "$ref": "#/components/parameters/Id" }],
+      "post": {
+        "tags": ["Recovery"], "summary": "受理占位资料显式补全", "operationId": "repairRecoveryPlaceholder",
+        "parameters": [{ "$ref": "#/components/parameters/IdempotencyKey" }],
+        "requestBody": { "$ref": "#/components/requestBodies/RecoveryRepair" },
+        "responses": { "202": { "$ref": "#/components/responses/TaskAccepted" }, "400": { "$ref": "#/components/responses/Error" }, "404": { "$ref": "#/components/responses/Error" }, "409": { "$ref": "#/components/responses/Error" }, "503": { "$ref": "#/components/responses/Error" } }
+      }
+    },
+    "/api/v1/tasks/{id}/recovery-repair": {
+      "parameters": [{ "$ref": "#/components/parameters/Id" }],
+      "get": { "tags": ["Recovery"], "summary": "查询占位补全任务结果", "operationId": "getRecoveryRepair", "responses": { "200": { "description": "补全完成事实与新版本", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RecoveryRepairResponse" } } } }, "404": { "$ref": "#/components/responses/Error" }, "503": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/api/v1/comics/{id}/ai-analyses": {
+      "parameters": [{ "$ref": "#/components/parameters/Id" }],
+      "post": {
+        "tags": ["AI"], "summary": "受理漫画 AI 资料分析", "operationId": "createComicAnalysis",
+        "parameters": [{ "$ref": "#/components/parameters/IdempotencyKey" }],
+        "requestBody": { "$ref": "#/components/requestBodies/AnalysisRequest" },
+        "responses": { "202": { "$ref": "#/components/responses/TaskAccepted" }, "400": { "$ref": "#/components/responses/Error" }, "404": { "$ref": "#/components/responses/Error" }, "409": { "$ref": "#/components/responses/Error" }, "503": { "$ref": "#/components/responses/Error" } }
+      }
+    },
+    "/api/v1/tasks/{id}/ai-result": {
+      "parameters": [{ "$ref": "#/components/parameters/Id" }],
+      "get": { "tags": ["AI"], "summary": "读取待人工确认的 AI 分析候选", "operationId": "getComicAnalysisResult", "responses": { "200": { "description": "冻结来源与候选资料；不会自动写回漫画", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AnalysisResultResponse" } } } }, "404": { "$ref": "#/components/responses/Error" }, "409": { "description": "候选尚未提交，错误码 AI_RESULT_NOT_READY", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }, "503": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/api/v1/tasks/{id}": {
+      "parameters": [{ "$ref": "#/components/parameters/Id" }],
+      "get": {
+        "tags": ["Tasks"],
+        "summary": "读取任务状态",
+        "operationId": "getTask",
+        "responses": {
+          "200": { "description": "任务", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/TaskResponse" } } } },
+          "404": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/api/v1/tasks/{id}/cancel": {
+      "parameters": [{ "$ref": "#/components/parameters/Id" }],
+      "post": {
+        "tags": ["Tasks"],
+        "summary": "取消可取消任务",
+        "operationId": "cancelTask",
+        "responses": {
+          "200": { "description": "取消后的任务状态", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/TaskResponse" } } } },
+          "409": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/api/v1/tasks/{id}/retry": {
+      "parameters": [{ "$ref": "#/components/parameters/Id" }],
+      "post": {
+        "tags": ["Tasks"],
+        "summary": "重试失败任务",
+        "operationId": "retryTask",
+        "responses": {
+          "200": { "description": "重试后的任务状态", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/TaskResponse" } } } },
+          "409": { "$ref": "#/components/responses/Error" },
+          "503": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/api/v1/comics": {
+      "get": {
+        "tags": ["Library"],
+        "summary": "分页检索漫画",
+        "operationId": "listComics",
+        "parameters": [
+          { "$ref": "#/components/parameters/Page" },
+          { "$ref": "#/components/parameters/PageSize" },
+          { "name": "keyword", "in": "query", "schema": { "type": "string", "maxLength": 500 } },
+          { "name": "categoryId", "in": "query", "schema": { "type": "string" } },
+          { "name": "tagId", "in": "query", "schema": { "type": "string" } },
+          { "name": "readStatus", "in": "query", "schema": { "type": "string", "enum": ["read", "unread", "reading", "completed"] } },
+          { "name": "sort", "in": "query", "schema": { "type": "string", "enum": ["title", "author", "createdAt", "lastReadTime"], "default": "title" } },
+          { "name": "order", "in": "query", "schema": { "type": "string", "enum": ["asc", "desc"], "default": "asc" } }
+        ],
+        "responses": {
+          "200": { "description": "漫画分页", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ComicPageResponse" } } } },
+          "400": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/api/v1/comics/{id}": {
+      "parameters": [{ "$ref": "#/components/parameters/Id" }],
+      "get": {
+        "tags": ["Library"],
+        "summary": "读取漫画详情与目录结构",
+        "operationId": "getComic",
+        "responses": {
+          "200": { "description": "漫画详情", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ComicDetailResponse" } } } },
+          "404": { "$ref": "#/components/responses/Error" }
+        }
+      },
+      "put": {
+        "tags": ["Library"],
+        "summary": "按版本完整更新漫画资料",
+        "operationId": "updateComic",
+        "requestBody": { "$ref": "#/components/requestBodies/MetadataUpdate" },
+        "responses": {
+          "200": { "description": "更新后的身份与版本", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/MetadataVersionResponse" } } } },
+          "400": { "$ref": "#/components/responses/Error" },
+          "404": { "$ref": "#/components/responses/Error" },
+          "409": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/api/v1/comics/metadata/batch": {
+      "put": {
+        "tags": ["Library"], "summary": "按版本批量更新漫画资料", "operationId": "updateComicMetadataBatch",
+        "requestBody": { "$ref": "#/components/requestBodies/MetadataBatch" },
+        "responses": { "200": { "description": "逐本更新后的版本", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/MetadataVersionPageResponse" } } } }, "400": { "$ref": "#/components/responses/Error" }, "409": { "$ref": "#/components/responses/Error" } }
+      }
+    },
+    "/api/v1/comics/{id}/structure": {
+      "parameters": [{ "$ref": "#/components/parameters/Id" }],
+      "get": { "tags": ["Library"], "summary": "读取目录与章节混排结构", "operationId": "getComicStructure", "responses": { "200": { "description": "结构快照", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/StructureResponse" } } } }, "404": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/api/v1/comics/{id}/refresh": {
+      "parameters": [{ "$ref": "#/components/parameters/Id" }],
+      "post": { "tags": ["Library"], "summary": "受理漫画元数据刷新", "operationId": "refreshComicMetadata", "parameters": [{ "$ref": "#/components/parameters/IdempotencyKey" }], "requestBody": { "$ref": "#/components/requestBodies/EmptyObject" }, "responses": { "202": { "$ref": "#/components/responses/TaskAccepted" }, "400": { "$ref": "#/components/responses/Error" }, "409": { "$ref": "#/components/responses/Error" }, "503": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/api/v1/comics/{id}/sidecar": {
+      "parameters": [{ "$ref": "#/components/parameters/Id" }],
+      "get": { "tags": ["Library"], "summary": "查询自动侧车同步状态", "operationId": "getComicSidecarStatus", "responses": { "200": { "description": "侧车状态", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SidecarStatusResponse" } } } }, "404": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/api/v1/comics/{id}/sidecar/sync": {
+      "parameters": [{ "$ref": "#/components/parameters/Id" }],
+      "post": { "tags": ["Library"], "summary": "强制受理侧车同步", "operationId": "syncComicSidecar", "parameters": [{ "$ref": "#/components/parameters/IdempotencyKey" }], "requestBody": { "$ref": "#/components/requestBodies/EmptyObject" }, "responses": { "202": { "$ref": "#/components/responses/TaskAccepted" }, "400": { "$ref": "#/components/responses/Error" }, "409": { "$ref": "#/components/responses/Error" }, "503": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/api/v1/comics/{id}/cover": {
+      "parameters": [{ "$ref": "#/components/parameters/Id" }],
+      "get": { "tags": ["Reading"], "summary": "读取已生成的漫画封面", "operationId": "getComicCover", "responses": { "200": { "$ref": "#/components/responses/WebP" }, "404": { "$ref": "#/components/responses/Error" }, "503": { "$ref": "#/components/responses/Error" } } },
+      "head": { "tags": ["Reading"], "summary": "读取漫画封面响应头", "operationId": "headComicCover", "responses": { "200": { "description": "封面响应头", "headers": { "Content-Type": { "schema": { "const": "image/webp" } }, "Content-Length": { "schema": { "type": "integer" } }, "ETag": { "schema": { "type": "string" } } } }, "404": { "$ref": "#/components/responses/Error" } } }
+    },
+
+    "/api/v1/comics/{id}/catalogs": {
+      "parameters": [{ "$ref": "#/components/parameters/Id" }],
+      "post": { "tags": ["Library"], "summary": "创建目录节点", "operationId": "createCatalog", "requestBody": { "$ref": "#/components/requestBodies/StructureChange" }, "responses": { "201": { "description": "创建后的结构节点", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/StructureResultResponse" } } } }, "400": { "$ref": "#/components/responses/Error" }, "409": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/api/v1/comics/{id}/chapters": {
+      "parameters": [{ "$ref": "#/components/parameters/Id" }],
+      "post": { "tags": ["Library"], "summary": "创建空章节", "operationId": "createChapter", "requestBody": { "$ref": "#/components/requestBodies/StructureChange" }, "responses": { "201": { "description": "创建后的结构节点", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/StructureResultResponse" } } } }, "400": { "$ref": "#/components/responses/Error" }, "409": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/api/v1/comics/{id}/catalogs/{nodeId}": {
+      "parameters": [{ "$ref": "#/components/parameters/Id" }, { "name": "nodeId", "in": "path", "required": true, "schema": { "type": "string", "maxLength": 128 } }],
+      "get": { "tags": ["Library"], "summary": "读取目录节点", "operationId": "getCatalog", "responses": { "200": { "description": "目录和结构版本", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/StructureResultResponse" } } } }, "404": { "$ref": "#/components/responses/Error" } } },
+      "put": { "tags": ["Library"], "summary": "按版本重命名或移动目录", "operationId": "updateCatalog", "requestBody": { "$ref": "#/components/requestBodies/StructureChange" }, "responses": { "200": { "description": "更新后的结构节点", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/StructureResultResponse" } } } }, "400": { "$ref": "#/components/responses/Error" }, "404": { "$ref": "#/components/responses/Error" }, "409": { "$ref": "#/components/responses/Error" } } },
+      "delete": { "tags": ["Library"], "summary": "移交直接子节点后删除目录", "operationId": "deleteCatalog", "requestBody": { "$ref": "#/components/requestBodies/CatalogDelete" }, "responses": { "200": { "description": "删除后的结构版本", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/StructureResultResponse" } } } }, "400": { "$ref": "#/components/responses/Error" }, "409": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/api/v1/comics/{id}/chapters/{nodeId}": {
+      "parameters": [{ "$ref": "#/components/parameters/Id" }, { "name": "nodeId", "in": "path", "required": true, "schema": { "type": "string", "maxLength": 128 } }],
+      "get": { "tags": ["Library"], "summary": "读取章节节点", "operationId": "getChapterNode", "responses": { "200": { "description": "章节和结构版本", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/StructureResultResponse" } } } }, "404": { "$ref": "#/components/responses/Error" } } },
+      "put": { "tags": ["Library"], "summary": "按版本重命名或移动章节", "operationId": "updateChapterNode", "requestBody": { "$ref": "#/components/requestBodies/StructureChange" }, "responses": { "200": { "description": "更新后的结构节点", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/StructureResultResponse" } } } }, "400": { "$ref": "#/components/responses/Error" }, "404": { "$ref": "#/components/responses/Error" }, "409": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/api/v1/comics/{id}/structure/order": {
+      "parameters": [{ "$ref": "#/components/parameters/Id" }],
+      "put": { "tags": ["Library"], "summary": "重排指定父目录下的所有直接节点", "operationId": "reorderComicStructure", "requestBody": { "$ref": "#/components/requestBodies/StructureOrder" }, "responses": { "200": { "description": "新的结构快照", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/StructureResponse" } } } }, "400": { "$ref": "#/components/responses/Error" }, "409": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/api/v1/chapters/{id}/media/order": {
+      "parameters": [{ "$ref": "#/components/parameters/Id" }],
+      "put": { "tags": ["Library"], "summary": "按版本重排章节全部媒体", "operationId": "reorderChapterMedia", "requestBody": { "$ref": "#/components/requestBodies/MediaOrder" }, "responses": { "200": { "description": "新的媒体顺序", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/MediaOrderResponse" } } } }, "400": { "$ref": "#/components/responses/Error" }, "409": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/api/v1/chapters/{id}/reader": {
+      "parameters": [{ "$ref": "#/components/parameters/Id" }],
+      "get": {
+        "tags": ["Reading"],
+        "summary": "读取章节与有序媒体",
+        "operationId": "getReaderChapter",
+        "responses": {
+          "200": { "description": "阅读章节", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ReaderResponse" } } } },
+          "404": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/api/v1/comics/{id}/reading-progress": {
+      "parameters": [{ "$ref": "#/components/parameters/Id" }],
+      "get": {
+        "tags": ["Reading"],
+        "summary": "读取漫画阅读进度",
+        "operationId": "getReadingProgress",
+        "responses": {
+          "200": { "description": "进度或 null", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/NullableProgressResponse" } } } },
+          "404": { "$ref": "#/components/responses/Error" }
+        }
+      },
+      "put": {
+        "tags": ["Reading"],
+        "summary": "保存漫画阅读位置",
+        "operationId": "saveReadingProgress",
+        "requestBody": { "$ref": "#/components/requestBodies/ReadingProgress" },
+        "responses": {
+          "200": { "description": "已保存进度", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ProgressResponse" } } } },
+          "400": { "$ref": "#/components/responses/Error" },
+          "404": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/api/v1/settings/reader": {
+      "get": {
+        "tags": ["Metadata"],
+        "summary": "读取阅读默认设置",
+        "operationId": "getReaderSettings",
+        "responses": {
+          "200": { "description": "阅读设置", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ReaderSettingsResponse" } } } }
+        }
+      },
+      "put": {
+        "tags": ["Metadata"],
+        "summary": "按版本更新阅读默认设置",
+        "operationId": "updateReaderSettings",
+        "requestBody": { "$ref": "#/components/requestBodies/ReaderSettings" },
+        "responses": {
+          "200": { "description": "更新后设置", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ReaderSettingsResponse" } } } },
+          "400": { "$ref": "#/components/responses/Error" },
+          "409": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/api/v1/categories": {
+      "get": {
+        "tags": ["Metadata"], "summary": "分页读取分类", "operationId": "listCategories",
+        "parameters": [{ "$ref": "#/components/parameters/Page" }, { "$ref": "#/components/parameters/PageSize" }, { "name": "keyword", "in": "query", "schema": { "type": "string", "maxLength": 500 } }],
+        "responses": { "200": { "description": "分类分页", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/TermPageResponse" } } } }, "400": { "$ref": "#/components/responses/Error" } }
+      },
+      "post": {
+        "tags": ["Metadata"], "summary": "创建分类", "operationId": "createCategory",
+        "requestBody": { "$ref": "#/components/requestBodies/TermCreate" },
+        "responses": { "201": { "description": "新分类", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/TermResponse" } } } }, "400": { "$ref": "#/components/responses/Error" }, "409": { "$ref": "#/components/responses/Error" } }
+      }
+    },
+    "/api/v1/tags": {
+      "get": {
+        "tags": ["Metadata"], "summary": "分页读取标签", "operationId": "listTags",
+        "parameters": [{ "$ref": "#/components/parameters/Page" }, { "$ref": "#/components/parameters/PageSize" }, { "name": "keyword", "in": "query", "schema": { "type": "string", "maxLength": 500 } }],
+        "responses": { "200": { "description": "标签分页", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/TermPageResponse" } } } }, "400": { "$ref": "#/components/responses/Error" } }
+      },
+      "post": {
+        "tags": ["Metadata"], "summary": "创建标签", "operationId": "createTag",
+        "requestBody": { "$ref": "#/components/requestBodies/TermCreate" },
+        "responses": { "201": { "description": "新标签", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/TermResponse" } } } }, "400": { "$ref": "#/components/responses/Error" }, "409": { "$ref": "#/components/responses/Error" } }
+      }
+    },
+    "/api/v1/categories/{id}": {
+      "parameters": [{ "$ref": "#/components/parameters/Id" }],
+      "get": { "tags": ["Metadata"], "summary": "读取分类", "operationId": "getCategory", "responses": { "200": { "description": "分类", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/TermResponse" } } } }, "404": { "$ref": "#/components/responses/Error" } } },
+      "put": { "tags": ["Metadata"], "summary": "按版本重命名分类", "operationId": "renameCategory", "requestBody": { "$ref": "#/components/requestBodies/TermUpdate" }, "responses": { "200": { "description": "更新后分类", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/TermResponse" } } } }, "400": { "$ref": "#/components/responses/Error" }, "404": { "$ref": "#/components/responses/Error" }, "409": { "$ref": "#/components/responses/Error" } } },
+      "delete": { "tags": ["Metadata"], "summary": "按版本删除未引用分类", "operationId": "deleteCategory", "parameters": [{ "name": "version", "in": "query", "required": true, "schema": { "type": "integer", "minimum": 1 } }], "responses": { "204": { "description": "分类已删除" }, "400": { "$ref": "#/components/responses/Error" }, "404": { "$ref": "#/components/responses/Error" }, "409": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/api/v1/tags/{id}": {
+      "parameters": [{ "$ref": "#/components/parameters/Id" }],
+      "get": { "tags": ["Metadata"], "summary": "读取标签", "operationId": "getTag", "responses": { "200": { "description": "标签", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/TermResponse" } } } }, "404": { "$ref": "#/components/responses/Error" } } },
+      "put": { "tags": ["Metadata"], "summary": "按版本重命名标签", "operationId": "renameTag", "requestBody": { "$ref": "#/components/requestBodies/TermUpdate" }, "responses": { "200": { "description": "更新后标签", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/TermResponse" } } } }, "400": { "$ref": "#/components/responses/Error" }, "404": { "$ref": "#/components/responses/Error" }, "409": { "$ref": "#/components/responses/Error" } } },
+      "delete": { "tags": ["Metadata"], "summary": "按版本删除未引用标签", "operationId": "deleteTag", "parameters": [{ "name": "version", "in": "query", "required": true, "schema": { "type": "integer", "minimum": 1 } }], "responses": { "204": { "description": "标签已删除" }, "400": { "$ref": "#/components/responses/Error" }, "404": { "$ref": "#/components/responses/Error" }, "409": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/api/v1/comics/{id}/reaction": {
+      "parameters": [{ "$ref": "#/components/parameters/Id" }],
+      "get": { "tags": ["Reading"], "summary": "读取漫画评价", "operationId": "getComicReaction", "responses": { "200": { "description": "评价", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ReactionResponse" } } } }, "404": { "$ref": "#/components/responses/Error" } } },
+      "put": { "tags": ["Reading"], "summary": "设置或清除漫画评价", "operationId": "setComicReaction", "requestBody": { "$ref": "#/components/requestBodies/ReactionUpdate" }, "responses": { "200": { "description": "当前评价", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ReactionResponse" } } } }, "400": { "$ref": "#/components/responses/Error" }, "404": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/api/v1/chapters/{id}/reaction": {
+      "parameters": [{ "$ref": "#/components/parameters/Id" }],
+      "get": { "tags": ["Reading"], "summary": "读取章节评价", "operationId": "getChapterReaction", "responses": { "200": { "description": "评价", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ReactionResponse" } } } }, "404": { "$ref": "#/components/responses/Error" } } },
+      "put": { "tags": ["Reading"], "summary": "设置或清除章节评价", "operationId": "setChapterReaction", "requestBody": { "$ref": "#/components/requestBodies/ReactionUpdate" }, "responses": { "200": { "description": "当前评价", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ReactionResponse" } } } }, "400": { "$ref": "#/components/responses/Error" }, "404": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/api/v1/media/{id}/reaction": {
+      "parameters": [{ "$ref": "#/components/parameters/Id" }],
+      "get": { "tags": ["Reading"], "summary": "读取媒体评价", "operationId": "getMediaReaction", "responses": { "200": { "description": "评价", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ReactionResponse" } } } }, "404": { "$ref": "#/components/responses/Error" } } },
+      "put": { "tags": ["Reading"], "summary": "设置或清除媒体评价", "operationId": "setMediaReaction", "requestBody": { "$ref": "#/components/requestBodies/ReactionUpdate" }, "responses": { "200": { "description": "当前评价", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ReactionResponse" } } } }, "400": { "$ref": "#/components/responses/Error" }, "404": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/api/v1/reactions": {
+      "get": {
+        "tags": ["Reading"], "summary": "分页查询活动对象评价", "operationId": "listReactions",
+        "parameters": [{ "$ref": "#/components/parameters/Page" }, { "$ref": "#/components/parameters/PageSize" }, { "name": "targetType", "in": "query", "schema": { "type": "string", "enum": ["comic", "chapter", "media"] } }, { "name": "value", "in": "query", "schema": { "type": "string", "enum": ["like", "dislike"] } }, { "name": "oldest", "in": "query", "schema": { "type": "boolean", "default": false } }],
+        "responses": { "200": { "description": "评价分页", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/FavoritePageResponse" } } } }, "400": { "$ref": "#/components/responses/Error" } }
+      }
+    },
+    "/api/v1/reactions/batch": {
+      "put": { "tags": ["Reading"], "summary": "原子批量设置或清除评价", "operationId": "setReactionsBatch", "requestBody": { "$ref": "#/components/requestBodies/ReactionBatch" }, "responses": { "200": { "description": "更新后的评价", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ReactionListResponse" } } } }, "400": { "$ref": "#/components/responses/Error" }, "409": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/api/v1/management/reactions": {
+      "get": { "tags": ["Metadata"], "summary": "分页查询含隐藏对象的评价记录", "operationId": "listManagedReactions", "parameters": [{ "$ref": "#/components/parameters/Page" }, { "$ref": "#/components/parameters/PageSize" }, { "name": "targetType", "in": "query", "schema": { "type": "string", "enum": ["comic", "chapter", "media"] } }, { "name": "value", "in": "query", "schema": { "type": "string", "enum": ["like", "dislike"] } }, { "name": "mediaType", "in": "query", "schema": { "type": "string", "enum": ["image", "video"] } }, { "name": "includeTrashed", "in": "query", "schema": { "type": "boolean", "default": false } }, { "name": "oldest", "in": "query", "schema": { "type": "boolean", "default": false } }], "responses": { "200": { "description": "管理评价分页", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ManagedReactionPageResponse" } } } }, "400": { "$ref": "#/components/responses/Error" }, "503": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/api/v1/management/reactions/batch": {
+      "put": { "tags": ["Metadata"], "summary": "原子批量设置隐藏或可见对象评价", "operationId": "updateManagedReactions", "requestBody": { "$ref": "#/components/requestBodies/ReactionBatch" }, "responses": { "200": { "description": "更新后的评价", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ReactionListResponse" } } } }, "400": { "$ref": "#/components/responses/Error" }, "404": { "$ref": "#/components/responses/Error" }, "409": { "$ref": "#/components/responses/Error" }, "503": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/api/v1/favorites": {
+      "get": {
+        "tags": ["Reading"], "summary": "分页读取收藏", "operationId": "listFavorites",
+        "parameters": [{ "$ref": "#/components/parameters/Page" }, { "$ref": "#/components/parameters/PageSize" }, { "name": "targetType", "in": "query", "schema": { "type": "string", "enum": ["comic", "chapter", "media"] } }, { "name": "oldest", "in": "query", "schema": { "type": "boolean", "default": false } }],
+        "responses": { "200": { "description": "收藏分页", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/FavoritePageResponse" } } } }, "400": { "$ref": "#/components/responses/Error" } }
+      }
+    },
+    "/api/v1/history": {
+      "get": {
+        "tags": ["Reading"], "summary": "分页读取最近阅读历史", "operationId": "listReadingHistory",
+        "parameters": [{ "$ref": "#/components/parameters/Page" }, { "$ref": "#/components/parameters/PageSize" }],
+        "responses": { "200": { "description": "阅读历史分页", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/HistoryPageResponse" } } } }, "400": { "$ref": "#/components/responses/Error" } }
+      }
+    },
+    "/api/v1/media/{id}/content": {
+      "parameters": [{ "$ref": "#/components/parameters/Id" }],
+      "get": {
+        "tags": ["Reading"], "summary": "读取媒体字节", "operationId": "getMediaContent",
+        "parameters": [{ "name": "quality", "in": "query", "schema": { "type": "string", "enum": ["hq", "auto", "lq"], "default": "auto" } }, { "name": "Range", "in": "header", "schema": { "type": "string", "pattern": "^bytes=" } }, { "name": "If-None-Match", "in": "header", "schema": { "type": "string" } }],
+        "responses": { "200": { "description": "媒体完整内容", "content": { "image/*": { "schema": { "type": "string", "format": "binary" } }, "video/*": { "schema": { "type": "string", "format": "binary" } } } }, "206": { "description": "媒体范围内容", "headers": { "Content-Range": { "schema": { "type": "string" } } }, "content": { "application/octet-stream": { "schema": { "type": "string", "format": "binary" } } } }, "304": { "description": "缓存未变化" }, "404": { "$ref": "#/components/responses/Error" }, "416": { "description": "Range 不可满足" } }
+      },
+      "head": { "tags": ["Reading"], "summary": "读取媒体响应头", "operationId": "headMediaContent", "responses": { "200": { "description": "媒体响应头", "headers": { "Content-Type": { "schema": { "type": "string" } }, "Content-Length": { "schema": { "type": "integer" } }, "ETag": { "schema": { "type": "string" } } } }, "404": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/api/v1/comics/{id}/trash": {
+      "parameters": [{ "$ref": "#/components/parameters/Id" }],
+      "post": { "tags": ["Lifecycle"], "summary": "回收漫画", "operationId": "trashComic", "parameters": [{ "$ref": "#/components/parameters/IdempotencyKey" }], "requestBody": { "$ref": "#/components/requestBodies/EmptyObject" }, "responses": { "202": { "$ref": "#/components/responses/TaskAccepted" }, "400": { "$ref": "#/components/responses/Error" }, "404": { "$ref": "#/components/responses/Error" }, "409": { "$ref": "#/components/responses/Error" }, "503": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/api/v1/chapters/{id}/trash": {
+      "parameters": [{ "$ref": "#/components/parameters/Id" }],
+      "post": { "tags": ["Lifecycle"], "summary": "回收章节", "operationId": "trashChapter", "parameters": [{ "$ref": "#/components/parameters/IdempotencyKey" }], "requestBody": { "$ref": "#/components/requestBodies/EmptyObject" }, "responses": { "202": { "$ref": "#/components/responses/TaskAccepted" }, "400": { "$ref": "#/components/responses/Error" }, "404": { "$ref": "#/components/responses/Error" }, "409": { "$ref": "#/components/responses/Error" }, "503": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/api/v1/media/{id}/trash": {
+      "parameters": [{ "$ref": "#/components/parameters/Id" }],
+      "post": { "tags": ["Lifecycle"], "summary": "回收单个媒体", "operationId": "trashMedia", "parameters": [{ "$ref": "#/components/parameters/IdempotencyKey" }], "requestBody": { "$ref": "#/components/requestBodies/EmptyObject" }, "responses": { "202": { "$ref": "#/components/responses/TaskAccepted" }, "400": { "$ref": "#/components/responses/Error" }, "404": { "$ref": "#/components/responses/Error" }, "409": { "$ref": "#/components/responses/Error" }, "503": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/api/v1/trash": {
+      "get": {
+        "tags": ["Lifecycle"], "summary": "分页查询回收记录", "operationId": "listTrashEntries",
+        "parameters": [{ "$ref": "#/components/parameters/Page" }, { "$ref": "#/components/parameters/PageSize" }, { "name": "state", "in": "query", "schema": { "type": "string", "enum": ["trashing", "trashed", "restoring", "restored", "purging", "purged", "detached"], "default": "trashed" } }, { "name": "keyword", "in": "query", "schema": { "type": "string", "maxLength": 500 } }],
+        "responses": { "200": { "description": "回收记录分页", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/LifecycleEntryPageResponse" } } } }, "400": { "$ref": "#/components/responses/Error" } }
+      }
+    },
+    "/api/v1/trash/{entryId}": {
+      "parameters": [{ "$ref": "#/components/parameters/EntryId" }],
+      "get": { "tags": ["Lifecycle"], "summary": "读取回收记录", "operationId": "getTrashEntry", "responses": { "200": { "description": "回收记录", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/LifecycleEntryResponse" } } } }, "404": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/api/v1/trash/{entryId}/cover": {
+      "parameters": [{ "$ref": "#/components/parameters/EntryId" }],
+      "get": { "tags": ["Lifecycle"], "summary": "读取或生成回收条目封面", "operationId": "getTrashCover", "responses": { "200": { "$ref": "#/components/responses/WebP" }, "404": { "$ref": "#/components/responses/Error" }, "409": { "$ref": "#/components/responses/Error" }, "422": { "$ref": "#/components/responses/Error" }, "503": { "$ref": "#/components/responses/Error" } } },
+      "head": { "tags": ["Lifecycle"], "summary": "读取回收条目封面响应头", "operationId": "headTrashCover", "responses": { "200": { "description": "封面响应头", "headers": { "Content-Type": { "schema": { "const": "image/webp" } }, "Content-Length": { "schema": { "type": "integer" } }, "ETag": { "schema": { "type": "string" } } } }, "404": { "$ref": "#/components/responses/Error" }, "503": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/api/v1/trash/{entryId}/restore": {
+      "parameters": [{ "$ref": "#/components/parameters/EntryId" }],
+      "post": { "tags": ["Lifecycle"], "summary": "还原回收记录", "operationId": "restoreTrashEntry", "parameters": [{ "$ref": "#/components/parameters/IdempotencyKey" }], "requestBody": { "$ref": "#/components/requestBodies/EmptyObject" }, "responses": { "202": { "$ref": "#/components/responses/TaskAccepted" }, "400": { "$ref": "#/components/responses/Error" }, "404": { "$ref": "#/components/responses/Error" }, "409": { "$ref": "#/components/responses/Error" }, "503": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/api/v1/trash/{entryId}/purge-preview": {
+      "parameters": [{ "$ref": "#/components/parameters/EntryId" }],
+      "post": { "tags": ["Lifecycle"], "summary": "预览永久清理范围", "operationId": "previewTrashPurge", "requestBody": { "$ref": "#/components/requestBodies/EmptyObject" }, "responses": { "200": { "description": "清理范围与确认令牌；不可清理时不返回令牌", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PurgePreviewResponse" } } } }, "400": { "$ref": "#/components/responses/Error" }, "404": { "$ref": "#/components/responses/Error" }, "409": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/api/v1/trash/{entryId}/purge": {
+      "parameters": [{ "$ref": "#/components/parameters/EntryId" }],
+      "post": { "tags": ["Lifecycle"], "summary": "按预览令牌受理永久清理", "operationId": "purgeTrashEntry", "parameters": [{ "$ref": "#/components/parameters/IdempotencyKey" }], "requestBody": { "$ref": "#/components/requestBodies/Purge" }, "responses": { "202": { "$ref": "#/components/responses/TaskAccepted" }, "400": { "$ref": "#/components/responses/Error" }, "404": { "$ref": "#/components/responses/Error" }, "409": { "$ref": "#/components/responses/Error" }, "503": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/api/v1/trash/{entryId}/reconcile": {
+      "parameters": [{ "$ref": "#/components/parameters/EntryId" }],
+      "get": { "tags": ["Lifecycle"], "summary": "读取最近一次文件核对报告", "operationId": "getTrashReconciliation", "responses": { "200": { "description": "最近一次核对摘要", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/LifecycleAuditSummaryResponse" } } } }, "404": { "$ref": "#/components/responses/Error" } } },
+      "post": { "tags": ["Lifecycle"], "summary": "受理只读文件核对", "operationId": "reconcileTrashEntry", "parameters": [{ "$ref": "#/components/parameters/IdempotencyKey" }], "requestBody": { "$ref": "#/components/requestBodies/EmptyObject" }, "responses": { "202": { "$ref": "#/components/responses/TaskAccepted" }, "400": { "$ref": "#/components/responses/Error" }, "404": { "$ref": "#/components/responses/Error" }, "409": { "$ref": "#/components/responses/Error" }, "503": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/api/v1/trash/{entryId}/repair": {
+      "parameters": [{ "$ref": "#/components/parameters/EntryId" }],
+      "post": { "tags": ["Lifecycle"], "summary": "依据核对报告重试原生命周期任务", "operationId": "repairTrashEntry", "requestBody": { "$ref": "#/components/requestBodies/EmptyObject" }, "responses": { "202": { "$ref": "#/components/responses/TaskAccepted" }, "400": { "$ref": "#/components/responses/Error" }, "404": { "$ref": "#/components/responses/Error" }, "409": { "$ref": "#/components/responses/Error" }, "503": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/api/v1/tasks/{id}/items": {
+      "parameters": [{ "$ref": "#/components/parameters/Id" }],
+      "get": { "tags": ["Tasks"], "summary": "分页查询任务逐项结果", "description": "响应 data 由任务类型决定。本契约列出上传发布、元数据刷新、自动侧车、批量任务、LQ、HQ 释放、视频转码和生命周期结构；未逐项建模的任务仍以各自协议页为准。", "operationId": "listTaskItems", "parameters": [{ "$ref": "#/components/parameters/Page" }, { "$ref": "#/components/parameters/PageSize" }], "responses": { "200": { "description": "任务逐项结果", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/TaskItemsResponse" } } } }, "400": { "$ref": "#/components/responses/Error" }, "404": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/api/v1/storage": {
+      "get": { "tags": ["Media"], "summary": "读取全库存储登记与最近观测", "operationId": "getStorageStatistics", "responses": { "200": { "description": "登记统计、最近完整观测与刷新任务", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/StorageStatisticsResponse" } } } }, "503": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/api/v1/storage/refresh": {
+      "post": { "tags": ["Media"], "summary": "受理媒体根占用扫描", "operationId": "refreshStorageObservation", "parameters": [{ "$ref": "#/components/parameters/IdempotencyKey" }], "requestBody": { "$ref": "#/components/requestBodies/EmptyObject" }, "responses": { "202": { "$ref": "#/components/responses/TaskAccepted" }, "400": { "$ref": "#/components/responses/Error" }, "409": { "$ref": "#/components/responses/Error" }, "503": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/api/v1/comics/{id}/storage": {
+      "parameters": [{ "$ref": "#/components/parameters/Id" }],
+      "get": { "tags": ["Media"], "summary": "读取漫画存储登记统计", "operationId": "getComicStorageStatistics", "responses": { "200": { "description": "漫画范围登记统计", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/StorageStatisticsResponse" } } } }, "404": { "$ref": "#/components/responses/Error" }, "503": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/api/v1/chapters/{id}/storage": {
+      "parameters": [{ "$ref": "#/components/parameters/Id" }],
+      "get": { "tags": ["Media"], "summary": "读取章节存储登记统计", "operationId": "getChapterStorageStatistics", "responses": { "200": { "description": "章节范围登记统计", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/StorageStatisticsResponse" } } } }, "404": { "$ref": "#/components/responses/Error" }, "503": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/api/v1/storage/comics": {
+      "get": { "tags": ["Media"], "summary": "分页查询漫画存储与操作能力", "operationId": "listStorageComics", "parameters": [{ "$ref": "#/components/parameters/Page" }, { "$ref": "#/components/parameters/PageSize" }, { "name": "keyword", "in": "query", "schema": { "type": "string", "maxLength": 500 } }, { "name": "categoryId", "in": "query", "schema": { "type": "string", "maxLength": 128 } }, { "name": "uncategorized", "in": "query", "schema": { "type": "boolean" } }, { "name": "tagId", "in": "query", "style": "form", "explode": true, "schema": { "type": "array", "items": { "type": "string", "maxLength": 128 } } }, { "name": "tagMode", "in": "query", "schema": { "type": "string", "enum": ["any", "all", "not", "none"] } }, { "name": "hqStatus", "in": "query", "schema": { "type": "string", "enum": ["has_hq", "no_hq"] } }, { "name": "lqStatus", "in": "query", "schema": { "type": "string", "enum": ["needs_lq", "ready"] } }, { "name": "attention", "in": "query", "schema": { "type": "string", "enum": ["missing_lq", "can_release", "missing_source_sha256"] } }, { "name": "sort", "in": "query", "schema": { "type": "string", "enum": ["title", "createdAt", "pages", "totalBytes", "hqBytes", "lqBytes"] } }, { "name": "order", "in": "query", "schema": { "type": "string", "enum": ["asc", "desc"], "default": "asc" } }], "responses": { "200": { "description": "漫画存储分页", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/StoragePageResponse" } } } }, "400": { "$ref": "#/components/responses/Error" }, "503": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/api/v1/storage/comics/{id}": {
+      "parameters": [{ "$ref": "#/components/parameters/Id" }],
+      "get": { "tags": ["Media"], "summary": "读取漫画存储详情", "operationId": "getStorageComic", "responses": { "200": { "description": "漫画登记容量及活动任务", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/StorageObjectResponse" } } } }, "404": { "$ref": "#/components/responses/Error" }, "503": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/api/v1/storage/comics/{id}/chapters": {
+      "parameters": [{ "$ref": "#/components/parameters/Id" }],
+      "get": { "tags": ["Media"], "summary": "分页查询漫画章节存储", "operationId": "listStorageChapters", "parameters": [{ "$ref": "#/components/parameters/Page" }, { "$ref": "#/components/parameters/PageSize" }, { "name": "keyword", "in": "query", "schema": { "type": "string", "maxLength": 500 } }, { "name": "categoryId", "in": "query", "schema": { "type": "string", "maxLength": 128 } }, { "name": "uncategorized", "in": "query", "schema": { "type": "boolean" } }, { "name": "tagId", "in": "query", "style": "form", "explode": true, "schema": { "type": "array", "items": { "type": "string", "maxLength": 128 } } }, { "name": "tagMode", "in": "query", "schema": { "type": "string", "enum": ["any", "all", "not", "none"] } }, { "name": "hqStatus", "in": "query", "schema": { "type": "string", "enum": ["has_hq", "no_hq"] } }, { "name": "lqStatus", "in": "query", "schema": { "type": "string", "enum": ["needs_lq", "ready"] } }, { "name": "sort", "in": "query", "schema": { "type": "string", "enum": ["title", "globalOrder", "totalBytes", "hqBytes", "lqBytes"] } }, { "name": "order", "in": "query", "schema": { "type": "string", "enum": ["asc", "desc"], "default": "asc" } }], "responses": { "200": { "description": "章节存储分页", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/StoragePageResponse" } } } }, "400": { "$ref": "#/components/responses/Error" }, "404": { "$ref": "#/components/responses/Error" }, "503": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/api/v1/storage/chapters/{id}": {
+      "parameters": [{ "$ref": "#/components/parameters/Id" }],
+      "get": { "tags": ["Media"], "summary": "读取章节存储详情", "operationId": "getStorageChapter", "responses": { "200": { "description": "章节登记容量及活动任务", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/StorageObjectResponse" } } } }, "404": { "$ref": "#/components/responses/Error" }, "503": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/api/v1/upload-sessions": {
+      "post": { "tags": ["Media"], "summary": "创建上传接收会话", "operationId": "createUploadSession", "parameters": [{ "$ref": "#/components/parameters/IdempotencyKey" }], "requestBody": { "$ref": "#/components/requestBodies/UploadCreate" }, "responses": { "201": { "description": "会话已创建", "headers": { "Location": { "schema": { "type": "string" } } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/UploadSessionResponse" } } } }, "400": { "$ref": "#/components/responses/Error" }, "409": { "$ref": "#/components/responses/Error" }, "413": { "$ref": "#/components/responses/Error" }, "500": { "$ref": "#/components/responses/Error" }, "507": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/api/v1/upload-sessions/{id}": {
+      "parameters": [{ "$ref": "#/components/parameters/Id" }],
+      "get": { "tags": ["Media"], "summary": "读取上传会话状态", "operationId": "getUploadSession", "responses": { "200": { "description": "接收清单与分片进度", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/UploadSessionResponse" } } } }, "404": { "$ref": "#/components/responses/Error" } } },
+      "delete": { "tags": ["Media"], "summary": "取消上传接收会话", "operationId": "cancelUploadSession", "responses": { "204": { "description": "会话已取消" }, "404": { "$ref": "#/components/responses/Error" }, "409": { "$ref": "#/components/responses/Error" }, "500": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/api/v1/upload-sessions/{id}/files/{fileId}": {
+      "parameters": [{ "$ref": "#/components/parameters/Id" }, { "$ref": "#/components/parameters/FileId" }],
+      "put": { "tags": ["Media"], "summary": "接收一个上传分片", "operationId": "putUploadSessionPart", "parameters": [{ "name": "Content-Range", "in": "header", "required": true, "schema": { "type": "string", "pattern": "^bytes [0-9]+-[0-9]+/[0-9]+$" } }], "requestBody": { "required": true, "content": { "application/octet-stream": { "schema": { "type": "string", "format": "binary", "x-max-bytes": 67108864 } } } }, "responses": { "200": { "description": "分片已确认", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/UploadPartResponse" } } } }, "400": { "$ref": "#/components/responses/Error" }, "404": { "$ref": "#/components/responses/Error" }, "409": { "$ref": "#/components/responses/Error" }, "410": { "$ref": "#/components/responses/Error" }, "413": { "$ref": "#/components/responses/Error" }, "500": { "$ref": "#/components/responses/Error" }, "507": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/api/v1/upload-sessions/{id}/complete": {
+      "parameters": [{ "$ref": "#/components/parameters/Id" }],
+      "post": { "tags": ["Media"], "summary": "提交上传会话以发布媒体", "operationId": "completeUploadSession", "requestBody": { "$ref": "#/components/requestBodies/EmptyObject" }, "responses": { "202": { "$ref": "#/components/responses/TaskAccepted" }, "400": { "$ref": "#/components/responses/Error" }, "404": { "$ref": "#/components/responses/Error" }, "409": { "$ref": "#/components/responses/Error" }, "503": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/api/v1/comics/{id}/lq": {
+      "parameters": [{ "$ref": "#/components/parameters/Id" }],
+      "post": { "tags": ["Media"], "summary": "受理漫画 LQ 生成或重建", "operationId": "createComicLQ", "parameters": [{ "$ref": "#/components/parameters/IdempotencyKey" }], "requestBody": { "$ref": "#/components/requestBodies/LQRequest" }, "responses": { "202": { "$ref": "#/components/responses/TaskAccepted" }, "400": { "$ref": "#/components/responses/Error" }, "404": { "$ref": "#/components/responses/Error" }, "409": { "$ref": "#/components/responses/Error" }, "503": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/api/v1/chapters/{id}/lq": {
+      "parameters": [{ "$ref": "#/components/parameters/Id" }],
+      "post": { "tags": ["Media"], "summary": "受理章节 LQ 生成或重建", "operationId": "createChapterLQ", "parameters": [{ "$ref": "#/components/parameters/IdempotencyKey" }], "requestBody": { "$ref": "#/components/requestBodies/LQRequest" }, "responses": { "202": { "$ref": "#/components/responses/TaskAccepted" }, "400": { "$ref": "#/components/responses/Error" }, "404": { "$ref": "#/components/responses/Error" }, "409": { "$ref": "#/components/responses/Error" }, "503": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/api/v1/comics/{id}/hq-release": {
+      "parameters": [{ "$ref": "#/components/parameters/Id" }],
+      "get": { "tags": ["Media"], "summary": "预览漫画 HQ 释放条件", "operationId": "previewComicHQRelease", "responses": { "200": { "description": "当前数据库快照中的可释放数量及阻塞原因", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/HQReleasePreviewResponse" } } } }, "404": { "$ref": "#/components/responses/Error" }, "409": { "$ref": "#/components/responses/Error" }, "503": { "$ref": "#/components/responses/Error" } } },
+      "post": { "tags": ["Media"], "summary": "受理漫画 HQ 释放", "operationId": "releaseComicHQ", "parameters": [{ "$ref": "#/components/parameters/IdempotencyKey" }], "requestBody": { "$ref": "#/components/requestBodies/EmptyObject" }, "responses": { "202": { "$ref": "#/components/responses/TaskAccepted" }, "400": { "$ref": "#/components/responses/Error" }, "404": { "$ref": "#/components/responses/Error" }, "409": { "$ref": "#/components/responses/Error" }, "503": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/api/v1/chapters/{id}/hq-release": {
+      "parameters": [{ "$ref": "#/components/parameters/Id" }],
+      "get": { "tags": ["Media"], "summary": "预览章节 HQ 释放条件", "operationId": "previewChapterHQRelease", "responses": { "200": { "description": "当前数据库快照中的可释放数量及阻塞原因", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/HQReleasePreviewResponse" } } } }, "404": { "$ref": "#/components/responses/Error" }, "409": { "$ref": "#/components/responses/Error" }, "503": { "$ref": "#/components/responses/Error" } } },
+      "post": { "tags": ["Media"], "summary": "受理章节 HQ 释放", "operationId": "releaseChapterHQ", "parameters": [{ "$ref": "#/components/parameters/IdempotencyKey" }], "requestBody": { "$ref": "#/components/requestBodies/EmptyObject" }, "responses": { "202": { "$ref": "#/components/responses/TaskAccepted" }, "400": { "$ref": "#/components/responses/Error" }, "404": { "$ref": "#/components/responses/Error" }, "409": { "$ref": "#/components/responses/Error" }, "503": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/api/v1/comics/{id}/transcode": {
+      "parameters": [{ "$ref": "#/components/parameters/Id" }],
+      "post": { "tags": ["Media"], "summary": "受理漫画视频转码", "operationId": "transcodeComicVideos", "parameters": [{ "$ref": "#/components/parameters/IdempotencyKey" }], "requestBody": { "$ref": "#/components/requestBodies/EmptyObject" }, "responses": { "202": { "$ref": "#/components/responses/TaskAccepted" }, "400": { "$ref": "#/components/responses/Error" }, "404": { "$ref": "#/components/responses/Error" }, "409": { "$ref": "#/components/responses/Error" }, "503": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/api/v1/chapters/{id}/transcode": {
+      "parameters": [{ "$ref": "#/components/parameters/Id" }],
+      "post": { "tags": ["Media"], "summary": "受理章节视频转码", "operationId": "transcodeChapterVideos", "parameters": [{ "$ref": "#/components/parameters/IdempotencyKey" }], "requestBody": { "$ref": "#/components/requestBodies/EmptyObject" }, "responses": { "202": { "$ref": "#/components/responses/TaskAccepted" }, "400": { "$ref": "#/components/responses/Error" }, "404": { "$ref": "#/components/responses/Error" }, "409": { "$ref": "#/components/responses/Error" }, "503": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/api/v1/media/{id}/transcode": {
+      "parameters": [{ "$ref": "#/components/parameters/Id" }],
+      "post": { "tags": ["Media"], "summary": "受理单个视频转码", "operationId": "transcodeMedia", "parameters": [{ "$ref": "#/components/parameters/IdempotencyKey" }], "requestBody": { "$ref": "#/components/requestBodies/EmptyObject" }, "responses": { "202": { "$ref": "#/components/responses/TaskAccepted" }, "400": { "$ref": "#/components/responses/Error" }, "404": { "$ref": "#/components/responses/Error" }, "409": { "$ref": "#/components/responses/Error" }, "503": { "$ref": "#/components/responses/Error" } } }
+    }
+  },
+  "components": {
+    "parameters": {
+      "Id": { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "minLength": 1, "maxLength": 128 } },
+      "TaskId": { "name": "taskId", "in": "path", "required": true, "schema": { "type": "string", "minLength": 1, "maxLength": 128 } },
+      "FileId": { "name": "fileId", "in": "path", "required": true, "schema": { "type": "string", "minLength": 1, "maxLength": 128 } },
+      "EntryId": { "name": "entryId", "in": "path", "required": true, "schema": { "type": "string", "minLength": 1, "maxLength": 128 } },
+      "Page": { "name": "page", "in": "query", "schema": { "type": "integer", "minimum": 1, "maximum": 1000000, "default": 1 } },
+      "PageSize": { "name": "pageSize", "in": "query", "schema": { "type": "integer", "minimum": 1, "maximum": 100, "default": 20 } },
+      "IdempotencyKey": { "name": "Idempotency-Key", "in": "header", "required": false, "schema": { "type": "string", "maxLength": 128 } }
+    },
+    "requestBodies": {
+      "StructureMove": {"required":true,"content":{"application/json":{"schema":{"$ref":"#/components/schemas/StructureMove"}}}},
+      "ImportRequest": {
+        "required": true,
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ImportRequest" } } }
+      },
+      "DirectoryScan": {
+        "required": true,
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/DirectoryScanRequest" } } }
+      },
+      "DirectoryScanImport": {
+        "required": true,
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/DirectoryScanImportRequest" } } }
+      },
+      "BatchPreview": {
+        "required": true,
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/BatchPreviewRequest" } } }
+      },
+      "BatchConfirmation": {
+        "required": true,
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/BatchConfirmationRequest" } } }
+      },
+      "ExportRequest": {
+        "required": true,
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ExportRequest" } } }
+      },
+      "DirectoryMovePreview": {
+        "required": true,
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/DirectoryMovePreviewRequest" } } }
+      },
+      "DirectoryMoveConfirmation": {
+        "required": true,
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/DirectoryMoveConfirmationRequest" } } }
+      },
+      "MetadataUpdate": {
+        "required": true,
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/MetadataUpdate" } } }
+      },
+      "ReadingProgress": {
+        "required": true,
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ReadingProgressRequest" } } }
+      },
+      "ReaderSettings": {
+        "required": true,
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ReaderSettings" } } }
+      },
+      "TermCreate": {
+        "required": true,
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/TermCreate" } } }
+      },
+      "TermUpdate": {
+        "required": true,
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/TermUpdate" } } }
+      },
+      "ReactionUpdate": {
+        "required": true,
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ReactionUpdate" } } }
+      },
+      "MetadataBatch": {
+        "required": true,
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/MetadataBatchRequest" } } }
+      },
+      "StructureChange": {
+        "required": true,
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/StructureChange" } } }
+      },
+      "CatalogDelete": {
+        "required": true,
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CatalogDeleteRequest" } } }
+      },
+      "StructureOrder": {
+        "required": true,
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/StructureOrderRequest" } } }
+      },
+      "MediaOrder": {
+        "required": true,
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/MediaOrderRequest" } } }
+      },
+      "EmptyObject": {
+        "required": true,
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/EmptyObject" } } }
+      },
+      "Purge": {
+        "required": true,
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PurgeRequest" } } }
+      },
+      "ReactionBatch": {
+        "required": true,
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ReactionBatchRequest" } } }
+      },
+      "RecoveryRepair": {
+        "required": true,
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RecoveryRepairRequest" } } }
+      },
+      "AnalysisRequest": {
+        "required": true,
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AnalysisRequest" } } }
+      },
+      "LQRequest": {
+        "required": true,
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/LQRequest" } } }
+      },
+      "UploadCreate": {
+        "required": true,
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/UploadRequest" } } }
+      }
+    },
+    "responses": {
+      "Error": { "description": "统一 API 错误", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+      "WebP": { "description": "固定规格 WebP 图片", "headers": { "ETag": { "schema": { "type": "string" } }, "Accept-Ranges": { "schema": { "type": "string", "const": "bytes" } } }, "content": { "image/webp": { "schema": { "type": "string", "format": "binary" } } } },
+      "TaskAccepted": {
+        "description": "任务已受理",
+        "headers": { "Location": { "description": "任务查询地址", "schema": { "type": "string" } } },
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/TaskResponse" } } }
+      }
+    },
+    "schemas": {
+      "StructureMove": {"type":"object","additionalProperties":false,"required":["version","parentId","items"],"properties":{"version":{"type":"integer","minimum":1},"parentId":{"type":["string","null"],"minLength":1},"items":{"type":"array","minItems":1,"maxItems":20000,"items":{"type":"object","required":["type","id"],"additionalProperties":false,"properties":{"type":{"type":"string","enum":["catalog","chapter"]},"id":{"type":"string","minLength":1}}}}}},
+      "CoverSelection": {"type": "object", "required": ["comicId", "mediaId", "version"], "properties": {"comicId": {"type": "string"}, "mediaId": {"type": "string"}, "version": {"type": "integer", "minimum": 1}}},
+      "CoverSelectionRequest": {"type": "object", "additionalProperties": false, "required": ["mediaId", "version"], "properties": {"mediaId": {"type": "string", "minLength": 1, "maxLength": 128}, "version": {"type": "integer", "minimum": 1, "maximum": 2147483646}}},
+      "CoverSelectionResponse": {"type": "object", "required": ["data"], "properties": {"data": {"$ref": "#/components/schemas/CoverSelection"}}},
+      "ErrorResponse": {
+        "type": "object", "required": ["error"], "additionalProperties": false,
+        "properties": { "error": { "$ref": "#/components/schemas/ApiError" } }
+      },
+      "ApiError": {
+        "type": "object", "required": ["code", "message", "details"], "additionalProperties": false,
+        "properties": { "code": { "type": "string" }, "message": { "type": "string" }, "details": { "type": "array", "items": { "type": "string" } } }
+      },
+      "StatusResponse": {
+        "type": "object", "required": ["data"], "additionalProperties": false,
+        "properties": { "data": { "type": "object", "required": ["status"], "properties": { "status": { "type": "string", "enum": ["up", "ready"] } } } }
+      },
+      "SystemResponse": {
+        "type": "object", "required": ["data"], "additionalProperties": false,
+        "properties": { "data": { "type": "object", "required": ["name", "apiVersion"], "properties": { "name": { "const": "ComicAtlas-go" }, "apiVersion": { "const": "v1" } } } }
+      },
+      "ToolCapabilitiesResponse": {
+        "type": "object", "required": ["data"], "additionalProperties": false,
+        "properties": { "data": { "$ref": "#/components/schemas/ToolCapabilities" } }
+      },
+      "ToolCapabilities": {
+        "type": "object", "required": ["ffmpeg", "ffprobe", "cwebp", "djpeg"], "additionalProperties": false,
+        "properties": { "ffmpeg": { "$ref": "#/components/schemas/ToolCapability" }, "ffprobe": { "$ref": "#/components/schemas/ToolCapability" }, "cwebp": { "$ref": "#/components/schemas/ToolCapability" }, "djpeg": { "$ref": "#/components/schemas/ToolCapability" } }
+      },
+      "ToolCapability": {
+        "type": "object", "required": ["configured", "available", "version"], "additionalProperties": false,
+        "properties": { "configured": { "type": "boolean" }, "available": { "type": "boolean" }, "version": { "type": ["string", "null"], "maxLength": 64 } }
+      },
+      "BatchComicFilter": { "type": "object", "additionalProperties": false, "properties": { "reaction": { "type": "string", "enum": ["any", "like", "dislike"] }, "keyword": { "type": "string", "maxLength": 500 }, "categoryId": { "type": "string", "maxLength": 128 }, "tagId": { "type": "string", "maxLength": 128 }, "readStatus": { "type": "string", "enum": ["read", "unread", "reading", "completed"] } } },
+      "BatchComicSelection": { "type": "object", "required": ["mode"], "additionalProperties": false, "properties": { "mode": { "type": "string", "enum": ["ids", "filter"] }, "ids": { "type": "array", "maxItems": 10000, "items": { "type": "string", "minLength": 1, "maxLength": 128 } }, "filter": { "$ref": "#/components/schemas/BatchComicFilter" }, "excludedIds": { "type": "array", "maxItems": 10000, "items": { "type": "string", "minLength": 1, "maxLength": 128 } } } },
+      "BatchTargetFilter": { "type": "object", "additionalProperties": false, "properties": { "keyword": { "type": "string", "maxLength": 500 }, "comicId": { "type": "string", "maxLength": 128 }, "chapterId": { "type": "string", "maxLength": 128 }, "reaction": { "type": "string", "enum": ["any", "like", "dislike"] }, "mediaType": { "type": "string", "enum": ["image", "video"] } } },
+      "BatchTargetSelection": { "type": "object", "required": ["mode"], "additionalProperties": false, "properties": { "mode": { "type": "string", "enum": ["ids", "filter"] }, "ids": { "type": "array", "maxItems": 10000, "items": { "type": "string", "minLength": 1, "maxLength": 128 } }, "filter": { "$ref": "#/components/schemas/BatchTargetFilter" }, "excludedIds": { "type": "array", "maxItems": 10000, "items": { "type": "string", "minLength": 1, "maxLength": 128 } } } },
+      "BatchEntryFilter": { "type": "object", "additionalProperties": false, "properties": { "keyword": { "type": "string", "maxLength": 500 }, "targetType": { "type": "string", "enum": ["comic", "chapter", "media"] } } },
+      "BatchTrashSelection": { "type": "object", "required": ["mode"], "additionalProperties": false, "properties": { "mode": { "type": "string", "enum": ["ids", "filter"] }, "ids": { "type": "array", "maxItems": 10000, "items": { "type": "string", "minLength": 1, "maxLength": 128 } }, "filter": { "$ref": "#/components/schemas/BatchEntryFilter" }, "excludedIds": { "type": "array", "maxItems": 10000, "items": { "type": "string", "minLength": 1, "maxLength": 128 } } } },
+      "BatchMetadataPatch": { "type": "object", "additionalProperties": false, "properties": { "title": { "type": ["string", "null"], "maxLength": 500 }, "author": { "type": ["string", "null"], "maxLength": 2000 }, "description": { "type": ["string", "null"], "maxLength": 65536 }, "categoryId": { "type": ["string", "null"], "maxLength": 128 }, "clearCategory": { "type": "boolean" }, "addTagIds": { "type": "array", "maxItems": 100, "uniqueItems": true, "items": { "type": "string", "maxLength": 128 } }, "removeTagIds": { "type": "array", "maxItems": 100, "uniqueItems": true, "items": { "type": "string", "maxLength": 128 } } } },
+      "BatchPreviewRequest": { "type": "object", "required": ["operation"], "additionalProperties": false, "properties": { "operation": { "type": "string", "enum": ["metadata_update", "image_lq", "metadata_refresh", "video_transcode", "hq_release", "comic_trash", "chapter_trash", "media_trash", "trash_restore", "trash_purge"] }, "selection": { "$ref": "#/components/schemas/BatchComicSelection" }, "targetSelection": { "$ref": "#/components/schemas/BatchTargetSelection" }, "trashSelection": { "$ref": "#/components/schemas/BatchTrashSelection" }, "patch": { "$ref": "#/components/schemas/BatchMetadataPatch" }, "lq": { "$ref": "#/components/schemas/LQRequest" } } },
+      "BatchConfirmationRequest": { "type": "object", "required": ["confirm"], "additionalProperties": false, "properties": { "confirm": { "type": "boolean", "const": true }, "confirmationToken": { "type": "string", "minLength": 1, "maxLength": 128 } } },
+      "BatchPurgeSummary": { "type": "object", "required": ["rootCount", "coveredCount", "entryCount", "fileCount", "registeredBytes", "unmeasuredFiles", "retentionDays"], "properties": { "rootCount": { "type": "integer", "minimum": 0 }, "coveredCount": { "type": "integer", "minimum": 0 }, "entryCount": { "type": "integer", "minimum": 0 }, "fileCount": { "type": "integer", "minimum": 0 }, "registeredBytes": { "type": "integer", "minimum": 0 }, "unmeasuredFiles": { "type": "integer", "minimum": 0 }, "retentionDays": { "type": ["integer", "null"], "minimum": 0 } } },
+      "BatchHQSummary": { "type": "object", "required": ["images", "originalBytes", "effect"], "properties": { "images": { "type": "integer", "minimum": 0 }, "originalBytes": { "type": "integer", "minimum": 0 }, "effect": { "type": "string", "const": "delete_hq_keep_lq" } } },
+      "BatchPreview": { "type": "object", "required": ["activeCount", "id", "operation", "patch", "selectedCount", "eligibleCount", "blockedCount", "pendingCount", "succeededCount", "failedCount", "cancelledCount", "createdAt", "expiresAt", "taskId", "taskStatus", "completedAt"], "properties": { "purge": { "$ref": "#/components/schemas/BatchPurgeSummary" }, "confirmationEffect": { "type": "string" }, "confirmationToken": { "type": "string" }, "hq": { "$ref": "#/components/schemas/BatchHQSummary" }, "lq": { "$ref": "#/components/schemas/LQRequest" }, "activeCount": { "type": "integer", "minimum": 0 }, "id": { "type": "string" }, "operation": { "type": "string" }, "patch": { "$ref": "#/components/schemas/BatchMetadataPatch" }, "selectedCount": { "type": "integer", "minimum": 0 }, "eligibleCount": { "type": "integer", "minimum": 0 }, "blockedCount": { "type": "integer", "minimum": 0 }, "pendingCount": { "type": "integer", "minimum": 0 }, "succeededCount": { "type": "integer", "minimum": 0 }, "failedCount": { "type": "integer", "minimum": 0 }, "cancelledCount": { "type": "integer", "minimum": 0 }, "createdAt": { "type": "string", "format": "date-time" }, "expiresAt": { "type": "string", "format": "date-time" }, "taskId": { "type": ["string", "null"] }, "taskStatus": { "oneOf": [{ "$ref": "#/components/schemas/TaskStatus" }, { "type": "null" }] }, "completedAt": { "type": ["string", "null"], "format": "date-time" } } },
+      "BatchPreviewResponse": { "type": "object", "required": ["data"], "properties": { "data": { "$ref": "#/components/schemas/BatchPreview" } } },
+      "BatchItem": { "type": "object", "required": ["targetType", "targetId", "childTaskId", "waitReason", "position", "comicId", "title", "status", "errorCode", "updatedVersion"], "properties": { "targetStamp": { "type": "string" }, "chapterId": { "type": "string" }, "targetFiles": { "type": "integer", "minimum": 0 }, "coveredBy": { "type": "integer", "minimum": 1 }, "coveredTaskId": { "type": "string" }, "entryId": { "type": "string" }, "entryStamp": { "type": "string" }, "targetType": { "type": "string" }, "targetId": { "type": "string" }, "dependencies": { "type": "array", "items": { "type": "integer", "minimum": 1 } }, "purge": { "oneOf": [{ "$ref": "#/components/schemas/BatchPurgeSummary" }, { "type": "null" }] }, "hq": { "$ref": "#/components/schemas/HQReleasePreview" }, "scopeRevision": { "type": "integer", "minimum": 0 }, "imageCount": { "type": "integer", "minimum": 0 }, "videoCount": { "type": "integer", "minimum": 0 }, "childTaskId": { "type": ["string", "null"] }, "waitReason": { "type": ["string", "null"] }, "position": { "type": "integer", "minimum": 1 }, "comicId": { "type": "string" }, "title": { "type": "string" }, "version": { "type": "integer", "minimum": 0 }, "status": { "type": "string", "enum": ["pending", "dispatched", "succeeded", "failed", "blocked", "cancelled"] }, "errorCode": { "type": ["string", "null"] }, "updatedVersion": { "type": ["integer", "null"], "minimum": 1 } } },
+      "BatchItemPage": { "type": "object", "required": ["items", "total", "page", "pageSize"], "properties": { "items": { "type": "array", "items": { "$ref": "#/components/schemas/BatchItem" } }, "total": { "type": "integer", "minimum": 0 }, "page": { "type": "integer", "minimum": 1 }, "pageSize": { "type": "integer", "minimum": 1, "maximum": 100 } } },
+      "BatchItemPageResponse": { "type": "object", "required": ["data"], "properties": { "data": { "$ref": "#/components/schemas/BatchItemPage" } } },
+      "ExportRequest": { "type": "object", "additionalProperties": false, "properties": { "format": { "type": "string", "enum": ["zip", "cbz"], "default": "zip" }, "partBytes": { "type": "integer", "minimum": 0, "maximum": 4294967295, "default": 0, "description": "0 表示单卷；分卷范围 65536..4294967295" } } },
+      "ExportArtifact": { "type": "object", "required": ["fileName", "size", "sha256", "lastSegment"], "properties": { "fileName": { "type": "string" }, "size": { "type": "integer", "minimum": 1 }, "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }, "lastSegment": { "type": "boolean" }, "path": { "type": "string" } } },
+      "ArtifactView": { "type": "object", "required": ["taskId", "status", "published", "directory", "items"], "properties": { "taskId": { "type": "string" }, "status": { "$ref": "#/components/schemas/TaskStatus" }, "published": { "type": "boolean" }, "directory": { "type": ["string", "null"] }, "items": { "type": "array", "items": { "$ref": "#/components/schemas/ExportArtifact" } } } },
+      "ArtifactViewResponse": { "type": "object", "required": ["data"], "properties": { "data": { "$ref": "#/components/schemas/ArtifactView" } } },
+      "DirectoryMovePreviewRequest": { "type": "object", "required": ["comicIds"], "additionalProperties": false, "properties": { "comicIds": { "type": "array", "minItems": 1, "maxItems": 10000, "uniqueItems": true, "items": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[A-Za-z0-9_-]+$" } } } },
+      "DirectoryMovePreview": { "type": "object", "required": ["id", "taskId", "status", "ready", "bookCount"], "properties": { "id": { "type": "string" }, "taskId": { "type": "string" }, "status": { "$ref": "#/components/schemas/TaskStatus" }, "confirmationToken": { "type": "string" }, "ready": { "type": "boolean" }, "bookCount": { "type": "integer", "minimum": 0 }, "expiresAt": { "type": "string", "format": "date-time" }, "fileCount": { "type": "integer", "minimum": 0 }, "bytes": { "type": "integer", "minimum": 0 }, "moveTaskId": { "type": "string" } } },
+      "DirectoryMovePreviewResponse": { "type": "object", "required": ["data"], "properties": { "data": { "$ref": "#/components/schemas/DirectoryMovePreview" } } },
+      "DirectoryMoveConfirmationRequest": { "type": "object", "required": ["confirm", "confirmationToken"], "additionalProperties": false, "properties": { "confirm": { "type": "boolean", "const": true }, "confirmationToken": { "type": "string", "minLength": 64, "maxLength": 64, "pattern": "^[0-9a-f]{64}$" } } },
+      "DirectoryMoveResult": { "type": "object", "required": ["position", "comicId", "source", "target", "size", "sha256", "state"], "properties": { "position": { "type": "integer", "minimum": 1 }, "comicId": { "type": "string" }, "source": { "type": "string" }, "target": { "type": "string" }, "size": { "type": "integer", "minimum": 0 }, "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }, "state": { "type": "string", "enum": ["pending", "linked", "moved", "initially_missing"] } } },
+      "DirectoryMoveResultPage": { "type": "object", "required": ["taskId", "status", "complete", "directory", "total", "page", "pageSize", "items"], "properties": { "taskId": { "type": "string" }, "status": { "$ref": "#/components/schemas/TaskStatus" }, "complete": { "type": "boolean" }, "directory": { "type": ["string", "null"] }, "total": { "type": "integer", "minimum": 0 }, "page": { "type": "integer", "minimum": 1 }, "pageSize": { "type": "integer", "minimum": 1, "maximum": 100 }, "items": { "type": "array", "items": { "$ref": "#/components/schemas/DirectoryMoveResult" } } } },
+      "DirectoryMoveResultPageResponse": { "type": "object", "required": ["data"], "properties": { "data": { "$ref": "#/components/schemas/DirectoryMoveResultPage" } } },
+      "ImportRequest": {
+        "type": "object", "required": ["sourcePath"], "additionalProperties": false,
+        "properties": { "sourcePath": { "type": "string", "minLength": 1, "maxLength": 4096, "description": "配置导入根内的宿主机完整路径；Docker 由后端统一映射到导入挂载点，不接受相对路径" }, "title": { "type": "string", "maxLength": 500 } }
+      },
+      "DirectoryScanRequest": { "type": "object", "required": ["sourcePath"], "additionalProperties": false, "properties": { "sourcePath": { "type": "string", "minLength": 1, "maxLength": 4096, "description": "配置导入根内的宿主机完整路径；Docker 由后端统一映射到导入挂载点；扫描可指定导入根自身" } } },
+      "DirectoryScanImportRequest": { "type": "object", "required": ["candidateIds"], "additionalProperties": false, "properties": { "candidateIds": { "type": "array", "minItems": 1, "maxItems": 1000, "uniqueItems": true, "items": { "type": "string", "minLength": 1, "maxLength": 128 } } } },
+      "ArchiveBatchImportRequest": {"type": "object", "additionalProperties": false, "required": ["sourcePaths"], "properties": {"sourcePaths": {"type": "array", "minItems": 1, "maxItems": 1000, "uniqueItems": true, "items": {"type": "string", "minLength": 1, "maxLength": 4096}}}},
+      "ImportCandidate": {"type": "object", "required": ["id", "sourcePath", "kind", "title", "selectable"], "properties": {"id": {"type": "string"}, "sourcePath": {"type": "string"}, "kind": {"type": "string", "enum": ["directory", "unsupported"]}, "title": {"type": "string"}, "selectable": {"type": "boolean"}}},
+      "ImportCandidatePage": { "type": "object", "required": ["items", "page", "pageSize", "total"], "properties": { "items": { "type": "array", "items": { "$ref": "#/components/schemas/ImportCandidate" } }, "page": { "type": "integer", "minimum": 1 }, "pageSize": { "type": "integer", "minimum": 1, "maximum": 100 }, "total": { "type": "integer", "minimum": 0, "maximum": 1000 } } },
+      "ImportCandidatePageResponse": { "type": "object", "required": ["data"], "properties": { "data": { "$ref": "#/components/schemas/ImportCandidatePage" } } },
+      "ImportBatchItem": { "type": "object", "required": ["referenceId", "taskId", "status", "errorCode"], "properties": { "referenceId": { "type": "string" }, "taskId": { "type": "string" }, "status": { "type": "string", "enum": ["pending", "dispatched", "succeeded", "failed", "cancelled"] }, "errorCode": { "type": ["string", "null"] } } },
+      "ImportBatch": { "type": "object", "required": ["id", "taskId", "status", "total", "completed", "items"], "properties": { "id": { "type": "string" }, "taskId": { "type": "string" }, "status": { "$ref": "#/components/schemas/TaskStatus" }, "total": { "type": "integer", "minimum": 0, "maximum": 1000 }, "completed": { "type": "integer", "minimum": 0, "maximum": 1000 }, "items": { "type": "array", "maxItems": 1000, "items": { "$ref": "#/components/schemas/ImportBatchItem" } } } },
+      "ImportBatchResponse": { "type": "object", "required": ["data"], "properties": { "data": { "$ref": "#/components/schemas/ImportBatch" } } },
+      "TaskStatus": { "type": "string", "enum": ["queued", "running", "cancelling", "cancelled", "succeeded", "failed"] },
+      "TaskType": { "type": "string", "enum": ["directory_import", "archive_import", "image_lq", "storage_refresh", "hq_release", "directory_scan", "archive_export", "video_transcode", "media_upload", "metadata_refresh", "lifecycle", "lifecycle_audit", "metadata_sync", "metadata_batch", "command_batch", "directory_move", "directory_preflight", "disk_recovery", "recovery_repair", "ai_analysis", "import_batch"] },
+      "Failure": {
+        "type": "object", "required": ["message", "action"], "additionalProperties": false,
+        "properties": { "message": { "type": "string" }, "action": { "type": "string" } }
+      },
+      "Task": {
+        "type": "object", "required": ["id", "type", "status", "stage", "attempt", "totalCount", "completedCount", "errorCode", "comicId", "canCancel", "canRetry", "createdAt", "startedAt", "finishedAt", "title", "failure", "targetType", "targetId", "cancellationReason"], "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string" }, "type": { "$ref": "#/components/schemas/TaskType" }, "status": { "$ref": "#/components/schemas/TaskStatus" }, "stage": { "type": "string" }, "attempt": { "type": "integer", "minimum": 1 }, "totalCount": { "type": ["integer", "null"], "minimum": 0 }, "completedCount": { "type": "integer", "minimum": 0 }, "errorCode": { "type": ["string", "null"] }, "comicId": { "type": ["string", "null"] }, "canCancel": { "type": "boolean" }, "canRetry": { "type": "boolean" }, "createdAt": { "type": "string", "format": "date-time" }, "startedAt": { "type": ["string", "null"], "format": "date-time" }, "finishedAt": { "type": ["string", "null"], "format": "date-time" }, "title": { "type": "string" }, "failure": { "oneOf": [{ "$ref": "#/components/schemas/Failure" }, { "type": "null" }] }, "targetType": { "type": ["string", "null"] }, "targetId": { "type": ["string", "null"] }, "cancellationReason": { "type": ["string", "null"] }
+        }
+      },
+      "TaskResponse": { "type": "object", "required": ["data"], "properties": { "data": { "$ref": "#/components/schemas/Task" } } },
+      "TaskPageResponse": {
+        "type": "object", "required": ["data"], "properties": { "data": { "type": "object", "required": ["items", "page", "pageSize", "total"], "properties": { "items": { "type": "array", "items": { "$ref": "#/components/schemas/Task" } }, "page": { "type": "integer" }, "pageSize": { "type": "integer" }, "total": { "type": "integer" } } } }
+      },
+      "TaskSummaryResponse": {
+        "type": "object", "required": ["data"], "properties": { "data": { "type": "object", "required": ["total", "queued", "running", "cancelling", "cancelled", "succeeded", "failed"], "properties": { "total": { "type": "integer" }, "queued": { "type": "integer" }, "running": { "type": "integer" }, "cancelling": { "type": "integer" }, "cancelled": { "type": "integer" }, "succeeded": { "type": "integer" }, "failed": { "type": "integer" } } } }
+      },
+      "TaskEventPageResponse": { "type": "object", "required": ["data"], "properties": { "data": { "type": "object", "required": ["taskId", "items", "nextAfter"], "properties": { "taskId": { "type": "string" }, "items": { "type": "array", "items": { "$ref": "#/components/schemas/TaskEvent" } }, "nextAfter": { "type": ["integer", "null"] } } } } },
+      "TaskEvent": { "type": "object", "required": ["id", "type", "status", "stage", "attempt", "totalCount", "completedCount", "errorCode", "occurredAt"], "properties": { "id": { "type": "integer", "minimum": 1 }, "type": { "type": "string", "enum": ["baseline", "created", "status_changed", "stage_changed", "progress_updated", "retry_queued"] }, "status": { "$ref": "#/components/schemas/TaskStatus" }, "stage": { "type": "string" }, "attempt": { "type": "integer", "minimum": 0 }, "totalCount": { "type": ["integer", "null"], "minimum": 0 }, "completedCount": { "type": "integer", "minimum": 0 }, "errorCode": { "type": ["string", "null"] }, "occurredAt": { "type": "string", "format": "date-time" } } },
+      "Term": {
+        "type": "object", "required": ["id", "name", "version"], "additionalProperties": false,
+        "properties": { "id": { "type": "string" }, "name": { "type": "string" }, "version": { "type": "integer", "minimum": 1 } }
+      },
+      "ComicTag": {
+        "type": "object", "required": ["id", "name", "version", "source"], "additionalProperties": false,
+        "properties": { "id": { "type": "string" }, "name": { "type": "string" }, "version": { "type": "integer" }, "source": { "type": "string", "enum": ["manual", "comicinfo", "auto"] } }
+      },
+      "Comic": {
+        "type": "object", "required": ["id", "title", "originalTitle", "createdAt", "author", "description", "category", "categoryName", "tags", "version", "coverUrl"],
+        "properties": { "id": { "type": "string" }, "title": { "type": "string" }, "originalTitle": { "type": ["string", "null"] }, "createdAt": { "type": "string", "format": "date-time" }, "author": { "type": "string" }, "description": { "type": "string" }, "category": { "oneOf": [{ "$ref": "#/components/schemas/Term" }, { "type": "null" }] }, "categoryName": { "type": "string" }, "tags": { "type": "array", "items": { "$ref": "#/components/schemas/ComicTag" } }, "version": { "type": "integer", "minimum": 1 }, "coverUrl": { "type": "string" } }
+      },
+      "ComicPageResponse": { "type": "object", "required": ["data"], "properties": { "data": { "type": "object", "required": ["items", "page", "pageSize", "total"], "properties": { "items": { "type": "array", "items": { "$ref": "#/components/schemas/Comic" } }, "page": { "type": "integer" }, "pageSize": { "type": "integer" }, "total": { "type": "integer" } } } } },
+      "MetadataUpdate": {
+        "type": "object", "required": ["version", "title", "author", "description", "categoryId", "tagIds"], "additionalProperties": false,
+        "properties": { "version": { "type": "integer", "minimum": 1 }, "title": { "type": "string", "minLength": 1, "maxLength": 500 }, "originalTitle": { "type": ["string", "null"], "maxLength": 500 }, "author": { "type": "string", "maxLength": 2000 }, "description": { "type": "string", "maxLength": 65536 }, "categoryId": { "type": ["string", "null"] }, "tagIds": { "type": "array", "maxItems": 100, "items": { "type": "string" } } }
+      },
+      "MetadataVersionResponse": { "type": "object", "required": ["data"], "properties": { "data": { "type": "object", "required": ["id", "version"], "properties": { "id": { "type": "string" }, "version": { "type": "integer" } } } } },
+      "Catalog": { "type": "object", "required": ["id", "parentId", "title", "sortOrder"], "properties": { "id": { "type": "string" }, "parentId": { "type": ["string", "null"] }, "title": { "type": "string" }, "sortOrder": { "type": "integer" } } },
+      "Chapter": { "type": "object", "required": ["id", "catalogId", "title", "globalOrder", "sortOrder", "mediaVersion"], "properties": { "id": { "type": "string" }, "catalogId": { "type": ["string", "null"] }, "title": { "type": "string" }, "globalOrder": { "type": "integer" }, "sortOrder": { "type": "integer" }, "mediaVersion": { "type": "integer" } } },
+      "ComicDetail": { "allOf": [{ "$ref": "#/components/schemas/Comic" }, { "type": "object", "required": ["structureVersion", "catalogs", "chapters", "comicInfo"], "properties": { "structureVersion": { "type": "integer" }, "catalogs": { "type": "array", "items": { "$ref": "#/components/schemas/Catalog" } }, "chapters": { "type": "array", "items": { "$ref": "#/components/schemas/Chapter" } }, "comicInfo": { "oneOf": [{ "$ref": "#/components/schemas/ComicInfo" }, { "type": "null" }] } } }] },
+      "ComicInfo": { "type": "object", "required": ["series", "title", "number", "writer", "summary", "genre", "tags"], "additionalProperties": false, "properties": { "series": { "type": "string" }, "title": { "type": "string" }, "number": { "type": "string" }, "writer": { "type": "string" }, "summary": { "type": "string" }, "genre": { "type": "string" }, "tags": { "type": "array", "items": { "type": "string" } } } },
+      "ComicDetailResponse": { "type": "object", "required": ["data"], "properties": { "data": { "$ref": "#/components/schemas/ComicDetail" } } },
+      "Media": { "type": "object", "required": ["id", "chapterId", "pageNumber", "fileName", "mediaType", "contentType", "size", "width", "height", "contentUrl", "autoContentUrl", "hqState", "lq", "video", "storageState", "previewUrl"], "properties": { "id": { "type": "string" }, "chapterId": { "type": "string" }, "pageNumber": { "type": "integer", "minimum": 1 }, "fileName": { "type": "string" }, "mediaType": { "type": "string", "enum": ["image", "video"] }, "contentType": { "type": "string" }, "size": { "type": "integer", "minimum": 0 }, "width": { "type": ["integer", "null"] }, "height": { "type": ["integer", "null"] }, "contentUrl": { "type": "string" }, "autoContentUrl": { "type": "string" }, "hqState": { "type": "string" }, "lq": { "oneOf": [{ "$ref": "#/components/schemas/LQInfo" }, { "type": "null" }] }, "video": { "oneOf": [{ "$ref": "#/components/schemas/Video" }, { "type": "null" }] }, "storageState": { "type": "string" }, "previewUrl": { "type": ["string", "null"] } } },
+      "LQInfo": { "type": "object", "required": ["state", "available", "width", "height", "size", "contentUrl", "taskId", "taskStatus", "errorCode"], "properties": { "state": { "type": "string", "enum": ["missing", "ready"] }, "available": { "type": "boolean" }, "width": { "type": ["integer", "null"] }, "height": { "type": ["integer", "null"] }, "size": { "type": ["integer", "null"] }, "contentUrl": { "type": ["string", "null"] }, "taskId": { "type": ["string", "null"] }, "taskStatus": { "type": ["string", "null"] }, "errorCode": { "type": ["string", "null"] } } },
+      "Video": { "type": "object", "required": ["container", "videoCodec", "audioCodecs", "pixelFormat", "width", "height", "durationMs", "playbackHint"], "properties": { "container": { "type": "string" }, "videoCodec": { "type": "string" }, "audioCodecs": { "type": "array", "items": { "type": "string" } }, "pixelFormat": { "type": "string" }, "width": { "type": "integer" }, "height": { "type": "integer" }, "durationMs": { "type": ["integer", "null"] }, "playbackHint": { "type": "string" } } },
+      "ReaderResponse": { "type": "object", "required": ["data"], "properties": { "data": { "type": "object", "required": ["comicId", "chapter", "items", "previousChapterId", "nextChapterId"], "properties": { "comicId": { "type": "string" }, "chapter": { "$ref": "#/components/schemas/Chapter" }, "items": { "type": "array", "items": { "$ref": "#/components/schemas/Media" } }, "previousChapterId": { "type": ["string", "null"] }, "nextChapterId": { "type": ["string", "null"] } } } } },
+      "ReadingProgressRequest": { "type": "object", "required": ["chapterId"], "additionalProperties": false, "properties": { "chapterId": { "type": "string" }, "mediaId": { "type": "string" }, "pageNumber": { "type": "integer", "minimum": 1 } }, "oneOf": [{ "required": ["mediaId"], "not": { "required": ["pageNumber"] } }, { "required": ["pageNumber"], "not": { "required": ["mediaId"] } }] },
+      "Progress": { "type": "object", "required": ["comicId", "chapterId", "mediaId", "pageNumber", "updatedAt"], "properties": { "comicId": { "type": "string" }, "chapterId": { "type": "string" }, "mediaId": { "type": "string" }, "pageNumber": { "type": "integer", "minimum": 1 }, "updatedAt": { "type": "string", "format": "date-time" } } },
+      "ProgressResponse": { "type": "object", "required": ["data"], "properties": { "data": { "$ref": "#/components/schemas/Progress" } } },
+      "NullableProgressResponse": { "type": "object", "required": ["data"], "properties": { "data": { "oneOf": [{ "$ref": "#/components/schemas/Progress" }, { "type": "null" }] } } },
+      "ReaderSettings": { "type": "object", "required": ["quality", "fit", "direction", "version"], "additionalProperties": false, "properties": { "quality": { "type": "string", "enum": ["auto", "hq", "lq"] }, "fit": { "type": "string", "enum": ["auto", "width", "height", "original"] }, "direction": { "type": "string", "enum": ["vertical", "horizontal", "ltr", "rtl"] }, "version": { "type": "integer", "minimum": 1 } } },
+      "ReaderSettingsResponse": { "type": "object", "required": ["data"], "properties": { "data": { "$ref": "#/components/schemas/ReaderSettings" } } },
+      "TermCreate": { "type": "object", "required": ["name"], "additionalProperties": false, "properties": { "name": { "type": "string", "minLength": 1, "maxLength": 200 } } },
+      "TermUpdate": { "type": "object", "required": ["name", "version"], "additionalProperties": false, "properties": { "name": { "type": "string", "minLength": 1, "maxLength": 200 }, "version": { "type": "integer", "minimum": 1 } } },
+      "TermResponse": { "type": "object", "required": ["data"], "properties": { "data": { "$ref": "#/components/schemas/Term" } } },
+      "TermPageResponse": { "type": "object", "required": ["data"], "properties": { "data": { "type": "object", "required": ["items", "page", "pageSize", "total"], "properties": { "items": { "type": "array", "items": { "$ref": "#/components/schemas/Term" } }, "page": { "type": "integer" }, "pageSize": { "type": "integer" }, "total": { "type": "integer" } } } } },
+      "ReactionValue": { "type": "string", "enum": ["like", "dislike", "none"] },
+      "ReactionUpdate": { "type": "object", "required": ["value"], "additionalProperties": false, "properties": { "value": { "$ref": "#/components/schemas/ReactionValue" } } },
+      "Reaction": { "type": "object", "required": ["targetType", "targetId", "value", "updatedAt"], "properties": { "targetType": { "type": "string", "enum": ["comic", "chapter", "media"] }, "targetId": { "type": "string" }, "value": { "$ref": "#/components/schemas/ReactionValue" }, "updatedAt": { "type": ["string", "null"], "format": "date-time" } } },
+      "ReactionResponse": { "type": "object", "required": ["data"], "properties": { "data": { "$ref": "#/components/schemas/Reaction" } } },
+      "ReactionChange": { "type": "object", "required": ["targetType", "targetId", "value"], "properties": { "targetType": { "type": "string", "enum": ["comic", "chapter", "media"] }, "targetId": { "type": "string" }, "value": { "$ref": "#/components/schemas/ReactionValue" } } },
+      "Favorite": { "allOf": [{ "$ref": "#/components/schemas/Reaction" }, { "type": "object", "required": ["comicId", "comicTitle", "chapterId", "pageNumber", "title", "mediaType", "contentUrl", "lastReadChapterId", "lastReadPageNumber", "previewUrl"], "properties": { "comicId": { "type": "string" }, "comicTitle": { "type": "string" }, "chapterId": { "type": ["string", "null"] }, "pageNumber": { "type": ["integer", "null"] }, "title": { "type": "string" }, "mediaType": { "type": ["string", "null"] }, "contentUrl": { "type": ["string", "null"] }, "lastReadChapterId": { "type": ["string", "null"] }, "lastReadPageNumber": { "type": ["integer", "null"] }, "previewUrl": { "type": "string" } } }] },
+      "FavoritePageResponse": { "type": "object", "required": ["data"], "properties": { "data": { "type": "object", "required": ["items", "page", "pageSize", "total"], "properties": { "items": { "type": "array", "items": { "$ref": "#/components/schemas/Favorite" } }, "page": { "type": "integer" }, "pageSize": { "type": "integer" }, "total": { "type": "integer" } } } } },
+      "HistoryEntry": { "type": "object", "required": ["completed", "comicId", "title", "chapterId", "chapterTitle", "pageNumber", "mediaId", "contentUrl", "updatedAt", "coverUrl"], "properties": { "completed": { "type": "boolean", "description": "当前位置为全书最后活动章节的最后活动媒体" }, "comicId": { "type": "string" }, "title": { "type": "string" }, "chapterId": { "type": "string" }, "chapterTitle": { "type": "string" }, "pageNumber": { "type": "integer" }, "mediaId": { "type": "string" }, "contentUrl": { "type": "string" }, "updatedAt": { "type": "string", "format": "date-time" }, "coverUrl": { "type": "string" } } },
+      "HistoryPageResponse": { "type": "object", "required": ["data"], "properties": { "data": { "type": "object", "required": ["items", "page", "pageSize", "total"], "properties": { "items": { "type": "array", "items": { "$ref": "#/components/schemas/HistoryEntry" } }, "page": { "type": "integer" }, "pageSize": { "type": "integer" }, "total": { "type": "integer" } } } } },
+      "EmptyObject": { "type": "object", "maxProperties": 0, "additionalProperties": false },
+      "ReactionBatchRequest": { "type": "object", "required": ["items"], "additionalProperties": false, "properties": { "items": { "type": "array", "minItems": 1, "maxItems": 100, "items": { "$ref": "#/components/schemas/ReactionChange" } } } },
+      "ReactionListResponse": { "type": "object", "required": ["data"], "properties": { "data": { "type": "array", "items": { "$ref": "#/components/schemas/Reaction" } } } },
+      "ManagedReaction": { "type": "object", "required": ["targetType", "targetId", "value", "updatedAt", "comicId", "comicTitle", "chapterId", "title", "mediaType", "pageNumber", "lifecycleState", "hidden", "canChange"], "properties": { "targetType": { "type": "string", "enum": ["comic", "chapter", "media"] }, "targetId": { "type": "string" }, "value": { "type": "string", "enum": ["like", "dislike", "none"] }, "updatedAt": { "type": ["string", "null"], "format": "date-time" }, "comicId": { "type": "string" }, "comicTitle": { "type": "string" }, "chapterId": { "type": ["string", "null"] }, "title": { "type": "string" }, "mediaType": { "type": ["string", "null"], "enum": ["image", "video", null] }, "pageNumber": { "type": ["integer", "null"], "minimum": 1 }, "lifecycleState": { "type": "string" }, "hidden": { "type": "boolean" }, "canChange": { "type": "boolean" }, "previewUrl": { "type": "string", "format": "uri-reference" }, "contentUrl": { "type": "string", "format": "uri-reference" } } },
+      "ManagedReactionPage": { "type": "object", "required": ["items", "page", "pageSize", "total"], "properties": { "items": { "type": "array", "items": { "$ref": "#/components/schemas/ManagedReaction" } }, "page": { "type": "integer", "minimum": 1 }, "pageSize": { "type": "integer", "minimum": 1, "maximum": 100 }, "total": { "type": "integer", "minimum": 0 } } },
+      "ManagedReactionPageResponse": { "type": "object", "required": ["data"], "properties": { "data": { "$ref": "#/components/schemas/ManagedReactionPage" } } },
+      "SidecarStatus": { "type": "object", "required": ["comicId", "state", "revision", "publishedRevision", "publishedAt", "taskId", "retryAt", "errorCode", "failure"], "properties": { "comicId": { "type": "string" }, "state": { "type": "string", "enum": ["pending", "syncing", "blocked", "failed", "synced"] }, "revision": { "type": "integer", "minimum": 0 }, "publishedRevision": { "type": "integer", "minimum": 0 }, "publishedAt": { "type": ["string", "null"], "format": "date-time" }, "taskId": { "type": ["string", "null"] }, "retryAt": { "type": ["string", "null"], "format": "date-time" }, "errorCode": { "type": ["string", "null"] }, "failure": { "oneOf": [{ "$ref": "#/components/schemas/Failure" }, { "type": "null" }] } } },
+      "SidecarStatusResponse": { "type": "object", "required": ["data"], "properties": { "data": { "$ref": "#/components/schemas/SidecarStatus" } } },
+      "SidecarResult": { "type": "object", "required": ["taskId", "comicId", "requestedRevision", "observedRevision", "observedAt", "published"], "properties": { "taskId": { "type": "string" }, "comicId": { "type": "string" }, "requestedRevision": { "type": "integer", "minimum": 1 }, "observedRevision": { "type": ["integer", "null"], "minimum": 1 }, "observedAt": { "type": ["string", "null"], "format": "date-time" }, "published": { "type": "boolean" } } },
+      "SidecarPage": { "type": "object", "required": ["items", "total", "page", "pageSize"], "properties": { "items": { "type": "array", "items": { "$ref": "#/components/schemas/SidecarResult" } }, "total": { "type": "integer", "minimum": 0 }, "page": { "type": "integer", "minimum": 1 }, "pageSize": { "type": "integer", "minimum": 1, "maximum": 100 } } },
+      "MetadataChange": { "type": "object", "required": ["id", "version", "title", "author", "description", "categoryId", "tagIds"], "additionalProperties": false, "properties": { "id": { "type": "string" }, "version": { "type": "integer", "minimum": 1 }, "title": { "type": "string", "minLength": 1, "maxLength": 500 }, "originalTitle": { "type": ["string", "null"], "maxLength": 500 }, "author": { "type": "string", "maxLength": 2000 }, "description": { "type": "string", "maxLength": 65536 }, "categoryId": { "type": ["string", "null"] }, "tagIds": { "type": "array", "maxItems": 100, "items": { "type": "string" } } } },
+      "MetadataBatchRequest": { "type": "object", "required": ["items"], "additionalProperties": false, "properties": { "items": { "type": "array", "minItems": 1, "maxItems": 100, "items": { "$ref": "#/components/schemas/MetadataChange" } } } },
+      "MetadataVersion": { "type": "object", "required": ["id", "version"], "properties": { "id": { "type": "string" }, "version": { "type": "integer" } } },
+      "MetadataVersionPageResponse": { "type": "object", "required": ["data"], "properties": { "data": { "type": "array", "items": { "$ref": "#/components/schemas/MetadataVersion" } } } },
+      "StructureChange": { "type": "object", "required": ["version", "title", "parentId"], "additionalProperties": false, "properties": { "version": { "type": "integer", "minimum": 1 }, "title": { "type": "string", "minLength": 1, "maxLength": 500 }, "parentId": { "type": ["string", "null"] } } },
+      "CatalogDeleteRequest": { "type": "object", "required": ["version", "reparentTo"], "additionalProperties": false, "properties": { "version": { "type": "integer", "minimum": 1 }, "reparentTo": { "type": ["string", "null"] } } },
+      "NodeReference": { "type": "object", "required": ["type", "id"], "additionalProperties": false, "properties": { "type": { "type": "string", "enum": ["catalog", "chapter"] }, "id": { "type": "string" } } },
+      "StructureOrderRequest": { "type": "object", "required": ["version", "parentId", "items"], "additionalProperties": false, "properties": { "version": { "type": "integer", "minimum": 1 }, "parentId": { "type": ["string", "null"] }, "items": { "type": "array", "items": { "$ref": "#/components/schemas/NodeReference" } } } },
+      "MediaOrderRequest": { "type": "object", "required": ["version", "ids"], "additionalProperties": false, "properties": { "version": { "type": "integer", "minimum": 1 }, "ids": { "type": "array", "maxItems": 10000, "items": { "type": "string" } } } },
+      "StructureNode": { "type": "object", "required": ["type", "id", "parentId", "title", "sortOrder", "globalOrder"], "properties": { "type": { "type": "string", "enum": ["catalog", "chapter"] }, "id": { "type": "string" }, "parentId": { "type": ["string", "null"] }, "title": { "type": "string" }, "sortOrder": { "type": "integer" }, "globalOrder": { "type": ["integer", "null"] } } },
+      "Structure": { "type": "object", "required": ["version", "nodes"], "properties": { "version": { "type": "integer" }, "nodes": { "type": "array", "items": { "$ref": "#/components/schemas/StructureNode" } } } },
+      "StructureResponse": { "type": "object", "required": ["data"], "properties": { "data": { "$ref": "#/components/schemas/Structure" } } },
+      "StructureResult": { "type": "object", "required": ["version", "node"], "properties": { "version": { "type": "integer" }, "node": { "oneOf": [{ "$ref": "#/components/schemas/StructureNode" }, { "type": "null" }] } } },
+      "StructureResultResponse": { "type": "object", "required": ["data"], "properties": { "data": { "$ref": "#/components/schemas/StructureResult" } } },
+      "MediaPosition": { "type": "object", "required": ["id", "pageNumber"], "properties": { "id": { "type": "string" }, "pageNumber": { "type": "integer", "minimum": 1 } } },
+      "MediaOrderResponse": { "type": "object", "required": ["data"], "properties": { "data": { "type": "object", "required": ["version", "items"], "properties": { "version": { "type": "integer" }, "items": { "type": "array", "items": { "$ref": "#/components/schemas/MediaPosition" } } } } } },
+      "PurgeRequest": { "type": "object", "required": ["token"], "additionalProperties": false, "properties": { "token": { "type": "string", "minLength": 64, "maxLength": 64, "pattern": "^[0-9a-f]{64}$" } } },
+      "LifecycleTarget": { "type": "object", "required": ["targetType", "targetId", "comicId", "chapterId", "title"], "properties": { "targetType": { "type": "string", "enum": ["comic", "chapter", "media"] }, "targetId": { "type": "string" }, "comicId": { "type": "string" }, "chapterId": { "type": "string" }, "title": { "type": "string" } } },
+      "LifecycleEntry": { "type": "object", "required": ["id", "target", "state", "origin", "createdAt", "updatedAt", "taskId"], "properties": { "id": { "type": "string" }, "target": { "$ref": "#/components/schemas/LifecycleTarget" }, "state": { "type": "string", "enum": ["trashing", "trashed", "restoring", "restored", "purging", "purged", "detached"] }, "origin": { "type": "string", "enum": ["native", "imported"] }, "createdAt": { "type": "string", "format": "date-time" }, "updatedAt": { "type": "string", "format": "date-time" }, "taskId": { "type": "string" }, "coverUrl": { "type": "string" } } },
+      "LifecycleEntryResponse": { "type": "object", "required": ["data"], "properties": { "data": { "$ref": "#/components/schemas/LifecycleEntry" } } },
+      "LifecycleEntryPageResponse": { "type": "object", "required": ["data"], "properties": { "data": { "type": "object", "required": ["items", "page", "pageSize", "total"], "properties": { "items": { "type": "array", "items": { "$ref": "#/components/schemas/LifecycleEntry" } }, "page": { "type": "integer" }, "pageSize": { "type": "integer" }, "total": { "type": "integer" } } } } },
+      "PurgePreview": { "type": "object", "required": ["entryId", "allowed", "blockers", "retentionDays", "eligibleAt", "entryCount", "fileCount", "registeredBytes", "unmeasuredFiles"], "properties": { "entryId": { "type": "string" }, "allowed": { "type": "boolean" }, "blockers": { "type": "array", "items": { "type": "string" } }, "retentionDays": { "type": "integer", "minimum": 0 }, "eligibleAt": { "type": "string", "format": "date-time" }, "entryCount": { "type": "integer", "minimum": 0 }, "fileCount": { "type": "integer", "minimum": 0 }, "registeredBytes": { "type": "integer", "minimum": 0 }, "unmeasuredFiles": { "type": "integer", "minimum": 0 }, "token": { "type": "string" }, "expiresAt": { "type": "string", "format": "date-time" } } },
+      "PurgePreviewResponse": { "type": "object", "required": ["data"], "properties": { "data": { "$ref": "#/components/schemas/PurgePreview" } } },
+      "LifecycleAuditSummary": { "type": "object", "required": ["taskId", "entryId", "ownerTaskId", "operation", "entryState", "ownerState", "totalFiles", "checkedFiles", "issueFiles", "entryIssues", "complete", "consistent", "repairAvailable", "superseded", "observedAt"], "properties": { "taskId": { "type": "string" }, "entryId": { "type": "string" }, "ownerTaskId": { "type": "string" }, "operation": { "type": "string" }, "entryState": { "type": "string" }, "ownerState": { "type": "string" }, "totalFiles": { "type": "integer", "minimum": 0 }, "checkedFiles": { "type": "integer", "minimum": 0 }, "issueFiles": { "type": "integer", "minimum": 0 }, "entryIssues": { "type": "integer", "minimum": 0 }, "complete": { "type": "boolean" }, "consistent": { "type": "boolean" }, "repairAvailable": { "type": "boolean" }, "superseded": { "type": "boolean" }, "observedAt": { "type": ["string", "null"], "format": "date-time" } } },
+      "LifecycleAuditSummaryResponse": { "type": "object", "required": ["data"], "properties": { "data": { "$ref": "#/components/schemas/LifecycleAuditSummary" } } },
+      "LifecycleFileResult": { "type": "object", "required": ["position", "entryId", "role", "fileName", "operation", "phase", "state", "observedAt"], "properties": { "position": { "type": "integer", "minimum": 1 }, "entryId": { "type": "string" }, "role": { "type": "string" }, "fileName": { "type": "string" }, "operation": { "type": "string" }, "phase": { "type": "string" }, "state": { "type": "string" }, "errorCode": { "type": "string" }, "observedAt": { "type": "string", "format": "date-time" } } },
+      "LifecycleFileResultPage": { "type": "object", "required": ["items", "taskId", "taskStatus", "taskAttempt", "attempt", "operation", "recorded", "complete", "totalFiles", "completedFiles", "failedFiles", "page", "pageSize", "total"], "properties": { "items": { "type": "array", "items": { "$ref": "#/components/schemas/LifecycleFileResult" } }, "taskId": { "type": "string" }, "taskStatus": { "$ref": "#/components/schemas/TaskStatus" }, "taskAttempt": { "type": "integer", "minimum": 1 }, "attempt": { "type": "integer", "minimum": 0 }, "operation": { "type": "string" }, "recorded": { "type": "boolean" }, "complete": { "type": "boolean" }, "totalFiles": { "type": ["integer", "null"], "minimum": 0 }, "completedFiles": { "type": "integer", "minimum": 0 }, "failedFiles": { "type": "integer", "minimum": 0 }, "page": { "type": "integer" }, "pageSize": { "type": "integer" }, "total": { "type": "integer" } } },
+      "LifecycleAuditFile": { "type": "object", "required": ["position", "entryId", "role", "fileName", "sourceState", "retainedState", "sameFile", "prepared", "initiallyMissing", "journalState", "journalPhase", "consistent", "resumable"], "properties": { "position": { "type": "integer", "minimum": 1 }, "entryId": { "type": "string" }, "role": { "type": "string" }, "fileName": { "type": "string" }, "sourceState": { "type": "string" }, "retainedState": { "type": "string" }, "sameFile": { "type": "boolean" }, "prepared": { "type": "boolean" }, "initiallyMissing": { "type": "boolean" }, "journalState": { "type": "string" }, "journalPhase": { "type": "string" }, "consistent": { "type": "boolean" }, "resumable": { "type": "boolean" }, "errorCode": { "type": "string" } } },
+      "LifecycleAuditPage": { "type": "object", "required": ["items", "taskId", "complete", "page", "pageSize", "total"], "properties": { "items": { "type": "array", "items": { "$ref": "#/components/schemas/LifecycleAuditFile" } }, "taskId": { "type": "string" }, "complete": { "type": "boolean" }, "page": { "type": "integer" }, "pageSize": { "type": "integer" }, "total": { "type": "integer" } } },
+      "TaskItemsResponse": { "type": "object", "required": ["data"], "properties": { "data": { "oneOf": [{ "$ref": "#/components/schemas/UploadPublishPage" }, { "$ref": "#/components/schemas/BatchItemPage" }, { "$ref": "#/components/schemas/SidecarPage" }, { "$ref": "#/components/schemas/MetadataRefreshPage" }, { "$ref": "#/components/schemas/LQItemPage" }, { "$ref": "#/components/schemas/HQReleasePage" }, { "$ref": "#/components/schemas/TranscodePage" }, { "$ref": "#/components/schemas/LifecycleFileResultPage" }, { "$ref": "#/components/schemas/LifecycleAuditPage" }] } } },
+      "StorageUsage": { "type": "object", "required": ["files", "bytes"], "properties": { "files": { "type": "integer", "minimum": 0 }, "bytes": { "type": "integer", "minimum": 0 } } },
+      "StorageInventory": {"type": "object", "required": ["scopeType", "scopeId", "comics", "chapters", "images", "videos", "hq", "lq", "currentLqImages", "covers", "availableImages", "availableBytes", "missingLq", "missingSourceSha256Images", "releasedImages", "releasingImages"], "properties": {"scopeType": {"type": "string", "enum": ["global", "comic", "chapter"]}, "scopeId": {"type": ["string", "null"]}, "comics": {"type": "integer", "minimum": 0}, "chapters": {"type": "integer", "minimum": 0}, "images": {"type": "integer", "minimum": 0}, "videos": {"type": "integer", "minimum": 0}, "hq": {"$ref": "#/components/schemas/StorageUsage"}, "lq": {"$ref": "#/components/schemas/StorageUsage"}, "currentLqImages": {"type": "integer", "minimum": 0}, "covers": {"$ref": "#/components/schemas/StorageUsage"}, "availableImages": {"type": "integer", "minimum": 0}, "availableBytes": {"type": "integer", "minimum": 0}, "missingLq": {"type": "integer", "minimum": 0}, "missingSourceSha256Images": {"type": "integer", "minimum": 0}, "releasedImages": {"type": "integer", "minimum": 0}, "releasingImages": {"type": "integer", "minimum": 0}}},
+      "StorageObservedUsage": {"type": "object", "required": ["hq", "lq", "staging", "other", "entries", "ignoredLinks", "ignoredSpecial", "covers", "metadata", "temp", "trash", "exports", "retired"], "properties": {"hq": {"$ref": "#/components/schemas/StorageUsage"}, "lq": {"$ref": "#/components/schemas/StorageUsage"}, "staging": {"$ref": "#/components/schemas/StorageUsage"}, "other": {"$ref": "#/components/schemas/StorageUsage"}, "entries": {"type": "integer", "minimum": 0}, "ignoredLinks": {"type": "integer", "minimum": 0}, "ignoredSpecial": {"type": "integer", "minimum": 0}, "covers": {"$ref": "#/components/schemas/StorageUsage"}, "metadata": {"$ref": "#/components/schemas/StorageUsage"}, "temp": {"$ref": "#/components/schemas/StorageUsage"}, "trash": {"$ref": "#/components/schemas/StorageUsage"}, "exports": {"$ref": "#/components/schemas/StorageUsage"}, "retired": {"$ref": "#/components/schemas/StorageUsage"}}},
+      "StorageObservation": { "type": "object", "required": ["taskId", "startedAt", "finishedAt", "usage"], "properties": { "taskId": { "type": "string" }, "startedAt": { "type": "string", "format": "date-time" }, "finishedAt": { "type": "string", "format": "date-time" }, "usage": { "$ref": "#/components/schemas/StorageObservedUsage" } } },
+      "StorageRefreshStatus": { "type": "object", "required": ["taskId", "status", "completedCount", "errorCode", "canCancel", "canRetry"], "properties": { "taskId": { "type": "string" }, "status": { "$ref": "#/components/schemas/TaskStatus" }, "completedCount": { "type": "integer", "minimum": 0 }, "errorCode": { "type": ["string", "null"] }, "canCancel": { "type": "boolean" }, "canRetry": { "type": "boolean" } } },
+      "StorageStatistics": { "type": "object", "required": ["inventory", "observation", "refresh", "device"], "properties": { "inventory": { "$ref": "#/components/schemas/StorageInventory" }, "observation": { "oneOf": [{ "$ref": "#/components/schemas/StorageObservation" }, { "type": "null" }] }, "refresh": { "oneOf": [{ "$ref": "#/components/schemas/StorageRefreshStatus" }, { "type": "null" }] }, "device": { "oneOf": [{ "$ref": "#/components/schemas/DeviceSpace" }, { "type": "null" }] } } },
+      "DeviceSpace": { "type": "object", "required": ["totalBytes", "availableBytes"], "properties": { "totalBytes": { "type": "integer", "minimum": 0 }, "availableBytes": { "type": "integer", "minimum": 0 } } },
+      "StorageStatisticsResponse": { "type": "object", "required": ["data"], "properties": { "data": { "$ref": "#/components/schemas/StorageStatistics" } } },
+      "StorageOperation": { "type": "object", "required": ["canSubmit", "blockers"], "properties": { "canSubmit": { "type": "boolean" }, "blockers": { "type": "array", "items": { "type": "string" } } } },
+      "StorageOperations": { "type": "object", "required": ["refreshMetadata", "transcode", "generateLq", "releaseHq"], "properties": { "refreshMetadata": { "$ref": "#/components/schemas/StorageOperation" }, "transcode": { "$ref": "#/components/schemas/StorageOperation" }, "generateLq": { "$ref": "#/components/schemas/StorageOperation" }, "releaseHq": { "$ref": "#/components/schemas/StorageOperation" } } },
+      "StorageTaskActivity": { "type": "object", "required": ["id", "type", "targetType", "targetId", "status", "canCancel", "cancellationReason"], "properties": { "id": { "type": "string" }, "type": { "type": "string" }, "targetType": { "type": "string" }, "targetId": { "type": "string" }, "status": { "$ref": "#/components/schemas/TaskStatus" }, "canCancel": { "type": "boolean" }, "cancellationReason": { "type": ["string", "null"] } } },
+      "StorageObject": { "type": "object", "required": ["activeTasks", "id", "comicId", "title", "globalOrder", "inventory", "totalBytes", "hqStatus", "lqStatus", "operations"], "properties": { "activeTasks": { "type": "array", "items": { "$ref": "#/components/schemas/StorageTaskActivity" } }, "id": { "type": "string" }, "comicId": { "type": "string" }, "title": { "type": "string" }, "globalOrder": { "type": ["integer", "null"] }, "inventory": { "$ref": "#/components/schemas/StorageInventory" }, "totalBytes": { "type": "integer", "minimum": 0 }, "hqStatus": { "type": "string", "enum": ["empty", "available", "releasing", "mixed", "released"] }, "lqStatus": { "type": "string", "enum": ["empty", "missing", "partial", "ready"] }, "operations": { "$ref": "#/components/schemas/StorageOperations" } } },
+      "StorageObjectResponse": { "type": "object", "required": ["data"], "properties": { "data": { "$ref": "#/components/schemas/StorageObject" } } },
+      "StoragePage": { "type": "object", "required": ["items", "page", "pageSize", "total"], "properties": { "items": { "type": "array", "items": { "$ref": "#/components/schemas/StorageObject" } }, "page": { "type": "integer", "minimum": 1 }, "pageSize": { "type": "integer", "minimum": 1, "maximum": 100 }, "total": { "type": "integer", "minimum": 0 } } },
+      "StoragePageResponse": { "type": "object", "required": ["data"], "properties": { "data": { "$ref": "#/components/schemas/StoragePage" } } },
+      "MetadataRefreshItem": { "type": "object", "required": ["position", "mediaId", "chapterId", "fileName", "status", "errorCode"], "properties": { "position": { "type": "integer", "minimum": 1 }, "mediaId": { "type": ["string", "null"] }, "chapterId": { "type": ["string", "null"] }, "fileName": { "type": "string" }, "status": { "type": "string", "enum": ["present", "changed", "missing", "released", "invalid", "discovered", "ignored"] }, "errorCode": { "type": ["string", "null"] } } },
+      "MetadataRefreshPage": { "type": "object", "required": ["items", "page", "pageSize", "total"], "properties": { "items": { "type": "array", "items": { "$ref": "#/components/schemas/MetadataRefreshItem" } }, "page": { "type": "integer", "minimum": 1 }, "pageSize": { "type": "integer", "minimum": 1, "maximum": 100 }, "total": { "type": "integer", "minimum": 0 } } },
+      "UploadFileRequest": { "type": "object", "required": ["name", "size", "sha256"], "additionalProperties": false, "properties": { "name": { "type": "string", "minLength": 1, "maxLength": 255 }, "size": { "type": "integer", "minimum": 1, "maximum": 21474836480 }, "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" } } },
+      "UploadRequest": { "type": "object", "required": ["chapterId", "files"], "additionalProperties": false, "properties": { "chapterId": { "type": "string", "minLength": 1, "maxLength": 128 }, "replaceMediaId": { "type": ["string", "null"], "maxLength": 128 }, "files": { "type": "array", "minItems": 1, "maxItems": 10000, "items": { "$ref": "#/components/schemas/UploadFileRequest" } } } },
+      "UploadFile": { "type": "object", "required": ["id", "name", "size", "sha256", "receivedBytes", "receivedParts"], "properties": { "id": { "type": "string" }, "name": { "type": "string" }, "size": { "type": "integer", "minimum": 1 }, "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }, "receivedBytes": { "type": "integer", "minimum": 0 }, "receivedParts": { "type": "array", "items": { "type": "integer", "minimum": 0 } } } },
+      "UploadSession": { "type": "object", "required": ["taskId", "id", "comicId", "chapterId", "replaceMediaId", "status", "totalBytes", "chunkSize", "createdAt", "expiresAt", "cleanupPending", "files"], "properties": { "taskId": { "type": ["string", "null"] }, "id": { "type": "string" }, "comicId": { "type": "string" }, "chapterId": { "type": "string" }, "replaceMediaId": { "type": ["string", "null"] }, "status": { "type": "string", "enum": ["active", "submitted", "activated", "completed", "cancelled", "expired"] }, "totalBytes": { "type": "integer", "minimum": 1, "maximum": 107374182400 }, "chunkSize": { "type": "integer", "const": 16777216 }, "createdAt": { "type": "string", "format": "date-time" }, "expiresAt": { "type": "string", "format": "date-time" }, "cleanupPending": { "type": "boolean" }, "files": { "type": "array", "items": { "$ref": "#/components/schemas/UploadFile" } } } },
+      "UploadSessionResponse": { "type": "object", "required": ["data"], "properties": { "data": { "$ref": "#/components/schemas/UploadSession" } } },
+      "UploadPart": { "type": "object", "required": ["fileId", "part", "size", "sha256"], "properties": { "fileId": { "type": "string" }, "part": { "type": "integer", "minimum": 0 }, "size": { "type": "integer", "minimum": 1, "maximum": 16777216 }, "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" } } },
+      "UploadPartResponse": { "type": "object", "required": ["data"], "properties": { "data": { "$ref": "#/components/schemas/UploadPart" } } },
+      "UploadPublishItem": { "type": "object", "required": ["fileId", "mediaId", "position", "status", "errorCode"], "properties": { "fileId": { "type": "string" }, "mediaId": { "type": "string" }, "position": { "type": "integer", "minimum": 1 }, "status": { "type": "string", "enum": ["pending", "prepared", "published"] }, "errorCode": { "type": ["string", "null"] } } },
+      "UploadPublishPage": { "type": "object", "required": ["items", "page", "pageSize", "total"], "properties": { "items": { "type": "array", "items": { "$ref": "#/components/schemas/UploadPublishItem" } }, "page": { "type": "integer", "minimum": 1 }, "pageSize": { "type": "integer", "minimum": 1, "maximum": 100 }, "total": { "type": "integer", "minimum": 0 } } },
+      "ImageSpec": { "type": "object", "required": ["maxLongEdge", "quality"], "additionalProperties": false, "properties": { "maxLongEdge": { "type": "integer", "minimum": 1, "maximum": 16383 }, "quality": { "type": "integer", "minimum": 1, "maximum": 100 } } },
+      "LQRequest": { "type": "object", "additionalProperties": false, "properties": { "force": { "type": "boolean", "default": false }, "spec": { "$ref": "#/components/schemas/ImageSpec" } } },
+      "LQTaskItem": { "type": "object", "required": ["mediaId", "position", "status", "errorCode"], "properties": { "mediaId": { "type": "string" }, "position": { "type": "integer", "minimum": 1 }, "status": { "type": "string", "enum": ["pending", "generated", "skipped", "failed"] }, "errorCode": { "type": ["string", "null"] } } },
+      "LQItemPage": { "type": "object", "required": ["items", "page", "pageSize", "total"], "properties": { "items": { "type": "array", "items": { "$ref": "#/components/schemas/LQTaskItem" } }, "page": { "type": "integer", "minimum": 1 }, "pageSize": { "type": "integer", "minimum": 1, "maximum": 100 }, "total": { "type": "integer", "minimum": 0 } } },
+      "HQReleasePreview": { "type": "object", "required": ["truncated", "scopeType", "scopeId", "allowed", "images", "available", "released", "originalBytes", "blockers"], "properties": { "truncated": { "type": "boolean" }, "scopeType": { "type": "string", "enum": ["comic", "chapter"] }, "scopeId": { "type": "string" }, "allowed": { "type": "boolean" }, "images": { "type": "integer", "minimum": 0 }, "available": { "type": "integer", "minimum": 0 }, "released": { "type": "integer", "minimum": 0 }, "originalBytes": { "type": "integer", "minimum": 0 }, "blockers": { "type": "array", "items": { "type": "string" } } } },
+      "HQReleasePreviewResponse": { "type": "object", "required": ["data"], "properties": { "data": { "$ref": "#/components/schemas/HQReleasePreview" } } },
+      "HQReleaseItem": { "type": "object", "required": ["mediaId", "position", "status", "originalBytes", "outcome", "errorCode"], "properties": { "mediaId": { "type": "string" }, "position": { "type": "integer", "minimum": 1 }, "status": { "type": "string", "enum": ["pending", "prepared", "released", "failed"] }, "originalBytes": { "type": "integer", "minimum": 0 }, "outcome": { "type": ["string", "null"], "enum": ["removed", "already_absent", null] }, "errorCode": { "type": ["string", "null"] } } },
+      "HQReleasePage": { "type": "object", "required": ["items", "page", "pageSize", "total"], "properties": { "items": { "type": "array", "items": { "$ref": "#/components/schemas/HQReleaseItem" } }, "page": { "type": "integer", "minimum": 1 }, "pageSize": { "type": "integer", "minimum": 1, "maximum": 100 }, "total": { "type": "integer", "minimum": 0 } } },
+      "TranscodeItem": { "type": "object", "required": ["mediaId", "position", "status", "errorCode"], "properties": { "mediaId": { "type": "string" }, "position": { "type": "integer", "minimum": 1 }, "status": { "type": "string", "enum": ["pending", "prepared", "completed", "skipped", "failed"] }, "errorCode": { "type": ["string", "null"] } } },
+      "TranscodePage": { "type": "object", "required": ["items", "page", "pageSize", "total"], "properties": { "items": { "type": "array", "items": { "$ref": "#/components/schemas/TranscodeItem" } }, "page": { "type": "integer", "minimum": 1 }, "pageSize": { "type": "integer", "minimum": 1, "maximum": 100 }, "total": { "type": "integer", "minimum": 0 } } },
+      "RecoveryHQPresence": { "type": "object", "required": ["media", "other", "directories"], "properties": { "media": { "type": "integer", "minimum": 0 }, "other": { "type": "integer", "minimum": 0 }, "directories": { "type": "integer", "minimum": 0 } } },
+      "RecoveryResultSummary": { "type": "object", "required": ["total", "processed", "restored", "placeholders", "skipped", "empty", "failed"], "properties": { "total": { "type": "integer", "minimum": 0 }, "processed": { "type": "integer", "minimum": 0 }, "restored": { "type": "integer", "minimum": 0 }, "placeholders": { "type": "integer", "minimum": 0 }, "skipped": { "type": "integer", "minimum": 0 }, "empty": { "type": "integer", "minimum": 0 }, "failed": { "type": "integer", "minimum": 0 } } },
+      "RecoveryResultItem": { "type": "object", "required": ["comicId", "status", "attempt", "tryCount", "errorCode", "updatedAt"], "properties": { "comicId": { "type": "string" }, "status": { "type": "string", "enum": ["restored", "placeholder", "skipped", "empty", "error"] }, "attempt": { "type": "integer", "minimum": 1 }, "tryCount": { "type": "integer", "minimum": 0 }, "errorCode": { "type": ["string", "null"] }, "updatedAt": { "type": "string", "format": "date-time" } } },
+      "RecoveryResultPage": { "type": "object", "required": ["taskId", "sealed", "candidateCount", "ignoredCount", "summary", "items", "nextAfter"], "properties": { "taskId": { "type": "string" }, "sealed": { "type": "boolean" }, "candidateCount": { "type": "integer", "minimum": 0 }, "ignoredCount": { "type": "integer", "minimum": 0 }, "summary": { "oneOf": [{ "$ref": "#/components/schemas/RecoveryResultSummary" }, { "type": "null" }] }, "items": { "type": "array", "items": { "$ref": "#/components/schemas/RecoveryResultItem" } }, "nextAfter": { "type": ["string", "null"] } } },
+      "RecoveryResultPageResponse": { "type": "object", "required": ["data"], "properties": { "data": { "$ref": "#/components/schemas/RecoveryResultPage" } } },
+      "RecoveryPlaceholder": { "type": "object", "required": ["comicId", "taskId", "reason", "createdAt", "presence"], "properties": { "comicId": { "type": "string" }, "taskId": { "type": ["string", "null"] }, "reason": { "type": "string", "const": "metadata_missing" }, "createdAt": { "type": "string", "format": "date-time" }, "presence": { "$ref": "#/components/schemas/RecoveryHQPresence" } } },
+      "RecoveryPlaceholderResponse": { "type": "object", "required": ["data"], "properties": { "data": { "$ref": "#/components/schemas/RecoveryPlaceholder" } } },
+      "RecoveryRepairRequest": { "type": "object", "required": ["version", "structureVersion"], "additionalProperties": false, "properties": { "version": { "type": "integer", "minimum": 1 }, "structureVersion": { "type": "integer", "minimum": 1 } } },
+      "RecoveryRepair": { "type": "object", "required": ["taskId", "comicId", "expectedVersion", "expectedStructureVersion", "completed", "completedAt", "version", "structureVersion", "preservedMetadata"], "properties": { "taskId": { "type": "string" }, "comicId": { "type": "string" }, "expectedVersion": { "type": "integer", "minimum": 1 }, "expectedStructureVersion": { "type": "integer", "minimum": 1 }, "completed": { "type": "boolean" }, "completedAt": { "type": ["string", "null"], "format": "date-time" }, "version": { "type": ["integer", "null"], "minimum": 1 }, "structureVersion": { "type": ["integer", "null"], "minimum": 1 }, "preservedMetadata": { "type": ["boolean", "null"] } } },
+      "RecoveryRepairResponse": { "type": "object", "required": ["data"], "properties": { "data": { "$ref": "#/components/schemas/RecoveryRepair" } } },
+      "AnalysisRequest": { "type": "object", "required": ["version", "structureVersion"], "additionalProperties": false, "properties": { "version": { "type": "integer", "minimum": 1 }, "structureVersion": { "type": "integer", "minimum": 1 }, "sampleCount": { "type": "integer", "minimum": 0, "maximum": 24, "default": 10, "description": "0 或省略时使用默认 10 张" } } },
+      "AnalysisTerm": { "type": "object", "required": ["id", "name"], "properties": { "id": { "type": "string" }, "name": { "type": "string" } } },
+      "AnalysisSample": { "type": "object", "required": ["mediaId", "ordinal", "sha256", "size", "width", "height", "contentType"], "properties": { "mediaId": { "type": "string" }, "ordinal": { "type": "integer", "minimum": 1 }, "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }, "size": { "type": "integer", "minimum": 1 }, "width": { "type": "integer", "minimum": 1 }, "height": { "type": "integer", "minimum": 1 }, "contentType": { "type": "string" } } },
+      "AnalysisSourceRequest": { "type": "object", "required": ["requestId", "comicId", "metadataVersion", "structureVersion", "samples", "categories", "tags"], "properties": { "requestId": { "type": "string" }, "comicId": { "type": "string" }, "metadataVersion": { "type": "integer", "minimum": 1 }, "structureVersion": { "type": "integer", "minimum": 1 }, "samples": { "type": "array", "items": { "$ref": "#/components/schemas/AnalysisSample" } }, "categories": { "type": "array", "items": { "$ref": "#/components/schemas/AnalysisTerm" } }, "tags": { "type": "array", "items": { "$ref": "#/components/schemas/AnalysisTerm" } } } },
+      "AnalysisTagCandidate": { "type": "object", "required": ["name", "existingId", "evidence"], "properties": { "name": { "type": "string" }, "existingId": { "type": ["string", "null"] }, "evidence": { "type": "array", "items": { "type": "integer", "minimum": 1 } } } },
+      "AnalysisCandidate": { "type": "object", "required": ["title", "author", "description", "categoryId", "tags", "warnings"], "properties": { "title": { "type": ["string", "null"] }, "author": { "type": ["string", "null"] }, "description": { "type": ["string", "null"] }, "categoryId": { "type": ["string", "null"] }, "tags": { "type": "array", "items": { "$ref": "#/components/schemas/AnalysisTagCandidate" } }, "warnings": { "type": "array", "items": { "type": "string" } } } },
+      "AnalysisResult": { "type": "object", "required": ["taskId", "request", "candidate", "completedAt"], "properties": { "taskId": { "type": "string" }, "request": { "$ref": "#/components/schemas/AnalysisSourceRequest" }, "candidate": { "$ref": "#/components/schemas/AnalysisCandidate" }, "completedAt": { "type": "string", "format": "date-time" } } },
+      "AnalysisResultResponse": { "type": "object", "required": ["data"], "properties": { "data": { "$ref": "#/components/schemas/AnalysisResult" } } }
+    }
+  }
+}

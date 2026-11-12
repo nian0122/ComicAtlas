@@ -1,0 +1,48 @@
+@import './theme.css';
+@import './controls.css';
+@import './dropdowns.css';
+@import './menus.css';
+@import './scrollbars.css';
+@import './reading.css';
+@import './management.css';
+* {
+  box-sizing: border-box;
+}
+html {
+  background: var(--atlas-bg);
+  color-scheme: dark;
+}
+body {
+  margin: 0;
+  font-family: var(--atlas-font);
+  background: var(--atlas-bg);
+}
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+button,
+a,
+input,
+select,
+textarea {
+  -webkit-tap-highlight-color: transparent;
+}
+:focus-visible {
+  outline: 2px solid var(--atlas-text);
+  outline-offset: 4px;
+}
+button:disabled {
+  cursor: not-allowed;
+}
+a {
+  color: inherit;
+}
+img {
+  max-width: 100%;
+}
+[hidden] {
+  display: none !important;
+}

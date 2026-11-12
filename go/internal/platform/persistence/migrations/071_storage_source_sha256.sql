@@ -1,0 +1,1 @@
+ALTER TABLE comic_storage_metrics RENAME COLUMN invalid_images TO missing_source_sha256_images;

@@ -1,0 +1,95 @@
+/* 所有单选下拉统一定制触发器与顶层面板，保留原生值、表单及键盘行为。 */
+:is(.ca-scope, .mw-scope) select:not([multiple], [size]),
+:is(.ca-scope, .mw-scope) select:not([multiple], [size])::picker(select) {
+  appearance: base-select;
+}
+:is(.ca-scope, .mw-scope) select:not([multiple], [size]) {
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-inline-size: min(132px, 100%);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+}
+:is(.ca-scope, .mw-scope) select:not([multiple], [size]):open {
+  border-color: var(--atlas-control-focus);
+  box-shadow: 0 0 0 2px var(--atlas-control-ring);
+}
+:is(.ca-scope, .mw-scope) select:not([multiple], [size])::picker-icon {
+  content: '';
+  flex: 0 0 auto;
+  width: 7px;
+  height: 7px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  color: var(--atlas-muted);
+  rotate: 45deg;
+  translate: 0 -2px;
+  transition: rotate var(--atlas-control-transition);
+}
+:is(.ca-scope, .mw-scope) select:not([multiple], [size]):open::picker-icon {
+  rotate: 225deg;
+  translate: 0 2px;
+  color: var(--atlas-text);
+}
+:is(.ca-scope, .mw-scope) select:not([multiple], [size])::picker(select) {
+  box-sizing: border-box;
+  min-inline-size: anchor-size(width);
+  max-inline-size: min(420px, calc(100dvw - 24px));
+  max-block-size: min(320px, 55dvh);
+  margin-block: 8px;
+  padding: 6px;
+  border: 1px solid var(--atlas-popup-border);
+  border-radius: var(--atlas-popup-radius);
+  background: var(--atlas-popup-fill);
+  color: var(--atlas-text);
+  font: inherit;
+  box-shadow: var(--atlas-popup-shadow);
+  overflow-y: auto;
+}
+:is(.ca-scope, .mw-scope) select:not([multiple], [size]) option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 38px;
+  padding: 9px 12px;
+  border: 0;
+  border-radius: var(--atlas-radius-cover);
+  background: transparent;
+  color: var(--atlas-text);
+  white-space: normal;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+:is(.ca-scope, .mw-scope) select:not([multiple], [size]) option:checked {
+  background: var(--atlas-picker-selected);
+  box-shadow: inset 2px 0 var(--atlas-accent);
+  font-weight: 600;
+}
+:is(.ca-scope, .mw-scope) select:not([multiple], [size]) option:hover:not(:disabled),
+:is(.ca-scope, .mw-scope) select:not([multiple], [size]) option:focus-visible {
+  outline: none;
+  background: var(--atlas-control-fill-hover);
+}
+:is(.ca-scope, .mw-scope) select:not([multiple], [size]) option::checkmark {
+  order: 1;
+  margin-inline-start: auto;
+  color: var(--atlas-accent);
+  font-weight: 700;
+}
+:is(.ca-scope, .mw-scope) select:not([multiple], [size]) option:disabled {
+  opacity: var(--atlas-control-disabled-opacity);
+  cursor: not-allowed;
+}
+
+:is(.ca-scope, .mw-scope) select[multiple] option:checked {
+  background: var(--atlas-picker-selected);
+  color: var(--atlas-text);
+  box-shadow: inset 2px 0 var(--atlas-accent);
+}
+@media (prefers-reduced-motion: reduce) {
+  :is(.ca-scope, .mw-scope) select::picker-icon {
+    transition: none;
+  }
+}

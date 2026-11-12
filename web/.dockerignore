@@ -1,0 +1,14 @@
+node_modules
+dist
+.git
+*.md
+.vscode
+.idea
+
+.env
+.env.*
+!.env.example
+test-results
+playwright-report
+.runtime
+*.log

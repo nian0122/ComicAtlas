@@ -1,0 +1,39 @@
+/* 菜单只由使用方决定定位；面板与下拉选择器共享弹出层变量。 */
+.atlas-menu {
+  display: grid;
+  gap: 4px;
+  padding: 6px;
+  border: 1px solid var(--atlas-popup-border);
+  border-radius: var(--atlas-popup-radius);
+  background: var(--atlas-popup-fill);
+  color: var(--atlas-text);
+  box-shadow: var(--atlas-popup-shadow);
+  max-block-size: min(420px, 70dvh);
+  overflow-y: auto;
+}
+.atlas-menu :is(.atlas-menu-item, .mw-button) {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  width: 100%;
+  min-height: var(--atlas-control-height);
+  gap: 8px;
+  padding: 9px 12px;
+  border: 1px solid transparent;
+  border-radius: var(--atlas-radius-cover);
+  background: transparent;
+  box-shadow: none;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.5;
+  text-align: left;
+  text-decoration: none;
+  white-space: normal;
+}
+.atlas-menu :is(.atlas-menu-item, .mw-button):hover:not(:disabled) {
+  background: var(--atlas-control-fill-hover);
+  border-color: transparent;
+}
+.atlas-menu .mw-button-danger:hover:not(:disabled) {
+  background: var(--atlas-accent-soft);
+}

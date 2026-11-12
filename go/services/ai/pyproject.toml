@@ -1,0 +1,12 @@
+[project]
+name = "comicatlas-ai"
+version = "0.1.0"
+description = "ComicAtlas 按需视觉分析服务，仅产生候选"
+requires-python = ">=3.12"
+dependencies = [
+  "starlette==1.10.0",
+  "uvicorn==0.54.0",
+  "httpx==0.28.1",
+  "pillow==13.0.0",
+  "python-multipart==0.0.32",
+]

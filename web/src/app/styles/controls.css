@@ -1,0 +1,336 @@
+/* 阅读、管理及原生 dialog 共用；业务样式只负责布局和特殊按钮形态。 */
+.app-button,
+.mw-button,
+.atlas-search,
+:is(.ca-scope, .mw-scope)
+  :where(
+    input:not([type='checkbox'], [type='radio'], [type='range'], [type='file'], [type='hidden']),
+    select,
+    textarea
+  ) {
+  min-height: var(--atlas-control-size, var(--atlas-control-height));
+  border: 1px solid var(--atlas-control-border);
+  border-radius: var(--atlas-radius-control);
+  background: var(--atlas-control-fill);
+  box-shadow: none;
+  color: var(--atlas-text);
+  font: inherit;
+  font-size: var(--atlas-control-font-size, 13px);
+  line-height: 1.5;
+  transition:
+    background-color var(--atlas-control-transition),
+    border-color var(--atlas-control-transition),
+    box-shadow var(--atlas-control-transition);
+}
+:is(.mw-view-switch, .mw-pagination) {
+  --atlas-control-size: var(--atlas-control-compact);
+}
+.app-button,
+.mw-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 14px;
+  font-weight: 500;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background-color var(--atlas-control-transition),
+    border-color var(--atlas-control-transition),
+    box-shadow var(--atlas-control-transition),
+    transform var(--atlas-control-transition);
+}
+.app-button.is-small,
+.mw-pagination .mw-button {
+  min-height: var(--atlas-control-compact);
+  padding: 7px 12px;
+  font-size: 12px;
+}
+.app-button-content {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+:is(.app-button, .mw-button):hover:not(:disabled) {
+  background-color: var(--atlas-control-fill-hover);
+  border-color: var(--atlas-control-border-hover);
+}
+:is(.app-button, .mw-button):active:not(:disabled) {
+  transform: translateY(1px);
+  box-shadow: none;
+}
+.app-button--primary,
+.mw-button-primary {
+  background-color: var(--atlas-accent);
+  border-color: var(--atlas-accent);
+  color: var(--atlas-on-accent);
+}
+:is(.app-button--primary, .mw-button-primary):hover:not(:disabled) {
+  background-color: var(--atlas-accent-hover);
+  border-color: var(--atlas-accent-hover);
+}
+.app-button--secondary {
+  background-color: var(--atlas-surface);
+  border-color: var(--atlas-line);
+  color: var(--atlas-text);
+}
+.app-button--ghost,
+.app-button--text {
+  background: transparent;
+  box-shadow: none;
+}
+.app-button--text {
+  border-color: transparent;
+}
+.mw-button-danger,
+.app-button--danger {
+  color: var(--atlas-error);
+  background-color: var(--atlas-error-surface);
+  border-color: color-mix(in srgb, var(--atlas-error) 35%, var(--atlas-line));
+}
+:is(.mw-button-danger, .app-button--danger):hover:not(:disabled) {
+  background-color: var(--atlas-accent-soft);
+  border-color: var(--atlas-error);
+}
+.app-button.is-icon {
+  width: var(--atlas-control-size, var(--atlas-control-height));
+  min-width: var(--atlas-control-size, var(--atlas-control-height));
+  padding: 8px;
+}
+:is(.mw-icon-button, .app-button.is-icon:is(.app-button--text, .app-button--ghost)) {
+  font: inherit;
+  font-size: var(--atlas-control-font-size, 13px);
+  line-height: 1.5;
+  width: var(--atlas-control-size, var(--atlas-control-height));
+  height: var(--atlas-control-size, var(--atlas-control-height));
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--atlas-radius-control);
+  background: transparent;
+  color: var(--atlas-muted);
+  cursor: pointer;
+  transition:
+    background-color var(--atlas-control-transition),
+    border-color var(--atlas-control-transition),
+    color var(--atlas-control-transition);
+}
+:is(.mw-icon-button, .app-button.is-icon:is(.app-button--text, .app-button--ghost)):hover:not(:disabled) {
+  background: var(--atlas-control-fill-hover);
+  border-color: var(--atlas-control-border);
+  color: var(--atlas-text);
+}
+.app-button.is-icon.is-small {
+  width: var(--atlas-control-compact);
+  min-width: var(--atlas-control-compact);
+  height: var(--atlas-control-compact);
+  padding: 6px;
+}
+:is(.app-button, .mw-button, .mw-icon-button):disabled {
+  opacity: var(--atlas-control-disabled-opacity);
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+/* 保留原生输入语义、键盘和 v-model，排除滑块、选框及隐藏文件选择器。 */
+:is(.ca-scope, .mw-scope)
+  :where(
+    input:not([type='checkbox'], [type='radio'], [type='range'], [type='file'], [type='hidden']),
+    select,
+    textarea
+  ) {
+  min-width: 0;
+  max-width: 100%;
+  padding: var(--atlas-control-padding, 10px 12px);
+}
+:is(.ca-scope, .mw-scope) :where(select) {
+  cursor: pointer;
+}
+:is(.ca-scope, .mw-scope) :where(textarea) {
+  min-height: 96px;
+  resize: vertical;
+}
+:is(.ca-scope, .mw-scope) :where(input, textarea)::placeholder {
+  color: var(--atlas-control-placeholder);
+  opacity: 1;
+}
+:is(.ca-scope, .mw-scope) :where(input, select, textarea):hover:not(:disabled, :focus, [readonly]) {
+  border-color: var(--atlas-control-border-hover);
+}
+:is(.ca-scope, .mw-scope) :where(input, select, textarea):focus {
+  outline: none;
+  border-color: var(--atlas-control-focus);
+  box-shadow: 0 0 0 2px var(--atlas-control-ring);
+}
+:is(.ca-scope, .mw-scope) :where(input, select, textarea)[aria-invalid='true'] {
+  border-color: var(--atlas-error);
+  background-color: var(--atlas-error-surface);
+}
+:is(.ca-scope, .mw-scope) :where(input, select, textarea):disabled {
+  opacity: var(--atlas-control-disabled-opacity);
+  cursor: not-allowed;
+}
+:is(.ca-scope, .mw-scope) :where(input, textarea)[readonly] {
+  color: var(--atlas-muted);
+  background-color: var(--atlas-surface);
+}
+:is(.ca-scope, .mw-scope) :where(select[multiple]) {
+  padding: 6px;
+}
+:is(.ca-scope, .mw-scope) :where(select[multiple]) option {
+  padding: 7px 10px;
+  border-radius: var(--atlas-radius-cover);
+}
+:is(.ca-scope, .mw-scope) :where(input[type='checkbox'], input[type='radio'], input[type='range']) {
+  accent-color: var(--atlas-accent);
+  cursor: pointer;
+}
+:is(.ca-scope, .mw-scope) :where(input[type='checkbox'], input[type='radio']) {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+
+/* 所有搜索入口复用 AppSearch，输入、图标和清空按钮共享一个外框。 */
+.atlas-search {
+  width: 100%;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: var(--atlas-control-size, var(--atlas-control-height));
+  padding: 0 12px;
+}
+.atlas-search:hover:not(.is-disabled) {
+  border-color: var(--atlas-control-border-hover);
+}
+.atlas-search:focus-within {
+  border-color: var(--atlas-control-focus);
+  box-shadow: 0 0 0 2px var(--atlas-control-ring);
+}
+.atlas-search > svg {
+  flex: 0 0 auto;
+  color: var(--atlas-faint);
+  transition: color var(--atlas-control-transition);
+}
+.atlas-search:focus-within > svg {
+  color: var(--atlas-control-focus);
+}
+.atlas-search-tail {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 26px;
+}
+.atlas-search-clear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--atlas-radius-cover);
+  background: transparent;
+  color: var(--atlas-muted);
+  cursor: pointer;
+}
+.atlas-search-clear:hover {
+  background: var(--atlas-control-fill-hover);
+  color: var(--atlas-text);
+}
+.atlas-search input::-webkit-search-cancel-button {
+  appearance: none;
+}
+.atlas-search input,
+.atlas-search input:focus {
+  width: 100%;
+  height: 100%;
+  font-size: 13px;
+  color: var(--atlas-text);
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  outline: none;
+}
+:is(.ca-scope, .mw-scope) :focus-visible:not(input, select, textarea),
+:is(.ca-scope, .mw-scope) :where(input[type='checkbox'], input[type='radio'], input[type='range']):focus-visible,
+.app-button:focus-visible {
+  outline: 2px solid var(--atlas-control-focus);
+  outline-offset: 3px;
+}
+.ca-button-spinner {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: ca-spin 1s linear infinite;
+}
+@keyframes ca-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .app-button,
+  .mw-button,
+  .mw-icon-button,
+  :is(.ca-scope, .mw-scope) :where(input, select, textarea),
+  .atlas-search,
+  .atlas-search > svg {
+    transition: none;
+  }
+  .ca-button-spinner {
+    animation: none;
+  }
+}
+
+.atlas-search.is-disabled {
+  opacity: var(--atlas-control-disabled-opacity);
+}
+@media (max-width: 600px) {
+  :is(.ca-scope, .mw-scope)
+    :where(
+      input:not([type='checkbox'], [type='radio'], [type='range'], [type='file'], [type='hidden']),
+      select,
+      textarea
+    ),
+  .atlas-search input,
+  .atlas-search input:focus {
+    font-size: var(--atlas-control-font-size, 16px);
+    line-height: 20px;
+  }
+}
+
+/* 禁用状态只在组合搜索框外层应用，避免输入与清空按钮叠加透明度。 */
+.atlas-search.is-disabled :is(input, button):disabled {
+  opacity: 1;
+}
+/* 阅读与管理弹窗共用表面；页面仅控制宽度、位置与内容布局。 */
+:is(.ca-dialog, .mw-dialog) {
+  border: 1px solid var(--atlas-control-border);
+  border-radius: var(--atlas-radius-dialog);
+  background: var(--atlas-raised);
+  color: var(--atlas-text);
+  box-shadow: 0 20px 100px var(--atlas-shadow);
+}
+:is(.ca-dialog, .mw-dialog)::backdrop {
+  background: var(--atlas-backdrop);
+}
+@media (pointer: coarse) {
+  :root {
+    --atlas-control-height: 44px;
+    --atlas-control-compact: 44px;
+  }
+}

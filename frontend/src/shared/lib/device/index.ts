@@ -1,1 +1,0 @@
-export { isMobileReadingDevice } from './device'

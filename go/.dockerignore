@@ -1,0 +1,7 @@
+**
+!Dockerfile
+!go.mod
+!go.sum
+!cmd/**/*.go
+!internal/**/*.go
+!internal/platform/persistence/migrations/*.sql
