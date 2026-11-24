@@ -15,7 +15,7 @@ func NewMediaVerifier(files recoveryports.MediaFiles) *MediaVerifier {
 	return &MediaVerifier{files: files}
 }
 
-// Verify 在任何恢复写事务之前逐项核对字节；不会修改侧车或保存成功记录。
+// Verify 在任何恢复写事务之前逐项核对文件属性和媒体头；不会修改侧车或保存成功记录。
 func (verifier *MediaVerifier) Verify(ctx context.Context, comic string, sidecar recoverydomain.Sidecar, progress func(int) error) (result recoverydomain.MediaVerification, err error) {
 	defer func() {
 		err = errors.Join(err, ctx.Err())
@@ -55,10 +55,8 @@ func (verifier *MediaVerifier) Verify(ctx context.Context, comic string, sidecar
 			if !recoverydomain.CurrentLQ(media) {
 				return result, recoverydomain.ErrMetadata
 			}
-			if media.Hash == "" {
-				if err = verifier.files.RequireHQAbsent(ctx, comic, media.StoragePath); err != nil {
-					return result, err
-				}
+			if err = verifier.files.RequireHQAbsent(ctx, comic, media.StoragePath); err != nil {
+				return result, err
 			}
 			switch availability {
 			case "released":

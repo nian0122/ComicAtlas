@@ -16,7 +16,6 @@ export const taskTypes = [
   'metadata_batch',
   'command_batch',
   'directory_move',
-  'directory_preflight',
   'disk_recovery',
   'recovery_repair',
   'ai_analysis',
@@ -88,5 +87,5 @@ export interface TaskArtifacts {
   status: TaskStatus
   published: boolean
   directory: string | null
-  items: { fileName: string; size: number; sha256: string; lastSegment: boolean; path?: string }[]
+  items: { fileName: string; size: number; modified: number; lastSegment: boolean; path?: string }[]
 }

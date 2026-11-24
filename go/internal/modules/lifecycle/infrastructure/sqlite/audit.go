@@ -37,7 +37,7 @@ func (repo *repository) AuditAdmission(expected lifecycledomain.AuditSnapshot) j
 			if current.OwnerTaskID != "" {
 				ownerTask = current.OwnerTaskID
 			}
-			_, err = tx.ExecContext(ctx, "INSERT INTO lifecycle_audits(task_id,entry_id,owner_task_id,snapshot_hash,total_files,created_at) VALUES(?,?,?,?,?,?)", task, current.Requested.ID, ownerTask, stamp, total, time.Now().UTC().Format(jobsdomain.TimestampFormat))
+			_, err = tx.ExecContext(ctx, "INSERT INTO lifecycle_audits(task_id,entry_id,owner_task_id,snapshot_stamp,total_files,created_at) VALUES(?,?,?,?,?,?)", task, current.Requested.ID, ownerTask, stamp, total, time.Now().UTC().Format(jobsdomain.TimestampFormat))
 			return err
 		}
 	}
@@ -50,7 +50,7 @@ func (repo *repository) BeginAudit(ctx context.Context, task string) (lifecycled
 	}
 	defer tx.Rollback()
 	var entry, expected string
-	if err = tx.QueryRowContext(ctx, "SELECT entry_id,snapshot_hash FROM lifecycle_audits WHERE task_id=? AND complete=0", task).Scan(&entry, &expected); err != nil {
+	if err = tx.QueryRowContext(ctx, "SELECT entry_id,snapshot_stamp FROM lifecycle_audits WHERE task_id=? AND complete=0", task).Scan(&entry, &expected); err != nil {
 		return lifecycledomain.AuditSnapshot{}, err
 	}
 	value, err := auditSnapshot(ctx, tx, entry)
@@ -103,7 +103,7 @@ func (repo *repository) RecordAudit(ctx context.Context, task string, items []li
 func (repo *repository) AuditCompletion(task string, summary lifecycledomain.AuditSummary) persistence.WriteAction {
 	return func(ctx context.Context, tx *sql.Tx) error {
 		var entry, expected string
-		if err := tx.QueryRowContext(ctx, "SELECT entry_id,snapshot_hash FROM lifecycle_audits WHERE task_id=? AND complete=0", task).Scan(&entry, &expected); err != nil {
+		if err := tx.QueryRowContext(ctx, "SELECT entry_id,snapshot_stamp FROM lifecycle_audits WHERE task_id=? AND complete=0", task).Scan(&entry, &expected); err != nil {
 			return err
 		}
 		current, err := auditSnapshot(ctx, tx, entry)
@@ -198,7 +198,7 @@ func (repo *repository) AuditItems(ctx context.Context, task string, page, size 
 func (repo *repository) RepairGuard(task string) persistence.WriteAction {
 	return func(ctx context.Context, tx *sql.Tx) error {
 		var entry, expected, data string
-		if err := tx.QueryRowContext(ctx, "SELECT entry_id,snapshot_hash,summary_json FROM lifecycle_audits WHERE task_id=? AND complete=1", task).Scan(&entry, &expected, &data); err != nil {
+		if err := tx.QueryRowContext(ctx, "SELECT entry_id,snapshot_stamp,summary_json FROM lifecycle_audits WHERE task_id=? AND complete=1", task).Scan(&entry, &expected, &data); err != nil {
 			return err
 		}
 		var summary lifecycledomain.AuditSummary

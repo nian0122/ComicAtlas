@@ -8,12 +8,12 @@ import (
 )
 
 func restoreMedia(ctx context.Context, tx *sql.Tx, plan recoverydomain.RestorePlan) error {
-	media, err := tx.PrepareContext(ctx, `INSERT INTO media(id,chapter_id,page_number,file_name,relative_path,media_type,content_type,size,width,height,sha256,video_metadata,hq_state) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+	media, err := tx.PrepareContext(ctx, `INSERT INTO media(id,chapter_id,page_number,file_name,relative_path,media_type,content_type,size,width,height,video_metadata,hq_state,modified_ns) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)`)
 	if err != nil {
 		return err
 	}
 	defer media.Close()
-	lq, err := tx.PrepareContext(ctx, `INSERT INTO image_lq(media_id,relative_path,sha256,size,width,height,max_long_edge,quality,valid,task_id,updated_at,origin,source_reference,original_state) VALUES(?,?,?,?,?,?,?,?,1,?,?,?,?,?)`)
+	lq, err := tx.PrepareContext(ctx, `INSERT INTO image_lq(media_id,relative_path,size,width,height,max_long_edge,quality,valid,task_id,updated_at,origin,original_state) VALUES(?,?,?,?,?,?,?,1,?,?,?,?)`)
 	if err != nil {
 		return err
 	}
@@ -27,12 +27,12 @@ func restoreMedia(ctx context.Context, tx *sql.Tx, plan recoverydomain.RestorePl
 			}
 			video = string(data)
 		}
-		if _, err = media.ExecContext(ctx, item.ID, item.ChapterID, item.PageNumber, item.FileName, item.StoragePath, item.MediaType, item.ContentType, item.Size, item.Width, item.Height, item.Hash, video, item.HQState); err != nil {
+		if _, err = media.ExecContext(ctx, item.ID, item.ChapterID, item.PageNumber, item.FileName, item.StoragePath, item.MediaType, item.ContentType, item.Size, item.Width, item.Height, video, item.HQState, item.Modified); err != nil {
 			return err
 		}
 		if recoverydomain.CurrentLQ(item) {
 			file := item.LQFile
-			registration, prepareErr := recoverydomain.RestoredLQRegistration(file.LQRecord, plan.TaskID, plan.SnapshotSHA256)
+			registration, prepareErr := recoverydomain.RestoredLQRegistration(file.LQRecord, plan.TaskID)
 			if prepareErr != nil {
 				return prepareErr
 			}
@@ -46,7 +46,7 @@ func restoreMedia(ctx context.Context, tx *sql.Tx, plan recoverydomain.RestorePl
 			if registration.TaskID != "" {
 				task = registration.TaskID
 			}
-			if _, err = lq.ExecContext(ctx, item.ID, file.StoragePath, file.Hash, file.Size, file.Width, file.Height, edge, quality, task, plan.RecordedAt, registration.Provenance.Origin, registration.Provenance.ReferenceSHA256, originalState); err != nil {
+			if _, err = lq.ExecContext(ctx, item.ID, file.StoragePath, file.Size, file.Width, file.Height, edge, quality, task, plan.RecordedAt, registration.Provenance.Origin, originalState); err != nil {
 				return err
 			}
 		}

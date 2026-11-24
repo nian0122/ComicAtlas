@@ -42,7 +42,7 @@ func uploadTarget(ctx context.Context, tx *sql.Tx, session mediadomain.UploadSes
 	}
 	if session.ReplaceMediaID != nil {
 		var current mediadomain.UploadPrevious
-		err = tx.QueryRowContext(ctx, "SELECT relative_path,sha256,hq_state,size FROM active_media AS media WHERE id=? AND chapter_id=?", *session.ReplaceMediaID, session.ChapterID).Scan(&current.Path, &current.SHA256, &current.State, &current.Size)
+		err = tx.QueryRowContext(ctx, "SELECT relative_path,hq_state,size FROM active_media AS media WHERE id=? AND chapter_id=?", *session.ReplaceMediaID, session.ChapterID).Scan(&current.Path, &current.State, &current.Size)
 		if errors.Is(err, sql.ErrNoRows) {
 			return mediadomain.ErrUploadNotFound
 		}
@@ -115,7 +115,7 @@ func (repo *repository) UploadJob(ctx context.Context, id string) (mediadomain.U
 func scanUploadPublishing(scanner interface{ Scan(...any) error }) (mediadomain.UploadPublishFile, error) {
 	var file mediadomain.UploadPublishFile
 	var info *string
-	err := scanner.Scan(&file.FileID, &file.MediaID, &file.Position, &file.Name, &file.Size, &file.SHA256, &file.Status, &file.ErrorCode, &info)
+	err := scanner.Scan(&file.FileID, &file.MediaID, &file.Position, &file.Name, &file.Size, &file.Status, &file.ErrorCode, &info)
 	if err == nil && info != nil {
 		var value mediadomain.Inspection
 		err = json.Unmarshal([]byte(*info), &value)
@@ -124,7 +124,7 @@ func scanUploadPublishing(scanner interface{ Scan(...any) error }) (mediadomain.
 	return file, err
 }
 
-const uploadPublishColumns = "id,media_id,position,name,size,sha256,publish_state,error_code,inspection_json"
+const uploadPublishColumns = "id,media_id,position,name,size,publish_state,error_code,inspection_json"
 
 func (repo *repository) UploadBatch(ctx context.Context, id string, after int) ([]mediadomain.UploadPublishFile, error) {
 	session, sessionErr := repo.UploadJob(ctx, id)
@@ -233,8 +233,8 @@ func (repo *repository) ActivateUpload(ctx context.Context, id string) error {
 		if err != nil {
 			return err
 		}
-		_, err = tx.ExecContext(ctx, `INSERT INTO media(id,chapter_id,page_number,file_name,relative_path,media_type,content_type,size,width,height,sha256,video_metadata,hq_state)
-		 SELECT media_id,?,?+position,name,target_path,json_extract(inspection_json,'$.mediaType'),json_extract(inspection_json,'$.contentType'),size,json_extract(inspection_json,'$.width'),json_extract(inspection_json,'$.height'),sha256,json_extract(inspection_json,'$.video'),'available' FROM upload_files WHERE session_id=? ORDER BY position`, session.ChapterID, base, session.ID)
+		_, err = tx.ExecContext(ctx, `INSERT INTO media(id,chapter_id,page_number,file_name,relative_path,media_type,content_type,size,width,height,video_metadata,hq_state)
+		 SELECT media_id,?,?+position,name,target_path,json_extract(inspection_json,'$.mediaType'),json_extract(inspection_json,'$.contentType'),size,json_extract(inspection_json,'$.width'),json_extract(inspection_json,'$.height'),json_extract(inspection_json,'$.video'),'available' FROM upload_files WHERE session_id=? ORDER BY position`, session.ChapterID, base, session.ID)
 		if err != nil {
 			return err
 		}
@@ -254,7 +254,7 @@ func (repo *repository) ActivateUpload(ctx context.Context, id string) error {
 			return err
 		}
 		for _, item := range mediadomain.UploadRetirePlan(prior) {
-			if _, err = tx.ExecContext(ctx, "INSERT INTO upload_retired(task_id,kind,path,sha256,size) VALUES(?,?,?,?,?)", id, item.Kind, item.Path, item.SHA256, item.Size); err != nil {
+			if _, err = tx.ExecContext(ctx, "INSERT INTO upload_retired(task_id,kind,path,size) VALUES(?,?,?,?)", id, item.Kind, item.Path, item.Size); err != nil {
 				return err
 			}
 		}
@@ -267,7 +267,7 @@ func (repo *repository) ActivateUpload(ctx context.Context, id string) error {
 		if _, err = tx.ExecContext(ctx, "DELETE FROM image_lq WHERE media_id=?", *session.ReplaceMediaID); err != nil {
 			return err
 		}
-		_, err = tx.ExecContext(ctx, `UPDATE media SET (file_name,relative_path,media_type,content_type,size,width,height,sha256,video_metadata)=(SELECT name,target_path,json_extract(inspection_json,'$.mediaType'),json_extract(inspection_json,'$.contentType'),size,json_extract(inspection_json,'$.width'),json_extract(inspection_json,'$.height'),sha256,json_extract(inspection_json,'$.video') FROM upload_files WHERE session_id=?),hq_state='available' WHERE id=?`, session.ID, *session.ReplaceMediaID)
+		_, err = tx.ExecContext(ctx, `UPDATE media SET (file_name,relative_path,media_type,content_type,size,width,height,video_metadata)=(SELECT name,target_path,json_extract(inspection_json,'$.mediaType'),json_extract(inspection_json,'$.contentType'),size,json_extract(inspection_json,'$.width'),json_extract(inspection_json,'$.height'),json_extract(inspection_json,'$.video') FROM upload_files WHERE session_id=?),hq_state='available',modified_ns=0 WHERE id=?`, session.ID, *session.ReplaceMediaID)
 		if err != nil {
 			return err
 		}
@@ -283,7 +283,7 @@ func (repo *repository) ActivateUpload(ctx context.Context, id string) error {
 func uploadPrior(ctx context.Context, tx *sql.Tx, id string) (mediadomain.UploadPrior, error) {
 	var value mediadomain.UploadPrior
 	var raw *string
-	err := tx.QueryRowContext(ctx, "SELECT file_name,media_type,content_type,relative_path,sha256,hq_state,size,width,height,video_metadata FROM active_media AS media WHERE id=?", id).Scan(&value.Name, &value.MediaType, &value.ContentType, &value.Previous.Path, &value.Previous.SHA256, &value.Previous.State, &value.Previous.Size, &value.Width, &value.Height, &raw)
+	err := tx.QueryRowContext(ctx, "SELECT file_name,media_type,content_type,relative_path,hq_state,size,width,height,video_metadata FROM active_media AS media WHERE id=?", id).Scan(&value.Name, &value.MediaType, &value.ContentType, &value.Previous.Path, &value.Previous.State, &value.Previous.Size, &value.Width, &value.Height, &raw)
 	if err != nil {
 		return value, err
 	}
@@ -295,7 +295,7 @@ func uploadPrior(ctx context.Context, tx *sql.Tx, id string) (mediadomain.Upload
 		value.Video = &video
 	}
 	var record mediadomain.LQRecord
-	err = tx.QueryRowContext(ctx, "SELECT relative_path,sha256,size FROM image_lq WHERE media_id=?", id).Scan(&record.Path, &record.SHA256, &record.Size)
+	err = tx.QueryRowContext(ctx, "SELECT relative_path,size FROM image_lq WHERE media_id=?", id).Scan(&record.Path, &record.Size)
 	if err == nil {
 		value.LQ = &record
 	}
@@ -305,7 +305,7 @@ func uploadPrior(ctx context.Context, tx *sql.Tx, id string) (mediadomain.Upload
 	return value, err
 }
 func (repo *repository) UploadRetirement(ctx context.Context, id string) ([]mediadomain.UploadRetired, error) {
-	rows, err := repo.database.Reader.QueryContext(ctx, "SELECT kind,path,sha256,size FROM upload_retired WHERE task_id=? AND status='pending' ORDER BY kind", id)
+	rows, err := repo.database.Reader.QueryContext(ctx, "SELECT kind,path,size FROM upload_retired WHERE task_id=? AND status='pending' ORDER BY kind", id)
 	if err != nil {
 		return nil, err
 	}
@@ -313,7 +313,7 @@ func (repo *repository) UploadRetirement(ctx context.Context, id string) ([]medi
 	items := []mediadomain.UploadRetired{}
 	for rows.Next() {
 		var item mediadomain.UploadRetired
-		if err = rows.Scan(&item.Kind, &item.Path, &item.SHA256, &item.Size); err != nil {
+		if err = rows.Scan(&item.Kind, &item.Path, &item.Size); err != nil {
 			return nil, err
 		}
 		items = append(items, item)

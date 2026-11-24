@@ -8,7 +8,7 @@ const MaxConfirmations = 128
 type PurgeItem struct {
 	Entry      Entry
 	Candidates []FileCandidate
-	PlanHash   string
+	PlanStamp  string
 }
 type PurgeScope struct {
 	Root  Entry

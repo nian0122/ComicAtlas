@@ -1,0 +1,1 @@
+ALTER TABLE comic_storage_metrics DROP COLUMN missing_source_sha256_images;

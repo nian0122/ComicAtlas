@@ -3,15 +3,10 @@ import { computed, reactive, ref, watch, onBeforeUnmount } from 'vue'
 import { RouterLink } from 'vue-router'
 import type { Task } from '@/entities/task'
 import { uploadAccept } from '@/features/upload-media'
-import {
-  ManagementImage,
-  ManagementDialog,
-  ManagementIcon,
-  formatBytes,
-  formatDate,
-  taskStatusLabels,
-} from '@/shared/ui/management'
+import { ManagementImage, ManagementIcon, formatBytes, formatDate, taskStatusLabels } from '@/shared/ui/management'
+import { AppDialog } from '@/shared/ui/dialog'
 import { useMediaUpload, type UploadTarget } from '../model/use-media-upload'
+import { AppPagination } from '@/shared/ui/pagination'
 const props = defineProps<{ open: boolean; target: UploadTarget | null; sessionId: string; workspaceBusy: boolean }>()
 const emit = defineEmits<{ close: []; accepted: [task: Task]; inspect: [id: string] }>()
 const w = reactive(useMediaUpload(props, (task) => emit('accepted', task)))
@@ -49,7 +44,7 @@ function choose(event: Event) {
 }
 </script>
 <template>
-  <ManagementDialog :open="open" title="上传媒体" :busy="w.phase === 'request'" size="compact" @close="close">
+  <AppDialog :open="open" title="上传媒体" :busy="w.phase === 'request'" size="compact" @close="close">
     <p v-if="w.error" class="mw-error" role="alert">{{ w.error }}</p>
     <p v-if="w.notice" class="mw-notice" role="status">{{ w.notice }}</p>
     <p v-if="w.storageWarning" class="mw-muted">{{ w.storageWarning }}</p>
@@ -131,10 +126,7 @@ function choose(event: Event) {
           个文件；媒体内容由后端再次识别。
         </p>
       </details>
-      <p v-if="w.phase === 'hashing'" role="status">
-        正在核对 {{ w.hashName }} 的 SHA-256：{{ formatBytes(w.hashBytes) }}
-      </p>
-      <p v-if="w.phase === 'sending'" role="status">正在传输 {{ w.hashName }}</p>
+      <p v-if="w.phase === 'sending'" role="status">正在传输 {{ w.sendingName }}</p>
       <div v-if="!w.session && w.files.length" class="upload-selection" role="status">
         <strong>已选 {{ w.files.length }} 个文件</strong>
         <span>{{ formatBytes(selectedBytes) }} · 尚未上传</span>
@@ -172,8 +164,7 @@ function choose(event: Event) {
         选择文件后核对清单，再开始上传。接收完成后还需确认发布。
       </p>
       <div v-if="w.session || w.files.length" class="mw-inline-actions upload-actions">
-        <button v-if="w.phase === 'hashing' || w.phase === 'sending'" class="mw-button" @click="w.pause">
-          暂停传输</button
+        <button v-if="w.phase === 'sending'" class="mw-button" @click="w.pause">暂停传输</button
         ><button
           v-else-if="w.target || w.session"
           class="mw-button mw-button-primary"
@@ -191,13 +182,14 @@ function choose(event: Event) {
       </li>
     </ol>
     <footer v-if="w.totalFiles > 20" class="mw-pagination">
-      <button class="mw-button" :disabled="w.page <= 1 || w.processing" @click="w.page--">上一页</button
-      ><span
-        >{{ (w.page - 1) * 20 + 1 }}–{{ Math.min(w.page * 20, w.totalFiles) }} / {{ w.totalFiles }} 个文件 · 第
-        {{ w.page }} / {{ Math.ceil(w.totalFiles / 20) }} 页</span
-      ><button class="mw-button" :disabled="w.page * 20 >= w.totalFiles || w.processing" @click="w.page++">
-        下一页
-      </button>
+      <span>{{ (w.page - 1) * 20 + 1 }}–{{ Math.min(w.page * 20, w.totalFiles) }} / {{ w.totalFiles }} 个文件</span
+      ><AppPagination
+        :page="w.page"
+        :pages="Math.ceil(w.totalFiles / 20)"
+        :disabled="w.processing"
+        label="上传文件分页"
+        @change="w.page = $event"
+      />
     </footer>
     <section v-if="w.completeBytes" class="upload-confirm">
       <h3>确认发布</h3>
@@ -241,13 +233,13 @@ function choose(event: Event) {
         </button>
       </details>
       <p class="mw-muted">
-        这里只在本机记住会话编号；刷新后需要重新选择原文件，文件大小和完整摘要一致才可续传。关闭面板会暂停浏览器传输，已提交的发布任务继续执行。
+        这里只在本机记住会话编号；刷新后需要重新选择原文件，文件名称和大小一致才可续传。关闭面板会暂停浏览器传输，已提交的发布任务继续执行。
       </p>
     </details>
     <button v-if="w.session && !w.processing && target" class="mw-button upload-fresh" @click="w.fresh">
       返回当前章节的新上传
     </button>
-  </ManagementDialog>
+  </AppDialog>
 </template>
 <style scoped>
 .upload-picker {

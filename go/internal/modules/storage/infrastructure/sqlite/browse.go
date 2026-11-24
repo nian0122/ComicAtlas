@@ -144,7 +144,7 @@ func scanStorageRows(kind string, rows *sql.Rows, windowCount bool, result *stor
 		var total int
 		inventory, images := &object.Inventory, &object.Facts.Images
 		scanTargets := []any{&object.ID, &object.ComicID, &object.Title, &object.GlobalOrder, &inventory.Chapters, &inventory.Images, &inventory.Videos, &inventory.HQ.Files, &inventory.HQ.Bytes, &inventory.LQ.Files, &inventory.LQ.Bytes, &inventory.CurrentLQImages,
-			&images.Available, &images.Released, &images.Releasing, &images.MissingSourceSHA256, &images.MissingLQ, &images.OriginalBytes, &inventory.Covers.Files, &inventory.Covers.Bytes}
+			&images.Available, &images.Released, &images.Releasing, &images.MissingLQ, &images.OriginalBytes, &inventory.Covers.Files, &inventory.Covers.Bytes}
 		if windowCount {
 			scanTargets = append(scanTargets, &total)
 		}
@@ -154,7 +154,7 @@ func scanStorageRows(kind string, rows *sql.Rows, windowCount bool, result *stor
 		inventory.ScopeType, inventory.ScopeID, inventory.Comics = kind, &object.ID, 1
 		images.Images = int(inventory.Images)
 		inventory.AvailableImages, inventory.AvailableBytes = int64(images.Available), images.OriginalBytes
-		inventory.MissingLQ, inventory.MissingSourceSHA256Images = int64(images.MissingLQ), int64(images.MissingSourceSHA256)
+		inventory.MissingLQ = int64(images.MissingLQ)
 		inventory.ReleasedImages, inventory.ReleasingImages = int64(images.Released), int64(images.Releasing)
 		result.Items = append(result.Items, object)
 		if windowCount {
@@ -165,7 +165,7 @@ func scanStorageRows(kind string, rows *sql.Rows, windowCount bool, result *stor
 }
 
 const comicColumns = "c.id,c.id AS comic_id,c.title,NULL AS global_order,m.chapters,m.images,m.videos,m.hq_files,m.hq_bytes,m.lq_files,m.lq_bytes,m.current_lq," +
-	"m.available_images,m.released_images,m.releasing_images,m.missing_source_sha256_images,m.missing_lq,m.available_bytes,m.cover_files,m.cover_bytes"
+	"m.available_images,m.released_images,m.releasing_images,m.missing_lq,m.available_bytes,m.cover_files,m.cover_bytes"
 
 func tagFilterSQL(query storagedomain.BrowseQuery) (string, []any) {
 	if query.TagMode == "none" {
@@ -226,8 +226,6 @@ func comicFilters(selected string, query storagedomain.BrowseQuery) (string, []a
 		where += " AND m.missing_lq>0"
 	case "can_release":
 		where += " AND m.available_images>0"
-	case "missing_source_sha256":
-		where += " AND m.missing_source_sha256_images>0"
 	}
 	return where, arguments
 }
@@ -281,7 +279,6 @@ func chapterMetrics(source string) string {
 	 COALESCE(SUM(m.media_type='image' AND m.hq_state='available'),0) AS available_images,
 	 COALESCE(SUM(m.media_type='image' AND m.hq_state='released'),0) AS released_images,
 	 COALESCE(SUM(m.media_type='image' AND m.hq_state='releasing'),0) AS releasing_images,
-	 COALESCE(SUM(m.media_type='image' AND m.hq_state='available' AND m.sha256=''),0) AS missing_source_sha256_images,
 	 COALESCE(SUM(m.media_type='image' AND m.hq_state='available' AND (l.media_id IS NULL OR l.valid<>1)),0) AS missing_lq,
 	 COALESCE(SUM(CASE WHEN m.media_type='image' AND m.hq_state='available' THEN m.size ELSE 0 END),0) AS available_bytes,
 	 0 AS cover_files,0 AS cover_bytes
@@ -292,7 +289,7 @@ func chapterMetrics(source string) string {
 }
 
 const chapterColumns = "o.id,o.comic_id,o.title,o.global_order,m.chapters,m.images,m.videos,m.hq_files,m.hq_bytes,m.lq_files,m.lq_bytes,m.current_lq," +
-	"m.available_images,m.released_images,m.releasing_images,m.missing_source_sha256_images,m.missing_lq,m.available_bytes,m.cover_files,m.cover_bytes"
+	"m.available_images,m.released_images,m.releasing_images,m.missing_lq,m.available_bytes,m.cover_files,m.cover_bytes"
 
 func chapterSortColumn(query storagedomain.BrowseQuery) string {
 	column := "o.global_order"

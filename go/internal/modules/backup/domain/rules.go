@@ -1,7 +1,6 @@
 package domain
 
 import (
-	"encoding/hex"
 	"math"
 	"path"
 	"strings"
@@ -25,11 +24,6 @@ func ValidPath(value string) bool {
 	return true
 }
 
-func ValidDigest(value string) bool {
-	decoded, err := hex.DecodeString(value)
-	return err == nil && len(decoded) == 32 && strings.ToLower(value) == value
-}
-
 func ValidTimestamp(value string) bool {
 	parsed, err := time.Parse(time.RFC3339Nano, value)
 	return err == nil && parsed.UTC().Format(time.RFC3339Nano) == value
@@ -40,7 +34,7 @@ func ValidateDescriptor(entry Entry) error {
 		return ErrValidation
 	}
 	if entry.Kind == Directory {
-		if entry.Path == DatabasePath || entry.Size != 0 || entry.SHA256 != "" || entry.ModifiedAt != "" {
+		if entry.Path == DatabasePath || entry.Size != 0 || entry.ModifiedAt != "" {
 			return ErrValidation
 		}
 		return nil
@@ -52,13 +46,7 @@ func ValidateDescriptor(entry Entry) error {
 }
 
 func ValidateEntry(entry Entry) error {
-	if err := ValidateDescriptor(entry); err != nil {
-		return err
-	}
-	if entry.Kind == File && !ValidDigest(entry.SHA256) {
-		return ErrValidation
-	}
-	return nil
+	return ValidateDescriptor(entry)
 }
 
 func Add(summary Summary, entry Entry) (Summary, error) {
@@ -82,7 +70,7 @@ func ValidateSummary(summary Summary) error {
 }
 
 func ValidateDatabase(info DatabaseInfo) error {
-	if info.Format != "comicatlas-go-v1" || info.MigrationCount < 1 || info.MigrationCount > 999 || !ValidDigest(info.MigrationChecksum) {
+	if info.Format != "comicatlas-go-v1" || info.MigrationCount < 1 || info.MigrationCount > 999 {
 		return ErrValidation
 	}
 	return nil
@@ -96,7 +84,7 @@ func ValidateRoots(data, media, database Entry) error {
 }
 
 func ValidateManifest(value Manifest) error {
-	if value.Format != Format || value.Version != Version || !ValidID(value.ID) || !ValidTimestamp(value.CreatedAt) || ValidateDatabase(value.Database) != nil || ValidateSummary(value.Summary) != nil || value.Catalog.Size < 1 || !ValidDigest(value.Catalog.SHA256) {
+	if value.Format != Format || value.Version != Version || !ValidID(value.ID) || !ValidTimestamp(value.CreatedAt) || ValidateDatabase(value.Database) != nil || ValidateSummary(value.Summary) != nil || value.Catalog.Size < 1 {
 		return ErrValidation
 	}
 	return nil

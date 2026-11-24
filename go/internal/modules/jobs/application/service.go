@@ -2,8 +2,6 @@ package application
 
 import (
 	"context"
-	"crypto/sha256"
-	"fmt"
 	"log/slog"
 
 	jobsports "comicatlas.local/backend/internal/modules/jobs/application/ports"
@@ -28,8 +26,7 @@ func (store *Store) CreateResource(ctx context.Context, request jobsdomain.Resou
 		return jobsdomain.Task{}, jobsdomain.ErrValidation
 	}
 	identity := request.Type + "\x00" + request.TargetType + "\x00" + request.TargetID + "\x00" + request.Payload
-	hash := fmt.Sprintf("%x", sha256.Sum256([]byte(identity)))
-	return store.repository.CreateResourceTask(ctx, request, key, hash, admission)
+	return store.repository.CreateResourceTask(ctx, request, key, identity, admission)
 }
 
 func (store *Store) create(ctx context.Context, kind, source, title, key string) (jobsdomain.Task, error) {
@@ -37,7 +34,7 @@ func (store *Store) create(ctx context.Context, kind, source, title, key string)
 	if err != nil {
 		return jobsdomain.Task{}, err
 	}
-	return store.repository.CreateTask(ctx, kind, value.Resource.SourcePath, value.Resource.Title, key, value.RequestHash, value.Explicit)
+	return store.repository.CreateTask(ctx, kind, value.Resource.SourcePath, value.Resource.Title, key, value.RequestKey, value.Explicit)
 }
 
 func (store *Store) claim(ctx context.Context) (jobsdomain.Task, error) {

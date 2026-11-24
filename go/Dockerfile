@@ -34,9 +34,11 @@ RUN curl -fsSL --retry 3 https://deb.debian.org/debian/pool/main/f/ffmpeg/ffmpeg
 FROM tools-build AS image-tools-build
 RUN apt-get -o Acquire::Retries=3 update && apt-get install -y --no-install-recommends cmake=3.25.1-1 libpng-dev && rm -rf /var/lib/apt/lists/*
 WORKDIR /image-source
+COPY tools/djpeg/backing_store.c /image-source/jpeg/src/backing_store.c
 RUN curl -fsSL --retry 3 https://github.com/libjpeg-turbo/libjpeg-turbo/releases/download/3.2.0/libjpeg-turbo-3.2.0.tar.gz -o jpeg.tar.gz \
     && echo "6f30092cef9fb839779646608f4ee14ae3cbac989c47fa05e841b0841f09878e  jpeg.tar.gz" | sha256sum -c - \
-    && mkdir jpeg && tar -xzf jpeg.tar.gz -C jpeg --strip-components=1 \
+    && tar -xzf jpeg.tar.gz -C jpeg --strip-components=1 \
+    && printf '\ntarget_sources(djpeg-static PRIVATE src/backing_store.c)\ntarget_link_options(djpeg-static PRIVATE -Wl,--wrap=jpeg_open_backing_store)\n' >> jpeg/CMakeLists.txt \
     && cmake -S jpeg -B jpeg-build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/opt/image-tools \
        -DENABLE_SHARED=FALSE -DENABLE_STATIC=TRUE -DWITH_TURBOJPEG=FALSE -DWITH_TOOLS=TRUE -DWITH_TESTS=FALSE \
     && (cmake --build jpeg-build --target djpeg-static -j2 >/tmp/jpeg-build.log 2>&1 || (tail -80 /tmp/jpeg-build.log; exit 1)) \
@@ -61,6 +63,9 @@ RUN curl -fsSL --retry 3 https://storage.googleapis.com/downloads.webmproject.or
     && cp /usr/share/doc/libpng-dev/copyright /opt/image-tools/share/licenses/libpng-copyright \
     && cp /usr/share/doc/zlib1g-dev/copyright /opt/image-tools/share/licenses/zlib-copyright \
     && if readelf -d /opt/image-tools/bin/cwebp | grep -q NEEDED; then exit 1; fi
+
+RUN install -s /image-source/webp/examples/dwebp /opt/image-tools/bin/dwebp \
+    && if readelf -d /opt/image-tools/bin/dwebp | grep -q NEEDED; then exit 1; fi
 
 FROM golang:1.27.3-bookworm@sha256:972b4110ba0f47539a975c31e52c64765e1ff19f2d74469ae4a595c6676e80a5 AS dev
 WORKDIR /workspace

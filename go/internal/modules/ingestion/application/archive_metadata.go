@@ -3,7 +3,6 @@ package application
 import (
 	"bytes"
 	"context"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"io"
@@ -51,7 +50,7 @@ func readArchiveMetadata(ctx context.Context, file *zip.File) (*librarydomain.Ar
 
 func validateArchiveMetadata(document librarydomain.ArchiveMetadata) error {
 	request := document.Request
-	if document.Version != 1 || request.Format != "zip" && request.Format != "cbz" || request.PartBytes != 0 && (request.PartBytes < 64<<10 || request.PartBytes > 4<<30-1) || document.Comic.ID == "" || len(document.Comic.ID) > 128 || len(document.Catalogs)+len(document.Chapters) > librarydomain.MaxStructureNodes || len(document.Sources) < 1 || len(document.Sources) > MaxMedia {
+	if document.Version != 2 || request.Format != "zip" && request.Format != "cbz" || request.PartBytes != 0 && (request.PartBytes < 64<<10 || request.PartBytes > 4<<30-1) || document.Comic.ID == "" || len(document.Comic.ID) > 128 || len(document.Catalogs)+len(document.Chapters) > librarydomain.MaxStructureNodes || len(document.Sources) < 1 || len(document.Sources) > MaxMedia {
 		return ingestiondomain.ErrMetadata
 	}
 	if err := librarydomain.ValidateImportedMetadata(document.Comic); err != nil {
@@ -118,10 +117,7 @@ func validateArchiveMetadata(document librarydomain.ArchiveMetadata) error {
 	chapterPages := map[string]map[int]bool{}
 	var total int64
 	for _, source := range document.Sources {
-		if source.MediaID == "" || len(source.MediaID) > 128 || media[source.MediaID] || !chapters[source.ChapterID] || source.PageNumber < 1 || source.FileName == "" || len(source.FileName) > 255 || path.Base(source.FileName) != source.FileName || strings.ContainsAny(source.FileName, "\\:\x00") || source.MediaType != "image" && source.MediaType != "video" || source.Quality != "hq" && source.Quality != "lq" || source.Path == "" || path.Clean(source.Path) != source.Path || path.IsAbs(source.Path) || strings.ContainsAny(source.Path, "\\:\x00") || len(source.Path) > 2048 || source.SHA256 == "" || strings.ToLower(source.SHA256) != source.SHA256 || source.Size < 0 || source.Size > MaxFileBytes || paths[source.Path] {
-			return ingestiondomain.ErrMetadata
-		}
-		if _, err := hex.DecodeString(source.SHA256); err != nil || len(source.SHA256) != 64 {
+		if source.MediaID == "" || len(source.MediaID) > 128 || media[source.MediaID] || !chapters[source.ChapterID] || source.PageNumber < 1 || source.FileName == "" || len(source.FileName) > 255 || path.Base(source.FileName) != source.FileName || strings.ContainsAny(source.FileName, "\\:\x00") || source.MediaType != "image" && source.MediaType != "video" || source.Quality != "hq" && source.Quality != "lq" || source.Path == "" || path.Clean(source.Path) != source.Path || path.IsAbs(source.Path) || strings.ContainsAny(source.Path, "\\:\x00") || len(source.Path) > 2048 || source.Size < 0 || source.Size > MaxFileBytes || paths[source.Path] {
 			return ingestiondomain.ErrMetadata
 		}
 		if chapterPages[source.ChapterID] == nil {
@@ -164,7 +160,7 @@ func restoreArchiveMetadata(task jobsdomain.Task, plan *librarydomain.Plan, docu
 	mediaBySource := make(map[string]librarydomain.Media, len(document.Sources))
 	for _, source := range document.Sources {
 		media, ok := copied[source.Path]
-		if !ok || media.Size != source.Size || media.SHA256 != source.SHA256 || media.MediaType != source.MediaType {
+		if !ok || media.Size != source.Size || media.MediaType != source.MediaType {
 			return ingestiondomainMetadataFailure(ingestiondomain.ErrMetadata)
 		}
 		mediaBySource[source.Path] = media

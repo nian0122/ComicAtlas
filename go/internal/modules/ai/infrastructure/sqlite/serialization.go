@@ -11,7 +11,7 @@ func encodeSnapshot(value aidomain.Snapshot) ([]byte, error) {
 	}
 	stored := storedSnapshot{ComicID: value.ComicID, MetadataVersion: value.MetadataVersion, StructureVersion: value.StructureVersion, Categories: value.Categories, Tags: value.Tags, Images: make([]storedImage, 0, len(value.Images))}
 	for _, image := range value.Images {
-		stored.Images = append(stored.Images, storedImage{MediaID: image.MediaID, Ordinal: image.Ordinal, Path: image.Path, SHA256: image.SHA256})
+		stored.Images = append(stored.Images, storedImage{MediaID: image.MediaID, Ordinal: image.Ordinal, Path: image.Path})
 	}
 	data, err := json.Marshal(stored)
 	if err != nil || len(data) > aidomain.MaxManifestBytes {
@@ -30,7 +30,7 @@ func decodeSnapshot(data []byte) (value aidomain.Snapshot, err error) {
 	}
 	value = aidomain.Snapshot{ComicID: stored.ComicID, MetadataVersion: stored.MetadataVersion, StructureVersion: stored.StructureVersion, Categories: stored.Categories, Tags: stored.Tags, Images: make([]aidomain.SourceImage, 0, len(stored.Images))}
 	for _, image := range stored.Images {
-		value.Images = append(value.Images, aidomain.SourceImage{MediaID: image.MediaID, Ordinal: image.Ordinal, Path: image.Path, SHA256: image.SHA256})
+		value.Images = append(value.Images, aidomain.SourceImage{MediaID: image.MediaID, Ordinal: image.Ordinal, Path: image.Path})
 	}
 	return value, aidomain.ValidateSnapshot(value)
 }

@@ -1,14 +1,13 @@
 package domain
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
+	"comicatlas.local/backend/internal/platform/stableid"
 	"encoding/json"
 	"sort"
 )
 
 func NewTrashSnapshot(target Target, catalog, reaction string) *TrashSnapshot {
-	value := &TrashSnapshot{digest: sha256.New()}
+	value := &TrashSnapshot{}
 	if ValidateTarget(target.Type, target.ID) != nil || target.Type == "comic" || target.State != "active" {
 		value.err = ErrValidation
 	}
@@ -43,7 +42,7 @@ func (value *TrashSnapshot) Seal(files []FileCandidate) (string, error) {
 	if value.err != nil {
 		return "", value.err
 	}
-	return hex.EncodeToString(value.digest.Sum(nil)), nil
+	return stableid.Hex(value.data.String()), nil
 }
 
 func (value *TrashSnapshot) add(fact any) {
@@ -60,6 +59,6 @@ func (value *TrashSnapshot) add(fact any) {
 		return
 	}
 	value.bytes += len(data) + 1
-	_, _ = value.digest.Write(data)
-	_, _ = value.digest.Write([]byte{'\n'})
+	_, _ = value.data.Write(data)
+	_ = value.data.WriteByte('\n')
 }

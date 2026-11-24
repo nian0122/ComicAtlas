@@ -13,7 +13,7 @@ var _ recoveryports.ResultRepository = (*sqliteRepository)(nil)
 
 func readOutcome(ctx context.Context, query rowReader, task, comic string) (*recoverydomain.Outcome, error) {
 	value := &recoverydomain.Outcome{TaskID: task, ComicID: comic}
-	err := query.QueryRowContext(ctx, "SELECT status,task_attempt,try_count,error_code,source_sha,updated_at FROM recovery_results WHERE task_id=? AND comic_id=?", task, comic).Scan(&value.Status, &value.TaskAttempt, &value.TryCount, &value.ErrorCode, &value.SourceSHA256, &value.UpdatedAt)
+	err := query.QueryRowContext(ctx, "SELECT status,task_attempt,try_count,error_code,updated_at FROM recovery_results WHERE task_id=? AND comic_id=?", task, comic).Scan(&value.Status, &value.TaskAttempt, &value.TryCount, &value.ErrorCode, &value.UpdatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
@@ -87,8 +87,8 @@ func (repo *sqliteRepository) CommitOutcome(ctx context.Context, value recoveryd
 		value.TryCount = previous.TryCount + 1
 		delta = 0
 	}
-	if _, err = tx.ExecContext(ctx, `INSERT INTO recovery_results(task_id,comic_id,status,task_attempt,try_count,error_code,source_sha,updated_at) VALUES(?,?,?,?,?,?,?,?)
- ON CONFLICT(task_id,comic_id) DO UPDATE SET status=excluded.status,task_attempt=excluded.task_attempt,try_count=excluded.try_count,error_code=excluded.error_code,source_sha=excluded.source_sha,updated_at=excluded.updated_at`, value.TaskID, value.ComicID, value.Status, value.TaskAttempt, value.TryCount, value.ErrorCode, value.SourceSHA256, value.UpdatedAt); err != nil {
+	if _, err = tx.ExecContext(ctx, `INSERT INTO recovery_results(task_id,comic_id,status,task_attempt,try_count,error_code,updated_at) VALUES(?,?,?,?,?,?,?)
+ ON CONFLICT(task_id,comic_id) DO UPDATE SET status=excluded.status,task_attempt=excluded.task_attempt,try_count=excluded.try_count,error_code=excluded.error_code,updated_at=excluded.updated_at`, value.TaskID, value.ComicID, value.Status, value.TaskAttempt, value.TryCount, value.ErrorCode, value.UpdatedAt); err != nil {
 		return result, err
 	}
 	updated, err := tx.ExecContext(ctx, "UPDATE tasks SET completed_count=completed_count+?,stage='recovering',total_count=? WHERE id=? AND type='disk_recovery' AND status='running' AND attempt=? AND completed_count+?<=?", delta, run.CandidateCount, value.TaskID, value.TaskAttempt, delta, run.CandidateCount)

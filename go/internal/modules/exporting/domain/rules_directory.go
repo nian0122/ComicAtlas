@@ -2,15 +2,13 @@ package domain
 
 import (
 	lifecycledomain "comicatlas.local/backend/internal/modules/lifecycle/domain"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"path"
 	"strings"
 	"unicode/utf8"
 )
 
-const DirectoryPlanVersion = 5
+const DirectoryPlanVersion = 6
 
 func directoryRelative(name string) bool {
 	if name == "" || len(name) > DirectoryPathBytes || !utf8.ValidString(name) || path.Clean(name) != name || strings.HasPrefix(name, "/") || strings.ContainsAny(name, "\\:\x00") {
@@ -57,10 +55,10 @@ func directorySource(name string) bool {
 	return found && (root == "hq" || root == "lq" || root == "thumbs" || root == "metadata" || root == "retired")
 }
 
-// DirectoryPlanStamp 逐项编码取摘要并限制总预算，不先把整批快照编码到大缓冲。
-func DirectoryPlanStamp(plans []DirectoryPlan) (string, error) {
+// ValidateDirectoryPlans 逐项编码并限制总预算，不先把整批快照编码到大缓冲。
+func ValidateDirectoryPlans(plans []DirectoryPlan) error {
 	if len(plans) == 0 || len(plans) > MaxDirectoryBooks {
-		return "", ErrValidation
+		return ErrValidation
 	}
 	fileCount, nodeCount, documentCount, absenceCount := 0, 0, 0, 0
 	for _, plan := range plans {
@@ -69,10 +67,9 @@ func DirectoryPlanStamp(plans []DirectoryPlan) (string, error) {
 		documentCount += len(plan.Documents)
 		absenceCount += len(plan.AbsentSources)
 		if fileCount > MaxDirectoryFiles || nodeCount > MaxNodes || documentCount > MaxNodes || absenceCount > MaxDirectoryAbsences {
-			return "", ErrValidation
+			return ErrValidation
 		}
 	}
-	hash := sha256.New()
 	budget, files, nodes, documents := 0, 0, 0, 0
 	add := func(value any) bool {
 		data, err := json.Marshal(value)
@@ -80,8 +77,6 @@ func DirectoryPlanStamp(plans []DirectoryPlan) (string, error) {
 			return false
 		}
 		budget += len(data) + 1
-		_, _ = hash.Write(data)
-		_, _ = hash.Write([]byte{'\n'})
 		return true
 	}
 	_ = add(struct{ Version, Books int }{DirectoryPlanVersion, len(plans)})
@@ -92,23 +87,23 @@ func DirectoryPlanStamp(plans []DirectoryPlan) (string, error) {
 		targets, dirs := map[string]bool{}, map[string]bool{}
 		name := strings.ToLower(plan.Name)
 		if !directoryTarget(plan.Name) || strings.Contains(plan.Name, "/") || strings.EqualFold(plan.Name, DirectoryOtherRoot) || plan.ComicID == "" || len(plan.ComicID) > 128 || comics[plan.ComicID] || names[name] {
-			return "", ErrValidation
+			return ErrValidation
 		}
 		comics[plan.ComicID], names[name] = true, true
 		if !add(struct {
 			Comic, Name                                    string
 			Files, Directories, Owned, Documents, Absences int
 		}{plan.ComicID, plan.Name, len(plan.Files), len(plan.Directories), len(plan.OwnedDirectories), len(plan.Documents), len(plan.AbsentSources)}) {
-			return "", ErrValidation
+			return ErrValidation
 		}
 		trash := map[string]bool{}
 		trashCount += len(plan.TrashIDs)
 		if trashCount > MaxNodes {
-			return "", ErrValidation
+			return ErrValidation
 		}
 		for _, id := range plan.TrashIDs {
 			if !directoryID(id) || trash[id] || !add(id) {
-				return "", ErrValidation
+				return ErrValidation
 			}
 			trash[id] = true
 		}
@@ -117,17 +112,17 @@ func DirectoryPlanStamp(plans []DirectoryPlan) (string, error) {
 			key := strings.ToLower(entry.Source)
 			mapped := DirectoryOutputPath(plan.Name, entry.Target)
 			target := strings.ToLower(mapped)
-			known := entry.Size >= 0 && entry.Size <= 20<<30 && digest(entry.SHA256)
-			unknown := entry.Optional && entry.Size == -1 && entry.SHA256 == ""
+			known := entry.Size >= 0 && entry.Size <= 20<<30
+			unknown := entry.Optional && entry.Size == -1
 			if files > MaxDirectoryFiles || !directorySource(entry.Source) || !directoryTarget(mapped) || sources[key] || targets[target] || !known && !unknown || !add(entry) {
-				return "", ErrValidation
+				return ErrValidation
 			}
 			sources[key], targets[target] = true, true
 		}
 		for _, source := range plan.AbsentSources {
 			key := strings.ToLower(source)
 			if !directorySource(source) || sources[key] || !add(source) {
-				return "", ErrValidation
+				return ErrValidation
 			}
 			sources[key] = true
 		}
@@ -136,21 +131,19 @@ func DirectoryPlanStamp(plans []DirectoryPlan) (string, error) {
 			mapped := DirectoryOutputPath(plan.Name, entry.Name)
 			target := strings.ToLower(mapped)
 			if documents > MaxNodes || !directoryTarget(mapped) || targets[target] || len(entry.Data) > MaxSnapshotBytes {
-				return "", ErrValidation
+				return ErrValidation
 			}
-			// 文档在计划 JSON 中为 base64；预算按实际编码长度计算，摘要直接覆盖原始内容。
+			// 文档在计划 JSON 中为 base64；预算按实际编码长度计算，计划戳直接覆盖原始内容。
 			encoded := (len(entry.Data) + 2) / 3 * 4
 			if encoded+budget > MaxDirectoryPlanBytes {
-				return "", ErrValidation
+				return ErrValidation
 			}
 			budget += encoded
-			digest := sha256.Sum256(entry.Data)
 			if !add(struct {
-				Name   string
-				Size   int
-				SHA256 [32]byte
-			}{entry.Name, len(entry.Data), digest}) {
-				return "", ErrValidation
+				Name string
+				Size int
+			}{entry.Name, len(entry.Data)}) {
+				return ErrValidation
 			}
 			targets[target] = true
 		}
@@ -159,7 +152,7 @@ func DirectoryPlanStamp(plans []DirectoryPlan) (string, error) {
 			mapped := DirectoryOutputPath(plan.Name, entry)
 			target := strings.ToLower(mapped)
 			if nodes > MaxNodes || !directoryTarget(mapped) || dirs[target] || targets[target] || !add(entry) {
-				return "", ErrValidation
+				return ErrValidation
 			}
 			dirs[target] = true
 		}
@@ -167,12 +160,12 @@ func DirectoryPlanStamp(plans []DirectoryPlan) (string, error) {
 			nodes++
 			key := strings.ToLower(entry)
 			if nodes > MaxNodes || !directorySource(entry) || owned[key] || !add(entry) {
-				return "", ErrValidation
+				return ErrValidation
 			}
 			owned[key] = true
 		}
 		if directoryPrefixCollision(targets, dirs) {
-			return "", ErrValidation
+			return ErrValidation
 		}
 		parents := map[string]bool{".": true}
 		for name := range dirs {
@@ -183,21 +176,21 @@ func DirectoryPlanStamp(plans []DirectoryPlan) (string, error) {
 				for parent := path.Dir(name); parent != "."; parent = path.Dir(parent) {
 					parents[parent] = true
 					if outputDirectories+len(parents) > MaxNodes+MaxDirectoryBooks {
-						return "", ErrValidation
+						return ErrValidation
 					}
 				}
 			}
 		}
 		outputDirectories += len(parents)
 		if outputDirectories > MaxNodes+MaxDirectoryBooks {
-			return "", ErrValidation
+			return ErrValidation
 		}
 	}
 	// 文件不能兼作祖先目录；独占来源根不能互相包含。
 	if directoryPrefixCollision(sources, nil) || directoryPrefixCollision(owned, nil) {
-		return "", ErrValidation
+		return ErrValidation
 	}
-	return hex.EncodeToString(hash.Sum(nil)), nil
+	return nil
 }
 
 func directoryPrefixCollision(files, dirs map[string]bool) bool {

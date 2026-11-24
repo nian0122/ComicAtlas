@@ -16,5 +16,4 @@ type storedImage struct {
 	MediaID string `json:"mediaId"`
 	Ordinal int    `json:"ordinal"`
 	Path    string `json:"path"`
-	SHA256  string `json:"sha256"`
 }

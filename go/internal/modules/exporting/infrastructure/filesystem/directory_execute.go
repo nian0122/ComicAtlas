@@ -3,11 +3,10 @@ package filesystem
 import (
 	exportdomain "comicatlas.local/backend/internal/modules/exporting/domain"
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
-	"os"
+	"fmt"
 	"path"
+	"strings"
 	"time"
 )
 
@@ -17,13 +16,13 @@ type directoryItem struct {
 	comic, target string
 	position      int
 	location      string
-	hash          string
-	verified      os.FileInfo
 }
 
 type directoryGroup struct {
-	target string
-	items  []*directoryItem
+	target  string
+	items   []*directoryItem
+	receipt string
+	phase   string
 }
 
 type directoryExecution struct {
@@ -35,15 +34,15 @@ type directoryExecution struct {
 	groups       []*directoryGroup
 	items        []*directoryItem
 	controls     map[string][]byte
+	receipts     map[string]*directoryGroup
 	directories  map[string]bool
 	safeDirs     map[string]bool
 	createdDirs  map[string]bool
 	wholeSources map[string]bool
-	buffer       []byte
 	stats        exportdomain.DirectoryExecutionStats
 }
 
-// ExecuteDirectory 只消费唯一不可变计划。每次执行校验内容一次，完成后发布；不创建磁盘运行清单。
+// ExecuteDirectory 只消费唯一不可变计划。每次执行核对文件属性后发布。
 func (files *Files) ExecuteDirectory(ctx context.Context, id string, planning exportdomain.DirectoryPlanningResult, visit func([]exportdomain.DirectoryFileResult) error) (exportdomain.DirectoryReport, error) {
 	files.directoryMutex.Lock()
 	defer files.directoryMutex.Unlock()
@@ -63,17 +62,8 @@ func (files *Files) ExecuteDirectory(ctx context.Context, id string, planning ex
 		return report, err
 	}
 	move.stats.SceneMillis = time.Since(start).Milliseconds()
-	var contentTime, moveTime, persistTime time.Duration
+	var moveTime, persistTime time.Duration
 	for _, group := range move.groups {
-		start = time.Now()
-		for _, item := range group.items {
-			if !item.state.Missing {
-				if err := move.verifyContent(ctx, item); err != nil {
-					return report, err
-				}
-			}
-		}
-		contentTime += time.Since(start)
 		start = time.Now()
 		if !move.published {
 			if err := move.moveGroup(ctx, group); err != nil {
@@ -102,21 +92,10 @@ func (files *Files) ExecuteDirectory(ctx context.Context, id string, planning ex
 		return report, err
 	}
 	move.stats.PublishMillis = time.Since(start).Milliseconds()
-	hash := sha256.New()
-	encoder := json.NewEncoder(hash)
 	for _, item := range move.items {
-		row := item.result()
-		if exportdomain.ValidateDirectoryCompletedResult(row, item.position) != nil {
-			return report, exportdomain.ErrManifest
-		}
-		if err := encoder.Encode(row); err != nil {
-			return report, err
-		}
-		report.Bytes += row.Size
+		report.Bytes += item.state.Size
 	}
 	report.FileCount = len(move.items)
-	report.ResultSHA256 = hex.EncodeToString(hash.Sum(nil))
-	move.stats.ContentMillis = contentTime.Milliseconds()
 	move.stats.MoveMillis = moveTime.Milliseconds()
 	move.stats.PersistMillis = persistTime.Milliseconds()
 	report.Stats = move.stats
@@ -124,8 +103,7 @@ func (files *Files) ExecuteDirectory(ctx context.Context, id string, planning ex
 }
 
 func newDirectoryExecution(files *Files, id string, planning exportdomain.DirectoryPlanningResult) *directoryExecution {
-	binding := sha256.Sum256([]byte(planning.Seal.PlanSHA256 + "\x00" + planning.Seal.FilesSHA256))
-	move := &directoryExecution{files: files, id: id, buffer: make([]byte, 256<<10), base: "staging/exports/" + id, planning: planning, marker: exportdomain.DirectoryMarker{Version: exportdomain.DirectoryPlanVersion, TaskID: id, PlanSHA256: hex.EncodeToString(binding[:])}, controls: map[string][]byte{}, directories: map[string]bool{".": true}, safeDirs: map[string]bool{}, createdDirs: map[string]bool{}, wholeSources: map[string]bool{}}
+	move := &directoryExecution{files: files, id: id, base: "staging/exports/" + id, planning: planning, marker: exportdomain.DirectoryMarker{Version: exportdomain.DirectoryPlanVersion, TaskID: id}, controls: map[string][]byte{}, receipts: map[string]*directoryGroup{}, directories: map[string]bool{".": true}, safeDirs: map[string]bool{}, createdDirs: map[string]bool{}, wholeSources: map[string]bool{}}
 	groups := map[string]*directoryGroup{}
 	addDirectory := func(name string) {
 		for name != "." {
@@ -162,11 +140,27 @@ func newDirectoryExecution(files *Files, id string, planning exportdomain.Direct
 			}
 		}
 	}
+	for _, group := range move.groups {
+		targets := map[string]*directoryItem{}
+		for _, item := range group.items {
+			if !item.state.Missing {
+				targets[strings.ToLower(path.Base(item.target))] = item
+			}
+		}
+		for _, item := range group.items {
+			other := targets[strings.ToLower(path.Base(item.entry.Source))]
+			if !item.state.Missing && other != nil && other != item {
+				group.receipt = fmt.Sprintf(".comicatlas-names-%06d.json", group.items[0].position)
+				move.receipts[group.receipt] = group
+				break
+			}
+		}
+	}
 	return move
 }
 
 func (item *directoryItem) result() exportdomain.DirectoryFileResult {
-	row := exportdomain.DirectoryFileResult{Position: item.position, ComicID: item.comic, Source: item.entry.Source, Target: item.target, Size: item.state.Size, SHA256: item.hash, State: "moved"}
+	row := exportdomain.DirectoryFileResult{Position: item.position, ComicID: item.comic, Source: item.entry.Source, Target: item.target, Size: item.state.Size, Modified: item.state.Modified, State: "moved"}
 	if item.state.Missing {
 		row.State = "initially_missing"
 	}

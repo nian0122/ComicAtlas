@@ -50,7 +50,7 @@ func loadDirectoryHistory(ctx context.Context, tx *sql.Tx, id string, value *exp
 }
 
 func loadDirectoryRetired(ctx context.Context, tx *sql.Tx, id string, value *exportdomain.DirectoryInventory) error {
-	rows, err := tx.QueryContext(ctx, `SELECT s.id,s.replace_media_id,r.kind,r.path,r.sha256,r.size,s.prior_json FROM upload_retired r JOIN upload_sessions s ON s.task_id=r.task_id JOIN media m ON m.id=s.replace_media_id JOIN chapters ch ON ch.id=m.chapter_id WHERE ch.comic_id=? AND r.status='moved' ORDER BY s.id,r.kind LIMIT ?`, id, exportdomain.MaxDirectoryFiles+1)
+	rows, err := tx.QueryContext(ctx, `SELECT s.id,s.replace_media_id,r.kind,r.path,r.size,s.prior_json FROM upload_retired r JOIN upload_sessions s ON s.task_id=r.task_id JOIN media m ON m.id=s.replace_media_id JOIN chapters ch ON ch.id=m.chapter_id WHERE ch.comic_id=? AND r.status='moved' ORDER BY s.id,r.kind LIMIT ?`, id, exportdomain.MaxDirectoryFiles+1)
 	if err != nil {
 		return err
 	}
@@ -58,7 +58,7 @@ func loadDirectoryRetired(ctx context.Context, tx *sql.Tx, id string, value *exp
 	for rows.Next() {
 		var item exportdomain.DirectoryRetired
 		var prior *string
-		if err = rows.Scan(&item.SessionID, &item.MediaID, &item.Kind, &item.OriginalPath, &item.File.SHA256, &item.File.Size, &prior); err != nil {
+		if err = rows.Scan(&item.SessionID, &item.MediaID, &item.Kind, &item.OriginalPath, &item.File.Size, &prior); err != nil {
 			return err
 		}
 		if prior != nil {

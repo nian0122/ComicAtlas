@@ -9,7 +9,6 @@ type WriteEntry struct {
 	Directory bool
 	Name      string
 	Size      int64
-	SHA256    string
 	Open      func(context.Context) (io.ReadCloser, error)
 }
 
@@ -22,6 +21,6 @@ type Artifact struct {
 	VerifiedInfo *WriteReceipt `json:"-"`
 	FileName     string        `json:"fileName"`
 	Size         int64         `json:"size"`
-	SHA256       string        `json:"sha256"`
+	Modified     int64         `json:"modified"`
 	LastSegment  bool          `json:"lastSegment"`
 }

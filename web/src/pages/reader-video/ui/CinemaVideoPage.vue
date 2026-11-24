@@ -5,9 +5,11 @@ import { reactionApi, type ReactionValue } from '@/entities/reaction'
 import { comicApi } from '@/entities/comic'
 import { useHistoryStore } from '@/entities/history'
 import { getApiErrorMessage } from '@/shared/api/http'
-import { ReadingDialog, ReadingIcon } from '@/shared/ui/reading'
+import { ReadingIcon } from '@/shared/ui/reading'
+import { AppDialog } from '@/shared/ui/dialog'
 import { useReadingNavigation } from '@/features/reading-navigation'
 import { nextMark } from '@/features/reading-marks'
+import { useScreenWakeLock } from '@/shared/lib/screen-wake-lock'
 import { formatTime, isVideoItem, seekTarget, sourceOf } from '../model/feed'
 import { useChapterFeed } from '../model/use-chapter-feed'
 import { useFeedSwipe } from '../model/use-feed-swipe'
@@ -16,6 +18,7 @@ const route = useRoute(),
   router = useRouter(),
   history = useHistoryStore(),
   navigation = useReadingNavigation()
+useScreenWakeLock()
 const {
   chapter,
   items,
@@ -853,7 +856,7 @@ function leave(): void {
       preload="metadata"
       aria-hidden="true"
     />
-    <ReadingDialog class="feed-sheet" :open="speedOpen" title="播放速度" @close="closeSpeed">
+    <AppDialog scope="reading" class="feed-sheet" :open="speedOpen" title="播放速度" @close="closeSpeed">
       <div class="feed-speeds" role="group" aria-label="选择播放速度">
         <button
           v-for="rate in playbackRates"
@@ -865,7 +868,7 @@ function leave(): void {
           {{ formatRate(rate) }}×
         </button>
       </div>
-    </ReadingDialog>
+    </AppDialog>
   </div>
 </template>
 

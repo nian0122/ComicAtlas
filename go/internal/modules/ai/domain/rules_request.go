@@ -1,7 +1,6 @@
 package domain
 
 import (
-	"encoding/hex"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -23,8 +22,7 @@ func ValidateRequest(value Request) error {
 	ids := map[string]bool{}
 	var size int64
 	for _, sample := range value.Samples {
-		digest, err := hex.DecodeString(sample.SHA256)
-		if !identifier(sample.MediaID) || ids[sample.MediaID] || sample.Ordinal <= previous || sample.Ordinal > librarydomain.MaxSnapshotMedia || err != nil || len(digest) != 32 || strings.ToLower(sample.SHA256) != sample.SHA256 || sample.Size < 1 || sample.Size > MaxPageBytes || size > MaxImageBytes-sample.Size || sample.Width < 1 || sample.Height < 1 || sample.Width > MaxImageEdge || sample.Height > MaxImageEdge {
+		if !identifier(sample.MediaID) || ids[sample.MediaID] || sample.Ordinal <= previous || sample.Ordinal > librarydomain.MaxSnapshotMedia || sample.Size < 1 || sample.Size > MaxPageBytes || size > MaxImageBytes-sample.Size || sample.Width < 1 || sample.Height < 1 || sample.Width > MaxImageEdge || sample.Height > MaxImageEdge {
 			return ErrValidation
 		}
 		if sample.ContentType != "image/webp" && sample.ContentType != "image/jpeg" && sample.ContentType != "image/png" {

@@ -2,7 +2,9 @@
 import { reactive } from 'vue'
 import type { ImportCandidate } from '@/entities/import-scan'
 import type { Task } from '@/entities/task'
-import { ManagementDialog, ManagementIcon, taskStatusLabels, taskStageLabel } from '@/shared/ui/management'
+import { ManagementIcon, taskStatusLabels, taskStageLabel } from '@/shared/ui/management'
+import { AppDialog } from '@/shared/ui/dialog'
+import { AppPagination } from '@/shared/ui/pagination'
 import { useImportScan } from '../model/use-import-scan'
 const props = defineProps<{ open: boolean; taskId: string; workspaceBusy: boolean }>()
 const emit = defineEmits<{ close: []; accepted: [task: Task]; inspect: [id: string] }>()
@@ -13,7 +15,7 @@ function toggle(candidate: ImportCandidate, event: Event) {
 }
 </script>
 <template>
-  <ManagementDialog :open="open" title="扫描与批量导入" :busy="w.busy" placement="right" @close="emit('close')">
+  <AppDialog :open="open" title="扫描与批量导入" :busy="w.busy" placement="right" @close="emit('close')">
     <p class="mw-muted">
       多本目录先扫描父目录，再勾选漫画；ZIP / CBZ 可直接提交路径列表。每本独立导入，结果在任务中心查看。
     </p>
@@ -143,16 +145,13 @@ function toggle(candidate: ImportCandidate, event: Event) {
           </article>
         </div>
         <footer v-if="w.total > 20" class="mw-pagination">
-          <button class="mw-button" :disabled="w.page <= 1 || w.loading || w.busy" @click="w.results(w.page - 1)">
-            上一页</button
-          ><span>第 {{ w.page }} / {{ Math.ceil(w.total / 20) }} 页</span
-          ><button
-            class="mw-button"
-            :disabled="w.page * 20 >= w.total || w.loading || w.busy"
-            @click="w.results(w.page + 1)"
-          >
-            下一页
-          </button>
+          <AppPagination
+            :page="w.page"
+            :pages="Math.ceil(w.total / 20)"
+            :disabled="w.loading || w.busy"
+            label="扫描结果分页"
+            @change="w.results"
+          />
         </footer>
         <p v-if="!w.total && !w.loading" class="mw-muted">没有可导入的直接子目录，请检查位置后重新扫描。</p>
         <section v-if="w.selected.length" class="scan-selection">
@@ -187,7 +186,7 @@ function toggle(candidate: ImportCandidate, event: Event) {
         扫描在后台执行，可以关闭面板，稍后从任务中心重新打开。仅成功扫描提供完整候选。
       </p>
     </template>
-  </ManagementDialog>
+  </AppDialog>
 </template>
 <style scoped>
 .scan-source {

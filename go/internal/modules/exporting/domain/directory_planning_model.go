@@ -23,16 +23,14 @@ type DirectoryPlacement struct {
 }
 
 type DirectoryExportDocument struct {
-	Version         int                  `json:"version"`
-	Kind            string               `json:"kind"`
-	InventorySHA256 string               `json:"inventorySha256"`
-	Inventory       DirectoryInventory   `json:"inventory"`
-	Files           []DirectoryPlacement `json:"files"`
+	Version   int                  `json:"version"`
+	Kind      string               `json:"kind"`
+	Inventory DirectoryInventory   `json:"inventory"`
+	Files     []DirectoryPlacement `json:"files"`
 }
 
 type DirectoryInventoryIdentity struct {
 	ComicID         string
-	SHA256          string
 	MutationVersion int64
 }
 

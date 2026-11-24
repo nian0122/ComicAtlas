@@ -4,8 +4,6 @@ import (
 	aiports "comicatlas.local/backend/internal/modules/ai/application/ports"
 	aidomain "comicatlas.local/backend/internal/modules/ai/domain"
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -71,15 +69,14 @@ func writeSample(ctx context.Context, form *multipart.Writer, field string, samp
 	if err != nil {
 		return err
 	}
-	digest := sha256.New()
-	size, err := io.CopyBuffer(io.MultiWriter(output, digest), io.LimitReader(sampleReader{input}, sample.Size+1), buffer)
+	size, err := io.CopyBuffer(output, io.LimitReader(sampleReader{input}, sample.Size+1), buffer)
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
 	if err != nil {
 		return err
 	}
-	if size != sample.Size || hex.EncodeToString(digest.Sum(nil)) != sample.SHA256 {
+	if size != sample.Size {
 		return aidomain.ErrSource
 	}
 	return nil

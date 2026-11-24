@@ -4,7 +4,7 @@ import { AppSearch } from '@/shared/ui/search'
 import { comicApi, type Term } from '@/entities/comic'
 import { managementCommands as commands } from '@/features/manage-items'
 import { getApiErrorMessage } from '@/shared/api/http'
-import { ManagementDialog } from '@/shared/ui/management'
+import { AppDialog } from '@/shared/ui/dialog'
 const props = defineProps<{ open: boolean }>()
 const emit = defineEmits<{ close: []; changed: [] }>()
 const kind = ref<'categories' | 'tags'>('categories')
@@ -90,7 +90,7 @@ async function submit() {
 }
 </script>
 <template>
-  <ManagementDialog :open="open" title="分类与标签" :busy="busy" placement="right" @close="emit('close')">
+  <AppDialog :open="open" title="分类与标签" :busy="busy" placement="right" @close="emit('close')">
     <p class="mw-muted">维护作品使用的资料词条。已关联作品的词条需要先解除关联才能删除。</p>
     <div class="mw-inline-actions" role="group" aria-label="词条类型">
       <button
@@ -155,7 +155,7 @@ async function submit() {
         </footer>
       </fieldset>
     </form>
-  </ManagementDialog>
+  </AppDialog>
 </template>
 <style scoped>
 .term-list {

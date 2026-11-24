@@ -2,10 +2,9 @@ package sqlite
 
 import (
 	lifecycledomain "comicatlas.local/backend/internal/modules/lifecycle/domain"
+	"comicatlas.local/backend/internal/platform/stableid"
 	"context"
-	"crypto/sha256"
 	"database/sql"
-	"encoding/hex"
 	"encoding/json"
 	"strings"
 )
@@ -28,9 +27,8 @@ func scanPurgeItem(row interface{ Scan(...any) error }, sealed bool) (lifecycled
 	if len(plan) > lifecycledomain.MaxJournalBytes || json.Unmarshal([]byte(plan), &value.Candidates) != nil || lifecycledomain.ValidateCandidates(value.Candidates) != nil {
 		return value, 0, lifecycledomain.ErrJournal
 	}
-	digest := sha256.Sum256([]byte(plan))
-	value.PlanHash = hex.EncodeToString(digest[:])
-	if sealed && value.PlanHash != expected {
+	value.PlanStamp = stableid.Hex(plan)
+	if sealed && value.PlanStamp != expected {
 		return value, 0, lifecycledomain.ErrJournal
 	}
 	return value, len(plan), nil
@@ -107,7 +105,7 @@ func purgeRun(ctx context.Context, tx interface {
 		return nil, lifecycledomain.ErrConflict
 	}
 	columns := "e." + strings.ReplaceAll(entryColumns, ",", ",e.")
-	rows, err := tx.QueryContext(ctx, "SELECT "+columns+",e.plan_json,p.plan_hash FROM lifecycle_purge_entries p JOIN lifecycle_entries e ON e.id=p.entry_id WHERE p.task_id=? ORDER BY e.id LIMIT ?", task, lifecycledomain.MaxFiles+1)
+	rows, err := tx.QueryContext(ctx, "SELECT "+columns+",e.plan_json,p.plan_stamp FROM lifecycle_purge_entries p JOIN lifecycle_entries e ON e.id=p.entry_id WHERE p.task_id=? ORDER BY e.id LIMIT ?", task, lifecycledomain.MaxFiles+1)
 	if err != nil {
 		return nil, err
 	}

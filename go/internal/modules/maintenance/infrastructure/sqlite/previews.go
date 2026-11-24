@@ -10,12 +10,12 @@ import (
 	"time"
 )
 
-func (repo *repository) CreatePreview(ctx context.Context, id, request, hash string, targets []maintenancedomain.Item, now time.Time) (maintenancedomain.Preview, error) {
+func (repo *repository) CreatePreview(ctx context.Context, id, request, token string, targets []maintenancedomain.Item, now time.Time) (maintenancedomain.Preview, error) {
 	var input maintenancedomain.Request
 	if err := json.Unmarshal([]byte(request), &input); err != nil {
 		return maintenancedomain.Preview{}, err
 	}
-	if err := maintenancedomain.ValidateDangerousConfirmation(input.Operation, hash, hash); err != nil {
+	if err := maintenancedomain.ValidateDangerousConfirmation(input.Operation, token, token); err != nil {
 		return maintenancedomain.Preview{}, err
 	}
 	tx, err := repo.database.Writer.BeginTx(ctx, nil)
@@ -79,7 +79,7 @@ func (repo *repository) CreatePreview(ctx context.Context, id, request, hash str
 		}
 	}
 	if maintenancedomain.RequiresConfirmation(input.Operation) {
-		if _, err = tx.ExecContext(ctx, "INSERT INTO batch_confirmations(preview_id,token_hash,image_count,original_bytes) VALUES(?,?,?,?)", id, hash, summary.Images, summary.OriginalBytes); err != nil {
+		if _, err = tx.ExecContext(ctx, "INSERT INTO batch_confirmations(preview_id,token,image_count,original_bytes) VALUES(?,?,?,?)", id, token, summary.Images, summary.OriginalBytes); err != nil {
 			return maintenancedomain.Preview{}, err
 		}
 	}
@@ -95,8 +95,8 @@ func readPreview(ctx context.Context, tx *sql.Tx, id string) (maintenancedomain.
 	var hq maintenancedomain.HQSummary
 	err := tx.QueryRowContext(ctx, `SELECT p.id,o.options_json,p.created_at,p.expires_at,p.task_id,t.status,p.completed_at,
  c.total_count,c.blocked_count,c.pending_count,c.succeeded_count,c.failed_count,c.active_count,c.cancelled_count,
- COALESCE(confirm.token_hash,''),COALESCE(confirm.image_count,0),COALESCE(confirm.original_bytes,0)
- FROM batch_previews p JOIN batch_preview_counts c ON c.preview_id=p.id JOIN batch_preview_options o ON o.preview_id=p.id LEFT JOIN tasks t ON t.id=p.task_id LEFT JOIN batch_confirmations confirm ON confirm.preview_id=p.id WHERE p.id=?`, id).Scan(&preview.ID, &value.OptionsJSON, &preview.CreatedAt, &preview.ExpiresAt, &preview.TaskID, &preview.TaskStatus, &preview.CompletedAt, &preview.SelectedCount, &preview.BlockedCount, &preview.PendingCount, &preview.SucceededCount, &preview.FailedCount, &preview.ActiveCount, &preview.CancelledCount, &value.ConfirmationHash, &hq.Images, &hq.OriginalBytes)
+ COALESCE(confirm.token,''),COALESCE(confirm.image_count,0),COALESCE(confirm.original_bytes,0)
+ FROM batch_previews p JOIN batch_preview_counts c ON c.preview_id=p.id JOIN batch_preview_options o ON o.preview_id=p.id LEFT JOIN tasks t ON t.id=p.task_id LEFT JOIN batch_confirmations confirm ON confirm.preview_id=p.id WHERE p.id=?`, id).Scan(&preview.ID, &value.OptionsJSON, &preview.CreatedAt, &preview.ExpiresAt, &preview.TaskID, &preview.TaskStatus, &preview.CompletedAt, &preview.SelectedCount, &preview.BlockedCount, &preview.PendingCount, &preview.SucceededCount, &preview.FailedCount, &preview.ActiveCount, &preview.CancelledCount, &value.Confirmation, &hq.Images, &hq.OriginalBytes)
 	if errors.Is(err, sql.ErrNoRows) {
 		return value, jobsdomain.ErrNotFound
 	}

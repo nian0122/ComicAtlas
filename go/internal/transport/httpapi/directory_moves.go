@@ -8,15 +8,13 @@ import (
 )
 
 func (application *Application) serveDirectoryMoves(response http.ResponseWriter, request *http.Request, resource []string) (int, bool) {
-	create := len(resource) == 1 && resource[0] == "directory-move-previews"
-	status := len(resource) == 2 && resource[0] == "directory-move-previews"
-	confirm := len(resource) == 3 && resource[0] == "directory-move-previews" && resource[2] == "confirm"
+	create := len(resource) == 1 && resource[0] == "directory-moves"
 	results := len(resource) == 3 && resource[0] == "tasks" && resource[2] == "directory-move-results"
-	if !create && !confirm && !results && !status {
+	if !create && !results {
 		return 0, false
 	}
 	method := http.MethodPost
-	if results || status {
+	if results {
 		method = http.MethodGet
 	}
 	if request.Method != method {
@@ -34,40 +32,15 @@ func (application *Application) serveDirectoryMoves(response http.ResponseWriter
 			}
 		}
 	}
-	if application.DirectoryPreviews == nil || application.DirectoryPreflight == nil || application.DirectoryMoves == nil || application.Jobs == nil {
+	if application.DirectoryMoves == nil || application.Jobs == nil {
 		return fail(response, 503, "UNAVAILABLE", "文件夹移出暂不可用"), true
 	}
 	if create {
-		var body exportdomain.DirectoryPreviewRequest
+		var body exportdomain.DirectoryMoveCreateRequest
 		if !decodeBodyLimit(response, request, &body, 2<<20) {
 			return 400, true
 		}
-		value, err := application.DirectoryPreflight.Create(request.Context(), body.ComicIDs)
-		if err != nil {
-			return applicationError(response, err), true
-		}
-		application.Jobs.Wake()
-		response.Header().Set("Location", "/api/v1/directory-move-previews/"+value.ID)
-		writeJSON(response, 202, DataResponse[exportdomain.DirectoryPreflightView]{Data: value})
-		return 202, true
-	}
-	if status {
-		value, err := application.DirectoryPreflight.Status(request.Context(), resource[1])
-		if err != nil {
-			return applicationError(response, err), true
-		}
-		writeData(response, value)
-		return 200, true
-	}
-	if confirm {
-		var body exportdomain.DirectoryConfirmRequest
-		if !decodeBody(response, request, &body) {
-			return 400, true
-		}
-		if err := exportdomain.ValidateDirectoryConsent(body); err != nil {
-			return applicationError(response, err), true
-		}
-		task, err := application.DirectoryPreviews.Submit(request.Context(), resource[1], body.ConfirmationToken, request.Header.Get("Idempotency-Key"))
+		task, err := application.DirectoryMoves.Create(request.Context(), body.ComicIDs, request.Header.Get("Idempotency-Key"))
 		if err != nil {
 			return applicationError(response, err), true
 		}

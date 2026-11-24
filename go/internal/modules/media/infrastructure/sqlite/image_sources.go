@@ -18,9 +18,9 @@ func imageSource(ctx context.Context, db imageQuery, id string) (mediadomain.Ima
 	where := "m.id=?"
 	var candidate mediadomain.ImageCandidate
 
-	err := db.QueryRowContext(ctx, `SELECT m.id,m.relative_path,m.sha256,m.sha256,m.size,m.hq_state,l.relative_path,l.sha256,l.size,l.valid,EXISTS(SELECT 1 FROM legacy_page_sources s WHERE s.media_id=m.id AND json_extract(s.source_json,'$.metadataOnly')=1)
+	err := db.QueryRowContext(ctx, `SELECT m.id,m.relative_path,m.modified_ns,m.size,CASE WHEN m.hq_state='available' AND m.size=0 AND l.original_state IN ('missing','unbound') THEN 'released' ELSE m.hq_state END,l.relative_path,l.size,l.valid
 	 FROM active_media m JOIN active_chapters ch ON ch.id=m.chapter_id LEFT JOIN image_lq l ON l.media_id=m.id
-	 WHERE `+where+` AND m.media_type='image' ORDER BY ch.global_order,m.page_number,m.id LIMIT 1`, id).Scan(&candidate.Source.MediaID, &candidate.Source.Path, &candidate.Source.SHA256, &candidate.Source.OriginalSHA256, &candidate.Source.Size, &candidate.HQState, &candidate.LQPath, &candidate.LQSHA256, &candidate.LQSize, &candidate.LQValid, &candidate.MetadataOnly)
+	 WHERE `+where+` AND m.media_type='image' ORDER BY ch.global_order,m.page_number,m.id LIMIT 1`, id).Scan(&candidate.Source.MediaID, &candidate.Source.Path, &candidate.Source.Modified, &candidate.Source.Size, &candidate.HQState, &candidate.LQPath, &candidate.LQSize, &candidate.LQValid)
 	if errors.Is(err, sql.ErrNoRows) {
 		err = mediadomain.ErrLQNotFound
 	}

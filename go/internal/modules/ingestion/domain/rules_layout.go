@@ -3,8 +3,7 @@ package domain
 import (
 	librarydomain "comicatlas.local/backend/internal/modules/library/domain"
 	"comicatlas.local/backend/internal/platform/natural"
-	"crypto/sha256"
-	"encoding/hex"
+	"comicatlas.local/backend/internal/platform/stableid"
 	"path"
 	"sort"
 	"strings"
@@ -20,8 +19,7 @@ func MediaFormat(name string) (string, string, bool) {
 	return value[0], value[1], ok
 }
 func stable(prefix, taskID, name string) string {
-	sum := sha256.Sum256([]byte(taskID + "\x00" + name))
-	return prefix + hex.EncodeToString(sum[:16])
+	return prefix + stableid.Hex(taskID+"\x00"+name)
 }
 func NormalizeLayout(identity string, comic librarydomain.Comic, files []string) (Layout, error) {
 	if len(files) < 1 {

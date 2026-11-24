@@ -5,8 +5,7 @@ import (
 	"strings"
 )
 
-// CanOpenOriginal 只按原件状态判断可读性。摘要不是阅读门禁：读取不校验内容，
-// 未知摘要的媒体同样按登记路径打开；摘要只在复制、派生和恢复等操作中使用。
+// CanOpenOriginal 按登记的原件状态判断可读性。
 func CanOpenOriginal(state string) bool {
 	return state == "available" || state == "releasing"
 }
@@ -34,8 +33,8 @@ func AddHQPreview(preview *HQReleasePreview, current HQCurrent) {
 		counts.Releasing = 1
 	case "available":
 		counts.Available, counts.OriginalBytes = 1, current.Size
-		if current.SourceSHA256 == "" {
-			counts.MissingSourceSHA256 = 1
+		if current.Size < 1 {
+			counts.Invalid = 1
 		}
 		if current.LQ == nil || !current.LQ.Valid {
 			counts.MissingLQ = 1
@@ -55,9 +54,6 @@ func AddHQCounts(preview *HQReleasePreview, counts HQImageCounts) {
 	}
 	if counts.MissingLQ > 0 {
 		appendHQBlocker(preview, "LQ_NOT_READY")
-	}
-	if counts.MissingSourceSHA256 > 0 {
-		appendHQBlocker(preview, "HQ_SOURCE_SHA256_MISSING")
 	}
 	if counts.Invalid > 0 {
 		appendHQBlocker(preview, "HQ_STATE_INVALID")
@@ -88,7 +84,7 @@ func appendHQBlocker(preview *HQReleasePreview, code string) {
 	preview.Blockers = append(preview.Blockers, code)
 }
 func MatchHQSnapshot(item HQReleaseItem, current HQCurrent) bool {
-	return current.SourceSHA256 != "" && (current.State == "available" || current.State == "releasing") && current.SourcePath == item.SourcePath && current.SourceSHA256 == item.SourceSHA256 && current.Size == item.OriginalBytes && current.LQ != nil && current.LQ.Valid && current.LQ.Path == item.LQ.Path && current.LQ.SHA256 == item.LQ.SHA256 && current.LQ.Size == item.LQ.Size
+	return (current.State == "available" || current.State == "releasing") && current.SourcePath == item.SourcePath && current.Modified == item.SourceModified && current.Size == item.OriginalBytes && current.LQ != nil && current.LQ.Valid && current.LQ.Path == item.LQ.Path && current.LQ.Width == item.LQ.Width && current.LQ.Height == item.LQ.Height && current.LQ.Size == item.LQ.Size
 }
 func ValidHQPath(value string) bool {
 	return strings.HasPrefix(value, "hq/") && path.Clean(value) == value && !strings.ContainsAny(value, "\\:")

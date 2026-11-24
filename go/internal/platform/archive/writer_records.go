@@ -5,7 +5,6 @@ const zip32Max = uint64(1<<32 - 1)
 type writeRecord struct {
 	directory  bool
 	dataOffset uint64
-	sourceSHA  string
 	name       string
 	size       uint64
 	crc        uint32

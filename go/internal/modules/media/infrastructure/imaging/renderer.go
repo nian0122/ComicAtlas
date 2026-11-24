@@ -3,11 +3,10 @@ package imaging
 import (
 	"bytes"
 	"context"
-	"crypto/sha256"
 	"encoding/binary"
-	"encoding/hex"
 	"errors"
 	"image"
+	"image/color"
 	_ "image/gif"
 	_ "image/jpeg"
 	"image/png"
@@ -15,7 +14,6 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
-	"strings"
 	"time"
 
 	mediaports "comicatlas.local/backend/internal/modules/media/application/ports"
@@ -30,23 +28,57 @@ type executor interface {
 	Run(context.Context, process.Request) (process.Result, error)
 }
 type Renderer struct {
-	runner       executor
-	cwebp, djpeg string
-	pixels       int64
-	space        func(string) (diskspace.Snapshot, error)
+	runner  executor
+	cwebp   string
+	djpeg   string
+	pixels  int64
+	scratch string
+	space   func(string) (diskspace.Snapshot, error)
+	budget  *pixelBudget
 }
 
-func New(runner *process.Runner, cwebp, djpeg string, pixels int64) *Renderer {
-	return &Renderer{runner: runner, cwebp: cwebp, djpeg: djpeg, pixels: pixels, space: diskspace.Measure}
+// New 中的 scratch 只保存可重建的解码中间文件，正式产物仍写入调用者的媒体暂存根。
+// 解码预算按像素权重共享，容量至少容纳单张上限，避免大图永远等不到全部权重。
+func New(runner executor, cwebp, djpeg string, pixels int64, scratch string, concurrency int) *Renderer {
+	if pixels < 1 {
+		pixels = mediadomain.DefaultImagePixels
+	}
+	units := max(int64(concurrency), (mediadomain.MaxImageDecodePixels+pixels-1)/pixels)
+	return &Renderer{runner: runner, cwebp: cwebp, djpeg: djpeg, pixels: pixels, scratch: scratch, space: diskspace.Measure, budget: newPixelBudget(units)}
 }
 
 var _ mediaports.ImageRenderer = (*Renderer)(nil)
 
-func (renderer *Renderer) Render(ctx context.Context, request mediadomain.ImageRequest) (artifact mediadomain.ImageArtifact, err error) {
-	if !filepath.IsAbs(request.SourcePath) || !filepath.IsAbs(request.WorkRoot) || request.SourceSHA256 != "" && len(request.SourceSHA256) != 64 {
-		return artifact, mediadomain.ErrImageInvalid
+const (
+	sourceCopyMinBytes int64 = 1 << 20
+	sourceCopyMaxBytes int64 = 64 << 20
+)
+
+// copySourceFile 把原件整块复制到快速暂存，避免解码工具在慢卷上做小缓冲读取。
+func copySourceFile(ctx context.Context, source *os.File, target string, expected int64) error {
+	if _, err := source.Seek(0, io.SeekStart); err != nil {
+		return mediadomain.ErrImageIO
 	}
-	if _, decodeErr := hex.DecodeString(request.SourceSHA256); decodeErr != nil {
+	file, err := os.OpenFile(target, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
+	if err != nil {
+		return mediadomain.ErrImageIO
+	}
+	written, copyErr := io.CopyBuffer(contextWriter{ctx: ctx, writer: file}, contextReader{ctx: ctx, reader: source}, make([]byte, 1<<20))
+	closeErr := file.Close()
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+	if copyErr != nil || closeErr != nil {
+		return mediadomain.ErrImageIO
+	}
+	if written != expected {
+		return mediadomain.ErrImageChanged
+	}
+	return nil
+}
+
+func (renderer *Renderer) Render(ctx context.Context, request mediadomain.ImageRequest) (artifact mediadomain.ImageArtifact, err error) {
+	if !filepath.IsAbs(request.SourcePath) || !filepath.IsAbs(request.WorkRoot) || !filepath.IsAbs(renderer.scratch) {
 		return artifact, mediadomain.ErrImageInvalid
 	}
 	input, err := os.Open(request.SourcePath)
@@ -71,27 +103,53 @@ func (renderer *Renderer) Render(ctx context.Context, request mediadomain.ImageR
 	if format == "jpeg" {
 		orientation = jpegOrientation(prefix)
 	}
-	plan, err := mediadomain.PlanImage(mediadomain.ImageHeader{Width: config.Width, Height: config.Height, Format: format, Orientation: orientation}, request.Spec, renderer.pixels)
+	header := mediadomain.ImageHeader{
+		Width: config.Width, Height: config.Height, Format: format, Orientation: orientation,
+		SimpleLossyWebP: format == "webp" && isSimpleLossyWebP(prefix, before.Size()),
+	}
+	plan, err := mediadomain.PlanImage(header, request.Spec)
 	if err != nil {
 		return artifact, err
 	}
-	if err = verifySourceDigest(ctx, input, request.SourceSHA256); err != nil {
+	units := (int64(plan.DecodeWidth)*int64(plan.DecodeHeight) + renderer.pixels - 1) / renderer.pixels
+	release, err := renderer.budget.acquire(ctx, units)
+	if err != nil {
 		return artifact, err
 	}
-	if renderer.cwebp == "" || !filepath.IsAbs(renderer.cwebp) || (plan.JPEGScale < 8 && (renderer.djpeg == "" || !filepath.IsAbs(renderer.djpeg))) {
+	defer release()
+	if !filepath.IsAbs(renderer.cwebp) || (format == "jpeg" && !filepath.IsAbs(renderer.djpeg)) {
 		return artifact, mediadomain.ErrImageUnavailable
 	}
-	workspaceBytes, err := imageWorkspaceBytes(plan, format, orientation, prefix)
+	mode := selectInputMode(plan, format, orientation, prefix)
+	intermediateBytes, err := imageIntermediateBytes(plan, mode)
 	if err != nil {
 		return artifact, err
+	}
+	// 媒体卷上的小缓冲读取远慢于本地暂存；大原件先整块复制再交给解码工具。
+	copySource := before.Size() >= sourceCopyMinBytes && before.Size() <= sourceCopyMaxBytes
+	requiredBytes := intermediateBytes
+	if copySource {
+		requiredBytes += before.Size()
 	}
 	space := renderer.space
 	if space == nil {
 		space = diskspace.Measure
 	}
-	if err = requireWorkspaceSpace(space, request.WorkRoot, workspaceBytes); err != nil {
+	if err = os.MkdirAll(renderer.scratch, 0750); err != nil {
 		return artifact, mediadomain.ErrImageIO
 	}
+	if err = requireWorkspaceSpace(space, renderer.scratch, requiredBytes); err != nil {
+		return artifact, mediadomain.ErrImageIO
+	}
+	scratch, err := os.MkdirTemp(renderer.scratch, "image-")
+	if err != nil {
+		return artifact, mediadomain.ErrImageIO
+	}
+	defer func() {
+		if cleanupErr := os.RemoveAll(scratch); cleanupErr != nil {
+			err = errors.Join(err, mediadomain.ErrImageIO)
+		}
+	}()
 	workspace, err := os.MkdirTemp(request.WorkRoot, "image-")
 	if err != nil {
 		return artifact, mediadomain.ErrImageIO
@@ -104,28 +162,57 @@ func (renderer *Renderer) Render(ctx context.Context, request mediadomain.ImageR
 			}
 		}
 	}()
-	decodedPath := request.SourcePath
-	if plan.JPEGScale < 8 {
-		decodedPath = filepath.Join(workspace, "scaled.ppm")
-		if err = renderer.execute(ctx, renderer.djpeg, []string{"-maxmemory", "128m", "-scale", strconv.Itoa(plan.JPEGScale) + "/8", "-outfile", decodedPath, request.SourcePath}); err != nil {
+	toolSource := request.SourcePath
+	if copySource {
+		toolSource = filepath.Join(scratch, "source")
+		if err = copySourceFile(ctx, input, toolSource, before.Size()); err != nil {
 			return artifact, err
 		}
-		if format == "jpeg" && orientation == 1 {
-			if err = validatePPM(decodedPath, plan.DecodeWidth, plan.DecodeHeight); err != nil {
-				return artifact, mediadomain.ErrImageInvalid
-			}
+		afterCopy, statErr := input.Stat()
+		if statErr != nil || !os.SameFile(before, afterCopy) || afterCopy.Size() != before.Size() || !afterCopy.ModTime().Equal(before.ModTime()) {
+			return artifact, mediadomain.ErrImageChanged
 		}
 	}
-	normalized := filepath.Join(workspace, "normalized.png")
-	encodedSource := normalized
-	if (format == "png" && isStaticPNG(prefix)) || (format == "webp" && isStaticWebP(prefix)) {
-		// cwebp 可直接读取静态 PNG/WebP 并缩放，避免 Go 再解码、复制整幅像素并写中间 PNG。
-		encodedSource = request.SourcePath
-	} else if format == "jpeg" && plan.JPEGScale < 8 && orientation == 1 {
-		// djpeg 已按预算缩小；cwebp 可直接读取 PNM，跳过 Go 整帧解码和中间 PNG。
+	decodedPath := filepath.Join(scratch, "decoded")
+	normalized := filepath.Join(scratch, "normalized.png")
+	encodedSource := toolSource
+	switch mode {
+	case jpegPPM, orientedJPEG:
+		outputFormat := "-pnm"
+		if mode == orientedJPEG {
+			outputFormat = "-bmp"
+		}
+		args := []string{"-maxmemory", "192m", "-scale", strconv.Itoa(plan.JPEGScale) + "/8", outputFormat}
+		// 灰度图强制输出三通道；CMYK 使用 djpeg 的输出颜色转换。
+		if config.ColorModel == color.GrayModel {
+			args = append(args, "-rgb")
+		}
+		args = append(args, "-outfile", decodedPath, toolSource)
+		if err = renderer.execute(ctx, scratch, renderer.djpeg, args); err != nil {
+			return artifact, err
+		}
 		encodedSource = decodedPath
-	} else if err = normalize(ctx, decodedPath, normalized, plan, orientation); err != nil {
-		return artifact, err
+	case webpPPM:
+		decoder := filepath.Join(filepath.Dir(renderer.cwebp), "dwebp"+filepath.Ext(renderer.cwebp))
+		args := []string{"-resize", strconv.Itoa(plan.Width), strconv.Itoa(plan.Height), "-ppm", "-o", decodedPath, "--", toolSource}
+		if err = renderer.execute(ctx, scratch, decoder, args); err != nil {
+			return artifact, err
+		}
+		encodedSource = decodedPath
+	}
+	switch mode {
+	case jpegPPM, webpPPM:
+		if err = validatePPM(encodedSource, plan.DecodeWidth, plan.DecodeHeight); err != nil {
+			if mode == jpegPPM {
+				return artifact, mediadomain.ErrImageInvalid
+			}
+			return artifact, mediadomain.ErrImageOutput
+		}
+	case orientedJPEG, normalizedInput:
+		if err = normalize(ctx, encodedSource, normalized, plan, orientation); err != nil {
+			return artifact, err
+		}
+		encodedSource = normalized
 	}
 	outputBytes, err := imageOutputBytes(plan)
 	if err != nil {
@@ -135,7 +222,7 @@ func (renderer *Renderer) Render(ctx context.Context, request mediadomain.ImageR
 		return artifact, mediadomain.ErrImageIO
 	}
 	output := filepath.Join(workspace, "image.webp")
-	if err = renderer.execute(ctx, renderer.cwebp, []string{"-quiet", "-q", strconv.Itoa(request.Spec.Quality), "-m", "4", "-low_memory", "-metadata", "none", "-resize", strconv.Itoa(plan.Width), strconv.Itoa(plan.Height), "-o", output, "--", encodedSource}); err != nil {
+	if err = renderer.execute(ctx, scratch, renderer.cwebp, []string{"-quiet", "-q", strconv.Itoa(request.Spec.Quality), "-m", "2", "-low_memory", "-metadata", "none", "-resize", strconv.Itoa(plan.Width), strconv.Itoa(plan.Height), "-o", output, "--", encodedSource}); err != nil {
 		return artifact, err
 	}
 	after, err := input.Stat()
@@ -143,19 +230,11 @@ func (renderer *Renderer) Render(ctx context.Context, request mediadomain.ImageR
 	if err != nil || currentErr != nil || !os.SameFile(before, current) || before.Size() != after.Size() || !before.ModTime().Equal(after.ModTime()) {
 		return artifact, mediadomain.ErrImageChanged
 	}
-	if err = verifySourceDigest(ctx, input, request.SourceSHA256); err != nil {
-		return artifact, err
-	}
 	artifact, err = inspectArtifact(ctx, output, workspace, plan)
 	if err != nil {
 		return artifact, err
 	}
-	// 临时中间文件不随产物保留，发布者只需处理一个 WebP。
-	for _, name := range []string{normalized, filepath.Join(workspace, "scaled.ppm")} {
-		if removeErr := os.Remove(name); removeErr != nil && !errors.Is(removeErr, os.ErrNotExist) {
-			return mediadomain.ImageArtifact{}, mediadomain.ErrImageIO
-		}
-	}
+	// 中间文件都在快速暂存目录，产物目录只保留最终 WebP。
 	keep = true
 	return artifact, nil
 }
@@ -171,33 +250,53 @@ func requireWorkspaceSpace(measure func(string) (diskspace.Snapshot, error), pat
 	return nil
 }
 
-// imageWorkspaceBytes 在开辟暂存目录和启动编码工具前，按像素估算产物与中间文件所需空间。
-func imageWorkspaceBytes(plan mediadomain.ImagePlan, format string, orientation int, prefix []byte) (int64, error) {
-	budget, err := imageOutputBytes(plan)
-	if err != nil {
-		return 0, err
-	}
-	intermediateBytesPerPixel := int64(0)
+type inputMode uint8
+
+const (
+	directInput inputMode = iota
+	jpegPPM
+	orientedJPEG
+	webpPPM
+	normalizedInput
+)
+
+// 暂存空间估算和实际编码共用同一次输入路径选择。
+func selectInputMode(plan mediadomain.ImagePlan, format string, orientation int, prefix []byte) inputMode {
 	switch {
+	case plan.ScaleWebP:
+		return webpPPM
 	case format == "png" && isStaticPNG(prefix), format == "webp" && isStaticWebP(prefix):
-		// 静态 PNG/WebP 直通 cwebp，不创建中间媒体文件。
-	case format == "jpeg" && plan.JPEGScale < 8 && orientation == 1:
-		intermediateBytesPerPixel = 3 // djpeg 的 PPM 暂存。
+		return directInput
+	case format == "jpeg" && orientation == 1:
+		return jpegPPM
+	case format == "jpeg":
+		return orientedJPEG
 	default:
-		intermediateBytesPerPixel = 4 // Go 规范化 PNG 的像素上界。
+		return normalizedInput
 	}
-	if intermediateBytesPerPixel == 0 {
-		return budget, nil
+}
+
+// imageIntermediateBytes 按像素估算快速暂存目录中可能出现的 PPM、BMP 或 PNG 中间文件。
+func imageIntermediateBytes(plan mediadomain.ImagePlan, mode inputMode) (int64, error) {
+	switch mode {
+	case directInput:
+		return 0, nil
+	case jpegPPM, webpPPM:
+		return imageFileBytes(plan.DecodeWidth, plan.DecodeHeight, 3)
+	case orientedJPEG:
+		// 对齐后的 BMP 和规范化 PNG 同时占用暂存空间。
+		bmp, err := imageFileBytes(plan.DecodeWidth, plan.DecodeHeight, 4)
+		if err != nil {
+			return 0, err
+		}
+		png, err := imageFileBytes(plan.DecodeWidth, plan.DecodeHeight, 4)
+		if err != nil {
+			return 0, err
+		}
+		return bmp + png, nil
+	default:
+		return imageFileBytes(plan.DecodeWidth, plan.DecodeHeight, 4) // Go 规范化 PNG 的像素上界。
 	}
-	intermediateBytes, err := imageFileBytes(plan.DecodeWidth, plan.DecodeHeight, intermediateBytesPerPixel)
-	if err != nil {
-		return 0, err
-	}
-	maxInt64 := int64(^uint64(0) >> 1)
-	if budget > maxInt64-intermediateBytes {
-		return 0, mediadomain.ErrImageLimit
-	}
-	return budget + intermediateBytes, nil
 }
 
 func imageOutputBytes(plan mediadomain.ImagePlan) (int64, error) {
@@ -222,13 +321,23 @@ func imageFileBytes(width, height int, bytesPerPixel int64) (int64, error) {
 	return pixels*bytesPerPixel + overhead, nil
 }
 
-func (renderer *Renderer) execute(ctx context.Context, executable string, args []string) error {
-	_, err := renderer.runner.Run(ctx, process.Request{Executable: executable, Args: args, Timeout: 2 * time.Minute})
+func (renderer *Renderer) execute(ctx context.Context, workspace, executable string, args []string) error {
+	result, err := renderer.runner.Run(ctx, process.Request{Directory: workspace, Executable: executable, Args: args, Timeout: 2 * time.Minute})
 	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 		return err
 	}
 	if errors.Is(err, process.ErrStart) {
 		return mediadomain.ErrImageUnavailable
+	}
+	if errors.Is(err, process.ErrExit) && executable == renderer.djpeg {
+		if bytes.Contains(result.Stderr, []byte("Memory limit exceeded")) {
+			return mediadomain.ErrImageLimit
+		}
+		// libjpeg-turbo 3 以退出码 2 表示解码完成但有可恢复告警（例如局部哈夫曼码损坏、
+		// 提前结束），输出仍是完整图像；后续仍核对 PPM/BMP 尺寸与最终产物。
+		if result.ExitCode == 2 {
+			return nil
+		}
 	}
 	if err != nil {
 		return mediadomain.ErrImageProcess
@@ -275,39 +384,7 @@ func normalize(ctx context.Context, source, target string, plan mediadomain.Imag
 	return nil
 }
 
-func verifySourceDigest(ctx context.Context, file *os.File, expected string) error {
-	if expected == "" {
-		return ctx.Err()
-	}
-	digest, err := sourceDigest(ctx, file)
-	if err != nil {
-		return err
-	}
-	if !strings.EqualFold(digest, expected) {
-		return mediadomain.ErrImageChanged
-	}
-	return nil
-}
-
-func sourceDigest(ctx context.Context, file *os.File) (string, error) {
-	if _, err := file.Seek(0, io.SeekStart); err != nil {
-		return "", mediadomain.ErrImageIO
-	}
-	hash := sha256.New()
-	count, err := io.CopyBuffer(hash, contextReader{ctx: ctx, reader: io.LimitReader(file, mediadomain.MaxImageInputBytes+1)}, make([]byte, 64<<10))
-	if err != nil {
-		if ctx.Err() != nil {
-			return "", ctx.Err()
-		}
-		return "", mediadomain.ErrImageIO
-	}
-	if count > mediadomain.MaxImageInputBytes {
-		return "", mediadomain.ErrImageChanged
-	}
-	return hex.EncodeToString(hash.Sum(nil)), nil
-}
-
-func inspectArtifact(ctx context.Context, path, workspace string, plan mediadomain.ImagePlan) (mediadomain.ImageArtifact, error) {
+func inspectArtifact(ctx context.Context, path, directory string, plan mediadomain.ImagePlan) (mediadomain.ImageArtifact, error) {
 	file, err := os.Open(path)
 	if err != nil {
 		return mediadomain.ImageArtifact{}, mediadomain.ErrImageOutput
@@ -324,21 +401,10 @@ func inspectArtifact(ctx context.Context, path, workspace string, plan mediadoma
 	if err != nil || config.Width != plan.Width || config.Height != plan.Height {
 		return mediadomain.ImageArtifact{}, mediadomain.ErrImageOutput
 	}
-	if _, err = file.Seek(0, io.SeekStart); err != nil {
-		return mediadomain.ImageArtifact{}, mediadomain.ErrImageIO
-	}
-	hash := sha256.New()
-	count, err := io.CopyBuffer(hash, contextReader{ctx: ctx, reader: file}, make([]byte, 64<<10))
-	if err != nil || count != info.Size() {
-		if ctx.Err() != nil {
-			return mediadomain.ImageArtifact{}, ctx.Err()
-		}
-		return mediadomain.ImageArtifact{}, mediadomain.ErrImageOutput
-	}
 	if err = ctx.Err(); err != nil {
 		return mediadomain.ImageArtifact{}, err
 	}
-	return mediadomain.ImageArtifact{Path: path, TemporaryDirectory: workspace, Width: config.Width, Height: config.Height, Size: info.Size(), SHA256: hex.EncodeToString(hash.Sum(nil)), JPEGScale: plan.JPEGScale}, nil
+	return mediadomain.ImageArtifact{Path: path, TemporaryDirectory: directory, Width: config.Width, Height: config.Height, Size: info.Size(), JPEGScale: plan.JPEGScale}, nil
 }
 
 // 校验完整容器长度与块边界；像素编码由受信任的 cwebp 生成，不再分配整帧重复解码。

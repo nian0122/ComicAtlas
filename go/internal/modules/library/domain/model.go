@@ -52,7 +52,7 @@ type Media struct {
 	Size           int64               `json:"size"`
 	Width          *int                `json:"width"`
 	Height         *int                `json:"height"`
-	SHA256         string              `json:"-"`
+	Modified       int64               `json:"-"`
 	ContentURL     string              `json:"contentUrl"`
 }
 

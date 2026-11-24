@@ -64,7 +64,7 @@ func (service *Repair) Run(parent context.Context, task jobsdomain.Task) (comple
 	if _, err = NewMediaVerifier(source).Verify(ctx, task.ComicID, document.Sidecar, nil); err != nil {
 		return completion, err
 	}
-	write := service.repository.RepairWriter(run, document.Sidecar, task.Attempt, document.SHA256, time.Now().UTC().Format(jobsdomain.TimestampFormat))
+	write := service.repository.RepairWriter(run, document.Sidecar, task.Attempt, time.Now().UTC().Format(jobsdomain.TimestampFormat))
 	if err = source.Recheck(ctx); err != nil {
 		return completion, err
 	}

@@ -19,12 +19,12 @@ type MetadataRepository interface {
 	MetadataRun(context.Context, string) (storagedomain.MetadataRun, error)
 	PrepareMetadata(context.Context, string, librarydomain.Snapshot, []storagedomain.MediaObservation, string) error
 	ActivateMetadata(context.Context, string, persistence.WriteAction) error
-	MetadataCompletion(string, string) persistence.WriteAction
+	MetadataCompletion(string) persistence.WriteAction
 	MetadataItems(context.Context, string, int, int) (storagedomain.MetadataPage, error)
 }
 type MetadataFiles interface {
 	ObserveMetadata(context.Context, librarydomain.Snapshot, func(int) error) ([]storagedomain.MediaObservation, error)
-	PublishMetadata(context.Context, string, string, []byte, string) error
+	PublishMetadata(context.Context, string, string, []byte) error
 }
 type MetadataVideo interface {
 	Inspect(context.Context, string) (mediadomain.Video, error)

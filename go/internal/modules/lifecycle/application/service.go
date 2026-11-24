@@ -100,6 +100,20 @@ func (service *Service) Run(ctx context.Context, task jobsdomain.Task) (jobsport
 		return jobsports.Completion{}, jobsdomain.NewFailure(jobsdomain.FailureLifecycle, err)
 	}
 	total := len(value.Candidates)
+	var journal lifecycledomain.FileJournal
+	if value.Operation == "restore" || value.Operation == "trash" && value.TrashMoveStarted {
+		journal, err = service.files.Journal(run, value.Entry.ID)
+		if err != nil {
+			return jobsports.Completion{}, jobsdomain.NewFailure(jobsdomain.FailureLifecycle, err)
+		}
+		total = len(journal.Files)
+	} else if value.Operation == "trash" && value.Entry.Target.Type == "comic" {
+		roots, err := lifecycledomain.TrashDirectories(value.Entry.Target)
+		if err != nil {
+			return jobsports.Completion{}, err
+		}
+		total = len(lifecycledomain.DirectoryPlan(value.Candidates, roots))
+	}
 	var recorder *resultRecorder
 	if value.Operation != "purge" {
 		if err = service.repository.BeginFileResults(run, task.ID, task.Attempt, value.Operation, total); err != nil {
@@ -122,11 +136,7 @@ func (service *Service) Run(ctx context.Context, task jobsdomain.Task) (jobsport
 	} else if value.Operation == "purge" {
 		err = service.runPurge(run, value.PurgeItems)
 	} else {
-		var journal lifecycledomain.FileJournal
-		journal, err = service.files.Journal(run, value.Entry.ID)
-		if err == nil {
-			err = lifecycledomain.MatchJournalCandidates(journal, value.Candidates)
-		}
+		err = lifecycledomain.MatchJournalCandidates(journal, value.Candidates)
 		if err == nil {
 			err = lifecycledomain.MatchTrashDirectories(journal, value.Entry.Target)
 		}

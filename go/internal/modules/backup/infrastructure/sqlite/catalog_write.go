@@ -15,7 +15,7 @@ func (writer *catalogWriter) Add(ctx context.Context, entry domain.Entry) error 
 	if err != nil {
 		return err
 	}
-	if _, err = writer.database.ExecContext(ctx, "INSERT INTO backup_entries VALUES(?,?,?,?,?)", entry.Path, entry.Kind, entry.Size, entry.SHA256, entry.ModifiedAt); err != nil {
+	if _, err = writer.database.ExecContext(ctx, "INSERT INTO backup_entries VALUES(?,?,?,?)", entry.Path, entry.Kind, entry.Size, entry.ModifiedAt); err != nil {
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}

@@ -69,16 +69,16 @@ func (service *Service) Run(ctx context.Context, task jobsdomain.Task) (completi
 	}()
 	run, cancel := context.WithTimeout(ctx, 2*time.Hour)
 	defer cancel()
-	snapshot, hash, err := service.repository.Load(run, task.ID)
+	snapshot, err := service.repository.Load(run, task.ID)
 	if err != nil {
 		return completion, err
 	}
 	if task.Type != "archive_export" || snapshot.Comic.ID != task.ComicID || task.TargetID != task.ComicID {
 		return completion, exportdomain.ErrManifest
 	}
-	manifest := exportdomain.Manifest{Version: 2, TaskID: task.ID, SnapshotSHA: hash}
+	manifest := exportdomain.Manifest{Version: 4, TaskID: task.ID}
 	if task.Manifest != nil {
-		if json.Unmarshal([]byte(*task.Manifest), &manifest) != nil || exportdomain.ValidateManifest(manifest, task.ID, hash, snapshot) != nil {
+		if json.Unmarshal([]byte(*task.Manifest), &manifest) != nil || exportdomain.ValidateManifest(manifest, task.ID, snapshot) != nil {
 			return completion, exportdomain.ErrManifest
 		}
 	} else {
@@ -106,7 +106,7 @@ func (service *Service) Run(ctx context.Context, task jobsdomain.Task) (completi
 		if err != nil {
 			return completion, err
 		}
-		if err = exportdomain.ValidateManifest(manifest, task.ID, hash, snapshot); err != nil {
+		if err = exportdomain.ValidateManifest(manifest, task.ID, snapshot); err != nil {
 			return completion, err
 		}
 		data, marshalErr := json.Marshal(manifest)

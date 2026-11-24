@@ -30,7 +30,7 @@ func (reader *catalogReader) Find(ctx context.Context, path string) (domain.Entr
 	if !domain.ValidPath(path) {
 		return entry, domain.ErrInvalid
 	}
-	err := reader.database.QueryRowContext(ctx, "SELECT path,kind,size,sha256,modified_at FROM backup_entries WHERE path=?", path).Scan(&entry.Path, &entry.Kind, &entry.Size, &entry.SHA256, &entry.ModifiedAt)
+	err := reader.database.QueryRowContext(ctx, "SELECT path,kind,size,modified_at FROM backup_entries WHERE path=?", path).Scan(&entry.Path, &entry.Kind, &entry.Size, &entry.ModifiedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return entry, domain.ErrNotFound
 	}
@@ -47,14 +47,14 @@ func (reader *catalogReader) Each(ctx context.Context, consume func(domain.Entry
 	}
 	last, seen := "", int64(0)
 	for {
-		rows, err := reader.database.QueryContext(ctx, "SELECT path,kind,size,sha256,modified_at FROM backup_entries WHERE path>? ORDER BY path LIMIT 128", last)
+		rows, err := reader.database.QueryContext(ctx, "SELECT path,kind,size,modified_at FROM backup_entries WHERE path>? ORDER BY path LIMIT 128", last)
 		if err != nil {
 			return catalogError(ctx, true)
 		}
 		batch := make([]domain.Entry, 0, 128)
 		for rows.Next() {
 			var entry domain.Entry
-			if rows.Scan(&entry.Path, &entry.Kind, &entry.Size, &entry.SHA256, &entry.ModifiedAt) != nil || domain.ValidateEntry(entry) != nil {
+			if rows.Scan(&entry.Path, &entry.Kind, &entry.Size, &entry.ModifiedAt) != nil || domain.ValidateEntry(entry) != nil {
 				rows.Close()
 				return domain.ErrInvalid
 			}

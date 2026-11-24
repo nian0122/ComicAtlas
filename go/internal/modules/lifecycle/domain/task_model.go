@@ -24,6 +24,7 @@ type Request struct {
 	Operation    string `json:"operation"`
 	EntryID      string `json:"entryId"`
 	Confirmation string `json:"confirmation,omitempty"`
+	Stamp        string `json:"-"`
 }
 
 type Run struct {

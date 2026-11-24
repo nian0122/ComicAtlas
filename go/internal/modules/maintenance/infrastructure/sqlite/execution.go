@@ -10,14 +10,14 @@ import (
 	"time"
 )
 
-func (repo *repository) Admission(id, hash string) jobsports.Admission {
+func (repo *repository) Admission(id, token string) jobsports.Admission {
 	return func(task string) persistence.WriteAction {
 		return func(ctx context.Context, tx *sql.Tx) error {
 			record, err := readPreview(ctx, tx, id)
 			if err != nil {
 				return err
 			}
-			if err = maintenancedomain.ValidateDangerousConfirmation(record.Preview.Operation, record.ConfirmationHash, hash); err != nil {
+			if err = maintenancedomain.ValidateDangerousConfirmation(record.Preview.Operation, record.Confirmation, token); err != nil {
 				return err
 			}
 			if err = maintenancedomain.ValidateConfirmation(record.Preview.TaskID, record.Preview.ExpiresAt, record.Preview.EligibleCount, time.Now().UTC()); err != nil {

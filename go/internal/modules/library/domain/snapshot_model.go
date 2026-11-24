@@ -11,12 +11,11 @@ const MaxSnapshotBytes = 32 << 20
 type StoredLQ struct {
 	mediadomain.LQRecord
 	StoragePath string `json:"storagePath"`
-	Hash        string `json:"hash"`
 }
 type StoredMedia struct {
 	Media
+	Modified    int64     `json:"modified,omitempty"`
 	StoragePath string    `json:"storagePath"`
-	Hash        string    `json:"hash,omitempty"`
 	LQFile      *StoredLQ `json:"lqFile"`
 }
 type Snapshot struct {
@@ -32,7 +31,6 @@ type SidecarSnapshot struct {
 	ComicID  string
 	Revision int64
 	Data     json.RawMessage
-	SHA256   string
 }
 
 type StorageDelta struct {

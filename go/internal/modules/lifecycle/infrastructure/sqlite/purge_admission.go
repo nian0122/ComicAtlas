@@ -46,7 +46,7 @@ func (repo *repository) ConfirmPurge(ctx context.Context, expected lifecycledoma
 	if count >= lifecycledomain.MaxConfirmations {
 		return jobsdomain.ErrFull
 	}
-	if _, err = tx.ExecContext(ctx, "INSERT INTO lifecycle_confirmations(token_hash,entry_id,scope_hash,retention_days,expires_at) VALUES(?,?,?,?,?)", tokenHash, current.Root.ID, preview.Stamp, days, expires); err != nil {
+	if _, err = tx.ExecContext(ctx, "INSERT INTO lifecycle_confirmations(token,entry_id,scope_stamp,retention_days,expires_at) VALUES(?,?,?,?,?)", tokenHash, current.Root.ID, preview.Stamp, days, expires); err != nil {
 		return err
 	}
 	return tx.Commit()
@@ -75,7 +75,7 @@ func (repo *repository) PurgeAdmission(request lifecycledomain.Request, days int
 			}
 			var stamp, expires string
 			var retained int
-			err = tx.QueryRowContext(ctx, "SELECT scope_hash,retention_days,expires_at FROM lifecycle_confirmations WHERE token_hash=? AND entry_id=? AND consumed_by IS NULL", request.Confirmation, request.EntryID).Scan(&stamp, &retained, &expires)
+			err = tx.QueryRowContext(ctx, "SELECT scope_stamp,retention_days,expires_at FROM lifecycle_confirmations WHERE token=? AND entry_id=? AND consumed_by IS NULL", request.Confirmation, request.EntryID).Scan(&stamp, &retained, &expires)
 			if errors.Is(err, sql.ErrNoRows) {
 				return lifecycledomain.ErrConfirmation
 			}
@@ -89,14 +89,14 @@ func (repo *repository) PurgeAdmission(request lifecycledomain.Request, days int
 			if err = sealPurge(ctx, tx, scope, task); err != nil {
 				return err
 			}
-			_, err = tx.ExecContext(ctx, "UPDATE lifecycle_confirmations SET consumed_by=? WHERE token_hash=?", task, request.Confirmation)
+			_, err = tx.ExecContext(ctx, "UPDATE lifecycle_confirmations SET consumed_by=? WHERE token=?", task, request.Confirmation)
 			return err
 		}
 	}
 }
 
 // PurgeSnapshotAdmission 只与已确认批次的原子准入回调组合使用。
-// Confirmation 在此表示冻结范围摘要；不会生成或消费单项清理令牌。
+// Confirmation 在此表示冻结范围标识；不会生成或消费单项清理令牌。
 func (repo *repository) PurgeSnapshotAdmission(request lifecycledomain.Request, days int) jobsports.Admission {
 	return func(task string) persistence.WriteAction {
 		return func(ctx context.Context, tx *sql.Tx) error {
@@ -118,8 +118,10 @@ func (repo *repository) PurgeSnapshotAdmission(request lifecycledomain.Request, 
 			if err != nil {
 				return err
 			}
-			if err = lifecycledomain.ValidatePurgeSnapshot(request.Confirmation, preview); err != nil {
-				return err
+			if request.Stamp != "" {
+				if err = lifecycledomain.ValidatePurgeSnapshot(request.Stamp, preview); err != nil {
+					return err
+				}
 			}
 			return sealPurge(ctx, tx, scope, task)
 		}
@@ -131,7 +133,7 @@ func sealPurge(ctx context.Context, tx *sql.Tx, scope lifecycledomain.PurgeScope
 		return err
 	}
 	for _, item := range scope.Items {
-		if _, err := tx.ExecContext(ctx, "INSERT INTO lifecycle_purge_entries VALUES(?,?,?)", task, item.Entry.ID, item.PlanHash); err != nil {
+		if _, err := tx.ExecContext(ctx, "INSERT INTO lifecycle_purge_entries VALUES(?,?,?)", task, item.Entry.ID, item.PlanStamp); err != nil {
 			return err
 		}
 	}

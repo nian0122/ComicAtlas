@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { DynamicScroller, DynamicScrollerItem } from 'vue-virtual-scroller'
 import ManagementImage from './ManagementImage.vue'
 interface Row {
   key: string | number
@@ -14,21 +15,33 @@ const emit = defineEmits<{ more: [] }>()
 </script>
 
 <template>
-  <ul v-if="rows.length" class="mw-batch-items">
-    <li v-for="row in rows" :key="row.key">
-      <ManagementImage :src="row.cover ?? null" :alt="row.title" />
-      <div class="mw-batch-copy">
-        <strong>{{ row.title }}</strong>
-        <p v-if="row.meta" class="mw-muted">{{ row.meta }}</p>
-        <p v-if="row.reason" class="mw-batch-reason">{{ row.reason }}</p>
-        <details v-if="row.errorCode">
-          <summary>诊断详情</summary>
-          <code>{{ row.errorCode }}</code>
-        </details>
-      </div>
-      <span v-if="row.status" class="mw-batch-status">{{ row.status }}</span>
-    </li>
-  </ul>
+  <div v-if="rows.length" class="mw-batch-items">
+    <DynamicScroller
+      :items="rows"
+      key-field="key"
+      :min-item-size="76"
+      page-mode
+      list-tag="ul"
+      item-tag="li"
+      list-class="mw-batch-list"
+    >
+      <template #default="{ item: row, index, active }">
+        <DynamicScrollerItem class="mw-batch-row" :item="row" :active="active" :index="index">
+          <ManagementImage :src="row.cover ?? null" :alt="row.title" />
+          <div class="mw-batch-copy">
+            <strong>{{ row.title }}</strong>
+            <p v-if="row.meta" class="mw-muted">{{ row.meta }}</p>
+            <p v-if="row.reason" class="mw-batch-reason">{{ row.reason }}</p>
+            <details v-if="row.errorCode">
+              <summary>诊断详情</summary>
+              <code>{{ row.errorCode }}</code>
+            </details>
+          </div>
+          <span v-if="row.status" class="mw-batch-status">{{ row.status }}</span>
+        </DynamicScrollerItem>
+      </template>
+    </DynamicScroller>
+  </div>
   <button v-if="rows.length < total" type="button" class="mw-button" :disabled="loadingMore" @click="emit('more')">
     加载更多清单（{{ rows.length }} / {{ total }}）
   </button>
@@ -36,13 +49,16 @@ const emit = defineEmits<{ more: [] }>()
 
 <style scoped>
 .mw-batch-items {
-  list-style: none;
   margin: var(--atlas-space-4) 0 var(--atlas-space-2);
-  padding: 0;
   max-height: 280px;
   overflow-y: auto;
 }
-.mw-batch-items li {
+.mw-batch-items :deep(.mw-batch-list) {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.mw-batch-row {
   display: grid;
   grid-template-columns: 40px minmax(0, 1fr) auto;
   gap: var(--atlas-space-3);

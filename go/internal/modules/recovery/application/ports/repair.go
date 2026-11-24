@@ -11,5 +11,5 @@ type RepairRepository interface {
 	RepairAdmission(string, recoverydomain.RepairRequest) jobsports.Admission
 	RepairRun(context.Context, string) (recoverydomain.RepairRun, error)
 	RepairRetry(string) persistence.WriteAction
-	RepairWriter(recoverydomain.RepairRun, recoverydomain.Sidecar, int, string, string) persistence.WriteAction
+	RepairWriter(recoverydomain.RepairRun, recoverydomain.Sidecar, int, string) persistence.WriteAction
 }

@@ -1,13 +1,10 @@
 package filesystem
 
 import (
-	"bytes"
 	librarydomain "comicatlas.local/backend/internal/modules/library/domain"
 	recoverydomain "comicatlas.local/backend/internal/modules/recovery/domain"
 	storagedomain "comicatlas.local/backend/internal/modules/storage/domain"
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"io"
@@ -61,9 +58,8 @@ func (files *Files) ReadSidecar(ctx context.Context, comic string) (result recov
 	if err != nil || !os.SameFile(before, opened) || opened.Size() != before.Size() {
 		return result, recoverydomain.ErrChanged
 	}
-	first := sha256.New()
 	limit := &io.LimitedReader{R: input, N: before.Size() + 1}
-	decoder := json.NewDecoder(io.TeeReader(&checkedReader{ctx: ctx, reader: limit}, first))
+	decoder := json.NewDecoder(&checkedReader{ctx: ctx, reader: limit})
 	decoder.UseNumber()
 	// 先按真实 Go 线格式逐项验证数量、重复键和准确字段大小写，再分配快照数组。
 	if err = validateWire(ctx, decoder, reflect.TypeOf(storagedomain.MetadataSidecar{})); err != nil {
@@ -75,9 +71,8 @@ func (files *Files) ReadSidecar(ctx context.Context, comic string) (result recov
 	if _, err = input.Seek(0, io.SeekStart); err != nil {
 		return result, err
 	}
-	second := sha256.New()
 	limit = &io.LimitedReader{R: input, N: before.Size() + 1}
-	decoder = json.NewDecoder(io.TeeReader(&checkedReader{ctx: ctx, reader: limit}, second))
+	decoder = json.NewDecoder(&checkedReader{ctx: ctx, reader: limit})
 	decoder.DisallowUnknownFields()
 	decoder.UseNumber()
 	result.Sidecar, err = decodeSidecar(decoder)
@@ -88,7 +83,7 @@ func (files *Files) ReadSidecar(ctx context.Context, comic string) (result recov
 	if decoder.Decode(&extra) != io.EOF {
 		return result, recoverydomain.ErrMetadata
 	}
-	if limit.N != 1 || !bytes.Equal(first.Sum(nil), second.Sum(nil)) {
+	if limit.N != 1 {
 		return result, recoverydomain.ErrChanged
 	}
 	if err = recoverydomain.ValidateSidecar(comic, result.Sidecar); err != nil {
@@ -108,7 +103,7 @@ func (files *Files) ReadSidecar(ctx context.Context, comic string) (result recov
 	if err = files.parents(name); err != nil {
 		return result, err
 	}
-	result.Path, result.Size, result.SHA256 = name, before.Size(), hex.EncodeToString(first.Sum(nil))
+	result.Path, result.Size = name, before.Size()
 	if files.observe != nil {
 		err = files.observe(name, before)
 	}
@@ -140,8 +135,6 @@ func decodeSidecar(decoder *json.Decoder) (value recoverydomain.Sidecar, err err
 			err = decoder.Decode(&value.ObservedAt)
 		case "taskId":
 			err = decoder.Decode(&value.TaskID)
-		case "baselineSha256":
-			err = decoder.Decode(&value.BaselineSHA256)
 		case "snapshot":
 			err = decoder.Decode(&value.Snapshot)
 		case "observations":

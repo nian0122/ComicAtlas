@@ -2,8 +2,16 @@ package imaging
 
 import "encoding/binary"
 
-// isStaticWebP accepts only complete static-image headers for direct cwebp input.
-// Animation chunks, unknown layouts and truncated headers use Go normalization.
+// 只接受单个 VP8 图块，排除动画、透明通道和无损编码。dwebp 会读入压缩文件，故单独限制输入体积。
+func isSimpleLossyWebP(header []byte, size int64) bool {
+	if size > 128<<20 || len(header) < 20 || string(header[:4]) != "RIFF" || string(header[8:16]) != "WEBPVP8 " {
+		return false
+	}
+	chunk := int64(binary.LittleEndian.Uint32(header[16:20]))
+	return int64(binary.LittleEndian.Uint32(header[4:8]))+8 == size && 20+chunk+(chunk&1) == size
+}
+
+// 仅将可识别的静态 WebP 直接交给 cwebp；其余布局走规范化路径。
 func isStaticWebP(header []byte) bool {
 	if len(header) < 20 || string(header[:4]) != "RIFF" || string(header[8:12]) != "WEBP" {
 		return false

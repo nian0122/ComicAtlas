@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { AppSearch } from '@/shared/ui/search'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
-import { ManagementPagedFeed } from '@/shared/ui/pagination'
+import { AppPagination, ManagementPagedFeed } from '@/shared/ui/pagination'
 import {
   storageApi,
   operationBlockers,
+  StorageUsageSummary,
   type Statistics,
   type StorageObject,
   type StorageQuery,
@@ -63,7 +64,6 @@ const observed = computed(() => {
         { key: 'lq', name: '轻量副本', usage: usage.lq },
         { key: 'covers', name: '漫画封面', usage: usage.covers },
         { key: 'metadata', name: '作品元数据', usage: usage.metadata ?? { files: 0, bytes: 0 } },
-        { key: 'temp', name: '解压临时文件', usage: usage.temp },
         { key: 'staging', name: '任务暂存', usage: usage.staging },
         { key: 'trash', name: '回收文件', usage: usage.trash },
         { key: 'exports', name: '导出产物', usage: usage.exports },
@@ -80,8 +80,7 @@ const observedMedia = computed(() => {
 const nonRegistered = computed(() =>
   observed.value.filter(
     (item) =>
-      ['metadata', 'temp', 'staging', 'trash', 'exports', 'retired', 'other'].includes(item.key) &&
-      item.usage.bytes > 0,
+      ['metadata', 'staging', 'trash', 'exports', 'retired', 'other'].includes(item.key) && item.usage.bytes > 0,
   ),
 )
 const nonRegisteredBytes = computed(() => nonRegistered.value.reduce((sum, item) => sum + item.usage.bytes, 0))
@@ -142,13 +141,6 @@ const attentionItems = computed(() => [
     hint: '可生成轻量副本',
     count: inventory.value.missingLq ?? 0,
   },
-  {
-    key: 'missing_source_sha256' as const,
-    label: '缺少原件 SHA-256',
-    value: `${inventory.value.missingSourceSha256Images} 张`,
-    hint: '在漫画详情中核对媒体',
-    count: inventory.value.missingSourceSha256Images,
-  },
 ])
 const visibleAttention = computed(() => attentionItems.value.filter((item) => item.count > 0))
 const hasAttention = computed(() => visibleAttention.value.length > 0)
@@ -167,10 +159,6 @@ const listCountLabel = computed(() => {
   const prefix = listError.value ? '上次结果：' : ''
   const attentionText = attention.value ? ` · ${attentionLabel.value}` : ''
   return `${prefix}共 ${total.value} 部${attentionText} · ${sortLabel.value}`
-})
-const currentAttention = computed(() => {
-  const value = current.value?.inventory
-  return !!value && !!((value.availableImages ?? 0) || (value.missingLq ?? 0) || value.missingSourceSha256Images)
 })
 function actualPercent(value: number) {
   return observedTotal.value > 0 ? `${(value / observedTotal.value) * 100}%` : '0%'
@@ -273,7 +261,7 @@ async function load(append = false) {
   }
 }
 function changePage(next: number) {
-  if (loading.value || loadingMore.value) return
+  if (loading.value) return
   page.value = next
   loadedPage.value = next
   void load()
@@ -555,9 +543,6 @@ onBeforeUnmount(() => {
                   <span v-if="(item.inventory.missingLq ?? 0) > 0" class="mw-storage-flag">
                     缺 {{ item.inventory.missingLq }} 张副本
                   </span>
-                  <span v-if="item.inventory.missingSourceSha256Images > 0" class="mw-storage-flag is-warn">
-                    缺少原件 SHA-256 {{ item.inventory.missingSourceSha256Images }} 张
-                  </span>
                 </div>
                 <div class="mw-storage-components">
                   <span>原件 {{ formatBytes(item.inventory.hq.bytes) }}</span
@@ -581,55 +566,29 @@ onBeforeUnmount(() => {
       <p v-if="detailLoading" role="status">正在读取明细…</p>
       <template v-else-if="current"
         ><h2>{{ current.title }}</h2>
-        <strong class="mw-storage-inspector-total">{{ formatBytes(current.totalBytes) }}</strong>
-        <dl class="mw-storage-inspector-grid">
-          <div>
-            <dt>原件</dt>
-            <dd>{{ formatBytes(current.inventory.hq.bytes) }}</dd>
-          </div>
-          <div>
-            <dt>轻量副本</dt>
-            <dd>{{ formatBytes(current.inventory.lq.bytes) }}</dd>
-          </div>
-          <div>
-            <dt>漫画封面</dt>
-            <dd>{{ formatBytes(current.inventory.covers.bytes) }}</dd>
-          </div>
-        </dl>
-        <dl v-if="currentAttention" class="mw-storage-inspector-facts">
-          <div>
-            <dt>可释放原件</dt>
-            <dd>{{ formatBytes(current.inventory.availableBytes ?? 0) }}</dd>
-          </div>
-          <div>
-            <dt>缺失副本</dt>
-            <dd>{{ current.inventory.missingLq ?? 0 }} 张</dd>
-          </div>
-          <div>
-            <dt>缺少原件 SHA-256</dt>
-            <dd>{{ current.inventory.missingSourceSha256Images }} 张</dd>
-          </div>
-        </dl>
-        <button
-          class="mw-button"
-          :disabled="!writable || !current.operations.generateLq.canSubmit"
-          @click="current && emit('generate-single', current)"
-        >
-          生成轻量副本
-        </button>
-        <p v-if="!current.operations.generateLq.canSubmit" class="mw-muted">
-          {{ operationBlockers(current.operations.generateLq.blockers) }}
-        </p>
-        <button
-          class="mw-button mw-button-danger"
-          :disabled="!writable"
-          @click="emit('release', 'comics', current.id, current.title)"
-        >
-          预览释放整部图片原件
-        </button>
-        <p v-if="!current.operations.releaseHq.canSubmit" class="mw-muted">
-          {{ operationBlockers(current.operations.releaseHq.blockers) }}
-        </p>
+        <StorageUsageSummary :object="current" />
+        <div class="mw-storage-inspector-actions">
+          <button
+            class="mw-button"
+            :disabled="!writable || !current.operations.generateLq.canSubmit"
+            @click="current && emit('generate-single', current)"
+          >
+            生成轻量副本
+          </button>
+          <p v-if="!current.operations.generateLq.canSubmit" class="mw-muted">
+            {{ operationBlockers(current.operations.generateLq.blockers) }}
+          </p>
+          <button
+            class="mw-button mw-button-danger"
+            :disabled="!writable"
+            @click="emit('release', 'comics', current.id, current.title)"
+          >
+            预览释放整部图片原件
+          </button>
+          <p v-if="!current.operations.releaseHq.canSubmit" class="mw-muted">
+            {{ operationBlockers(current.operations.releaseHq.blockers) }}
+          </p>
+        </div>
         <h3>章节占用</h3>
         <div v-for="chapter in chapters" :key="chapter.id" class="mw-chapter-usage">
           <div class="mw-chapter-copy">
@@ -647,17 +606,14 @@ onBeforeUnmount(() => {
           </button>
         </div>
         <div class="mw-inline-actions">
-          <button class="mw-button" :disabled="chapterPage <= 1" @click="inspect(current.id, chapterPage - 1)">
-            上一页</button
-          ><button
-            class="mw-button"
-            :disabled="chapterPage * 20 >= chapterTotal"
-            @click="inspect(current.id, chapterPage + 1)"
-          >
-            下一页
-          </button>
-        </div></template
-      >
+          <AppPagination
+            :page="chapterPage"
+            :pages="Math.max(1, Math.ceil(chapterTotal / 20))"
+            :disabled="detailLoading"
+            label="作品章节分页"
+            @change="inspect(current.id, $event)"
+          /></div
+      ></template>
     </aside>
   </div>
 </template>
@@ -1033,45 +989,10 @@ onBeforeUnmount(() => {
   font-size: 18px;
   line-height: 1.35;
 }
-.mw-storage-inspector-total {
-  display: block;
-  margin: var(--atlas-space-1) 0 var(--atlas-space-4);
-  font-size: 22px;
-  font-weight: 500;
-  font-variant-numeric: tabular-nums;
-}
-.mw-storage-inspector-grid {
+.mw-storage-inspector-actions {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--atlas-space-2);
-  margin: 0 0 var(--atlas-space-4);
-  padding: var(--atlas-space-3) 0;
-  border-top: 1px solid var(--atlas-line);
-  border-bottom: 1px solid var(--atlas-line);
-}
-.mw-storage-inspector-grid dt,
-.mw-storage-inspector-facts dt {
-  color: var(--atlas-muted);
-  font-size: 11px;
-}
-.mw-storage-inspector-grid dd,
-.mw-storage-inspector-facts dd {
-  margin: var(--atlas-space-1) 0 0;
-  font-size: 12px;
-  font-variant-numeric: tabular-nums;
-}
-.mw-storage-inspector-facts {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--atlas-space-2);
-  margin: 0 0 var(--atlas-space-4);
-  padding: var(--atlas-space-4);
-  border: 1px solid var(--atlas-line);
-  border-radius: 8px;
-  background: var(--atlas-raised);
-}
-.mw-storage-inspector-facts dd {
-  color: var(--atlas-warning);
+  gap: 8px;
+  margin: var(--atlas-space-4) 0;
 }
 .mw-chapter-copy {
   display: grid;
@@ -1142,10 +1063,6 @@ onBeforeUnmount(() => {
   .mw-storage-toolbar .atlas-search {
     flex-basis: 100%;
     max-width: none;
-  }
-  .mw-storage-inspector-facts,
-  .mw-storage-inspector-grid {
-    grid-template-columns: 1fr;
   }
 }
 </style>

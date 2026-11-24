@@ -7,7 +7,7 @@ import (
 type StoredMedia struct {
 	librarydomain.Media
 	StoragePath string `json:"storagePath"`
-	Hash        string `json:"hash"`
+	Modified    int64  `json:"modified"`
 }
 
 type Manifest struct {

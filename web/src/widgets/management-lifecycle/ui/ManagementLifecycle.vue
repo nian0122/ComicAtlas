@@ -4,7 +4,9 @@ import { reactive } from 'vue'
 import { entryStates, lifecycleOperations, fileFacts, fileRoles, auditIssues } from '@/entities/lifecycle'
 import type { Task } from '@/entities/task'
 import type { TrashEntry } from '@/entities/trash'
-import { ManagementDialog, ManagementIcon, ManagementImage, formatDate, taskStatusLabels } from '@/shared/ui/management'
+import { ManagementIcon, ManagementImage, formatDate, taskStatusLabels } from '@/shared/ui/management'
+import { AppDialog } from '@/shared/ui/dialog'
+import { AppPagination } from '@/shared/ui/pagination'
 import { useLifecycle } from '../model/use-lifecycle'
 const props = defineProps<{
   open: boolean
@@ -23,14 +25,7 @@ const types = { comic: '漫画', chapter: '章节', media: '媒体' }
 const auditStates = Object.fromEntries(Object.entries(entryStates).filter(([value]) => value !== 'purged'))
 </script>
 <template>
-  <ManagementDialog
-    :open="open"
-    title="回收文件核对"
-    :busy="w.busy"
-    placement="right"
-    size="results"
-    @close="emit('close')"
-  >
+  <AppDialog :open="open" title="回收文件核对" :busy="w.busy" placement="right" size="results" @close="emit('close')">
     <p class="mw-muted">按回收历史核对已登记文件，不扫描未知目录。检查不会修改文件或内容状态；继续原操作需另行确认。</p>
     <div class="lifecycle-layout">
       <section class="lifecycle-history" aria-label="回收历史选择">
@@ -77,20 +72,14 @@ const auditStates = Object.fromEntries(Object.entries(entryStates).filter(([valu
           </button>
         </div>
         <footer class="mw-pagination">
-          <span>{{ w.total }} 条 · 第 {{ w.page }} 页</span
-          ><button
-            class="mw-button"
-            :disabled="w.busy || w.listLoading || w.page <= 1"
-            @click="historyPage(w.page - 1)"
-          >
-            上一页</button
-          ><button
-            class="mw-button"
-            :disabled="w.busy || w.listLoading || w.page * 20 >= w.total"
-            @click="historyPage(w.page + 1)"
-          >
-            下一页
-          </button>
+          <span>{{ w.total }} 条</span
+          ><AppPagination
+            :page="w.page"
+            :pages="Math.max(1, Math.ceil(w.total / 20))"
+            :disabled="w.busy || w.listLoading"
+            label="回收历史分页"
+            @change="historyPage"
+          />
         </footer>
       </section>
       <section class="lifecycle-report" aria-label="回收核对报告">
@@ -188,20 +177,14 @@ const auditStates = Object.fromEntries(Object.entries(entryStates).filter(([valu
               </article>
               <p v-if="!w.observations.items.length" class="mw-muted">尚无已持久化的文件观察。条目问题仍按摘要显示。</p>
               <footer class="mw-pagination">
-                <span>观察 {{ w.observations.total }} 项 · 第 {{ w.observationPage }} 页</span
-                ><button
-                  class="mw-button"
-                  :disabled="w.loading || w.busy || w.observationPage <= 1"
-                  @click="w.paginate('observations', w.observationPage - 1)"
-                >
-                  上一页观察</button
-                ><button
-                  class="mw-button"
-                  :disabled="w.loading || w.busy || w.observationPage * 20 >= w.observations.total"
-                  @click="w.paginate('observations', w.observationPage + 1)"
-                >
-                  下一页观察
-                </button>
+                <span>观察 {{ w.observations.total }} 项</span
+                ><AppPagination
+                  :page="w.observationPage"
+                  :pages="Math.max(1, Math.ceil(w.observations.total / 20))"
+                  :disabled="w.loading || w.busy"
+                  label="文件观察分页"
+                  @change="w.paginate('observations', $event)"
+                />
               </footer>
             </div>
             <section class="lifecycle-repair">
@@ -264,22 +247,15 @@ const auditStates = Object.fromEntries(Object.entries(entryStates).filter(([valu
                   <small>{{ formatDate(item.observedAt) }}</small>
                 </article>
                 <footer class="mw-pagination">
-                  <span>记录 {{ w.results.total }} 项 · 第 {{ w.resultPage }} 页</span
-                  ><button
-                    class="mw-button"
-                    :disabled="w.loading || w.busy || w.resultPage <= 1"
-                    @click="w.paginate('results', w.resultPage - 1)"
-                  >
-                    上一页执行记录</button
-                  ><button
-                    class="mw-button"
-                    :disabled="w.loading || w.busy || w.resultPage * 20 >= w.results.total"
-                    @click="w.paginate('results', w.resultPage + 1)"
-                  >
-                    下一页执行记录
-                  </button>
-                </footer></template
-              >
+                  <span>记录 {{ w.results.total }} 项</span
+                  ><AppPagination
+                    :page="w.resultPage"
+                    :pages="Math.max(1, Math.ceil(w.results.total / 20))"
+                    :disabled="w.loading || w.busy"
+                    label="执行记录分页"
+                    @change="w.paginate('results', $event)"
+                  /></footer
+              ></template>
             </section>
           </template>
         </div>
@@ -290,7 +266,7 @@ const auditStates = Object.fromEntries(Object.entries(entryStates).filter(([valu
         </div>
       </section>
     </div>
-  </ManagementDialog>
+  </AppDialog>
 </template>
 <style scoped>
 .lifecycle-layout {

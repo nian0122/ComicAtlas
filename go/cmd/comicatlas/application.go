@@ -67,7 +67,7 @@ func runServer(configuration config.Config) error {
 	}
 	books := libraryapp.New(librarysqlite.New(database))
 	queue := jobsapp.NewStore(jobssqlite.New(database))
-	runner, err := process.New(1, 64<<10)
+	runner, err := process.New(configuration.ImageConcurrency+1, 64<<10)
 	if err != nil {
 		return err
 	}
@@ -85,10 +85,17 @@ func runServer(configuration config.Config) error {
 		return err
 	}
 	defer lifecycleFiles.Close()
-	images := mediaapp.NewImages(mediaimaging.New(runner, configuration.CwebpPath, configuration.DjpegPath, configuration.ImagePixels))
+	images := mediaapp.NewImages(mediaimaging.New(runner, configuration.CwebpPath, configuration.DjpegPath, configuration.ImagePixels, configuration.ImageScratchDirectory, configuration.ImageConcurrency), configuration.ImageConcurrency)
+	// 媒体暂存清扫和图片解码工作区清扫各自计时：前者包含有界的空壳目录清扫，
+	// 用掉共享预算时不应让后者误报超时而阻止启动。
 	cleanupContext, stopCleanup := context.WithTimeout(ctx, 3*time.Second)
 	err = mediafiles.CleanStartup(cleanupContext, configuration.MediaDirectory)
 	stopCleanup()
+	if err == nil {
+		scratchContext, stopScratch := context.WithTimeout(ctx, 3*time.Second)
+		err = mediaimaging.CleanScratch(scratchContext, configuration.ImageScratchDirectory)
+		stopScratch()
+	}
 	if err != nil {
 		return fmt.Errorf("媒体临时工作区启动清理失败: %w", err)
 	}
@@ -97,7 +104,7 @@ func runServer(configuration config.Config) error {
 		return err
 	}
 	defer analysis.Close()
-	lqFiles, err := mediafiles.New(configuration.MediaDirectory, images)
+	lqFiles, err := mediafiles.New(configuration.MediaDirectory, images, configuration.ImageScratchDirectory)
 	if err != nil {
 		return err
 	}
@@ -108,7 +115,7 @@ func runServer(configuration config.Config) error {
 	lifecycle := lifecycleapp.New(lifecycleRepository, lifecycleFiles, queue, coverService, configuration.TrashRetentionDays)
 	trashCovers := lifecycleapp.NewCovers(lifecycleRepository, lifecyclefiles.NewCoverReader(lifecycleFiles))
 	uploads := mediaapp.NewUploads(mediasqlite.New(database), lqFiles, mediadomain.UploadLimits{MinFreeBytes: configuration.UploadMinFreeBytes, MinFreePercent: configuration.UploadMinFreePercent})
-	lq := mediaapp.NewLQ(mediasqlite.New(database), lqFiles, queue)
+	lq := mediaapp.NewLQ(mediasqlite.New(database), lqFiles, queue, configuration.ImageConcurrency)
 	hq := mediaapp.NewHQ(mediasqlite.New(database), lqFiles, queue)
 	videoProbe := mediaffmpeg.New(runner, configuration.FFprobePath)
 	encoderMode, err := mediaffmpeg.ParseEncoderMode(configuration.TranscodeEncoder)
@@ -128,16 +135,14 @@ func runServer(configuration config.Config) error {
 	sidecars := storageapp.NewSidecars(storagesqlite.New(database), metadataFiles, books, queue, coverService)
 	maintenance := maintenanceapp.New(maintenancesqlite.New(database), books, queue, maintenanceapp.NewDispatcher(maintenanceapp.CommandServices{LQ: lq, Metadata: metadata, Transcode: transcode, HQ: hq, Trash: lifecycle, Restore: lifecycle, Purge: lifecycle}))
 	scans := ingestionapp.NewScans(ingestionsqlite.NewScans(database), directories, queue)
-	exportStorage, err := exportfiles.New(configuration.MediaDirectory)
+	exportStorage, err := exportfiles.New(configuration.MediaDirectory, configuration.ExportDirectory)
 	if err != nil {
 		return err
 	}
 	defer exportStorage.Close()
 	exportRepository := exportsqlite.New(database)
 	exports := exportapp.New(exportRepository, exportStorage, queue)
-	directoryMoves := exportapp.NewDirectoryExecution(exportRepository, exportStorage, coverService, queue)
-	directoryPreviews := exportapp.NewDirectoryConfirmation(exportRepository, queue)
-	directoryPreflight := exportapp.NewDirectoryPreflight(exportapp.NewDirectoryPlanner(exportRepository, exportStorage), exportRepository, coverService, queue)
+	directoryMoves := exportapp.NewDirectoryMoves(exportapp.NewDirectoryPlanner(exportRepository, exportStorage), exportRepository, exportStorage, coverService, queue)
 	recoveryFiles, err := recoveryfiles.New(configuration.MediaDirectory)
 	if err != nil {
 		return err
@@ -146,24 +151,23 @@ func runServer(configuration config.Config) error {
 	recovery := recoveryapp.New(recoverysqlite.New(database), recoveryfiles.NewVideo(recoveryFiles, mediaapp.NewOpenedInspector(videoProbe)), queue)
 	repair := recoveryapp.NewRepair(recoverysqlite.New(database), recoveryfiles.NewVideo(recoveryFiles, mediaapp.NewOpenedInspector(videoProbe)), queue)
 	handler := routeTasks(map[string]jobsapp.Handler{
-		"directory_import":    directories.Run,
-		"archive_import":      directories.Run,
-		"recovery_repair":     repair.Run,
-		"disk_recovery":       recovery.Run,
-		"directory_preflight": directoryPreflight.Run,
-		"directory_move":      directoryMoves.Run,
-		"metadata_batch":      maintenance.Run,
-		"metadata_sync":       sidecars.Run,
-		"lifecycle_audit":     lifecycle.RunAudit,
-		"lifecycle":           lifecycle.Run,
-		"metadata_refresh":    metadata.Run,
-		"media_upload":        uploadPublishing.Run,
-		"video_transcode":     transcode.Run,
-		"archive_export":      exports.Run,
-		"directory_scan":      scans.Run,
-		"hq_release":          hq.Run,
-		"storage_refresh":     storage.Run,
-		"image_lq":            lq.Run,
+		"directory_import": directories.Run,
+		"archive_import":   directories.Run,
+		"recovery_repair":  repair.Run,
+		"disk_recovery":    recovery.Run,
+		"directory_move":   directoryMoves.Run,
+		"metadata_batch":   maintenance.Run,
+		"metadata_sync":    sidecars.Run,
+		"lifecycle_audit":  lifecycle.RunAudit,
+		"lifecycle":        lifecycle.Run,
+		"metadata_refresh": metadata.Run,
+		"media_upload":     uploadPublishing.Run,
+		"video_transcode":  transcode.Run,
+		"archive_export":   exports.Run,
+		"directory_scan":   scans.Run,
+		"hq_release":       hq.Run,
+		"storage_refresh":  storage.Run,
+		"image_lq":         lq.Run,
 	})
 	engine, err := jobsapp.Start(ctx, queue, handler, func(err error) {
 		logger.Warn("后台任务执行或状态提交失败", "diagnostic", err, "completionStage", jobsdomain.CompletionStage(err), "storageClass", persistence.FailureClass(err))
@@ -250,6 +254,25 @@ func runServer(configuration config.Config) error {
 			return err
 		}
 	}
+	if configuration.SQLiteBackupDirectory != "" {
+		snapshots, snapshotErr := persistence.NewOnlineSnapshots(configuration.DataDirectory, configuration.SQLiteBackupDirectory, 7)
+		if snapshotErr != nil {
+			return snapshotErr
+		}
+		if err = scheduler.Register(schedulerapp.Job{
+			ID:              "sqlite-backup",
+			Title:           "数据库快照备份",
+			Description:     "启动时与每 24 小时用 SQLite 在线备份 API 生成独立数据库快照，保留最近 7 份；不包含媒体。",
+			Unit:            "份快照",
+			DefaultInterval: 24 * time.Hour,
+			DefaultEnabled:  true,
+			Timeout:         10 * time.Minute,
+			RunAtStartup:    true,
+			Run:             snapshots.Run,
+		}); err != nil {
+			return err
+		}
+	}
 	if err = scheduler.Start(ctx, func(err error) {
 		logger.Warn("定时器调度失败", "error", err)
 	}); err != nil {
@@ -269,8 +292,6 @@ func runServer(configuration config.Config) error {
 	application.Maintenance = maintenance
 	application.Lifecycle = lifecycle
 	application.TrashCovers = trashCovers
-	application.DirectoryPreviews = directoryPreviews
-	application.DirectoryPreflight = directoryPreflight
 	application.DirectoryMoves = directoryMoves
 	endpoints, err := listenServers(configuration.HTTPAddress, configuration.ReadingHTTPAddress, httpapi.New(database, logger, application), httpapi.NewReading(database, logger, application))
 	if err != nil {

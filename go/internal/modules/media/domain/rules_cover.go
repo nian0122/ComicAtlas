@@ -1,9 +1,6 @@
 package domain
 
-import (
-	"crypto/sha256"
-	"encoding/hex"
-)
+import "strconv"
 
 func CoverPath(comic string) string {
 	if !StorageKey(comic) {
@@ -25,12 +22,15 @@ func ValidCover(record CoverRecord, source ImageSource, comic string) bool {
 }
 
 // FrameCoverKey 为视频抽帧封面生成独立来源键；它不指向可切换的图片媒体。
-func FrameCoverKey(media, sha string) string {
-	digest := sha256.Sum256([]byte("video-frame-cover-v1\x00" + media + "\x00" + sha))
-	return hex.EncodeToString(digest[:])
+func FrameCoverKey(media string) string {
+	return "video-frame\x00" + media
 }
 
 // ValidFrameCover 校验视频抽帧封面；media 只作为来源证据，不建立可切换的封面选择。
 func ValidFrameCover(record CoverRecord, comic string) bool {
-	return StorageKey(comic) && StorageKey(record.MediaID) && record.Path == CoverPath(comic) && record.SourceKey == FrameCoverKey(record.MediaID, record.SHA256) && record.Size > 0 && record.Size <= 2<<20 && record.Width > 0 && record.Height > 0 && max(record.Width, record.Height) <= CoverSpec().MaxLongEdge
+	return StorageKey(comic) && StorageKey(record.MediaID) && record.Path == CoverPath(comic) && record.SourceKey == FrameCoverKey(record.MediaID) && record.Size > 0 && record.Size <= 2<<20 && record.Width > 0 && record.Height > 0 && max(record.Width, record.Height) <= CoverSpec().MaxLongEdge
+}
+
+func CoverKey(source ImageSource) string {
+	return "cover\x00" + source.MediaID + "\x00" + source.Path + "\x00" + strconv.FormatInt(source.Size, 10) + "\x00" + strconv.FormatInt(source.Modified, 10)
 }

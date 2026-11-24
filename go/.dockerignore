@@ -5,3 +5,4 @@
 !cmd/**/*.go
 !internal/**/*.go
 !internal/platform/persistence/migrations/*.sql
+!tools/djpeg/backing_store.c

@@ -1,8 +1,7 @@
 package domain
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
+	"comicatlas.local/backend/internal/platform/stableid"
 	"path"
 	"strings"
 	"unicode"
@@ -121,8 +120,7 @@ func directoryUniqueName(base, id string, used map[string]bool, force bool) stri
 }
 
 func directoryFullKey(id string) string {
-	sum := sha256.Sum256([]byte(id))
-	return hex.EncodeToString(sum[:])
+	return stableid.Hex(id)
 }
 
 // directoryBookNames 生成整批书名目录。普通书名不带序号或哈希；同批重名时才追加短 ID。

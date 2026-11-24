@@ -13,7 +13,6 @@ type RepairRun struct {
 	MarkerCreatedAt          string  `json:"-"`
 	MarkerTaskID             *string `json:"-"`
 	Completed                bool    `json:"completed"`
-	SourceSHA                *string `json:"-"`
 	CompletedAt              *string `json:"completedAt"`
 	Version                  *int    `json:"version"`
 	StructureVersion         *int    `json:"structureVersion"`

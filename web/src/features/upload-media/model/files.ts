@@ -26,6 +26,6 @@ export function missingParts(file: UploadFile, chunkSize: number) {
   const received = new Set(file.receivedParts)
   return Array.from({ length: Math.ceil(file.size / chunkSize) }, (_, i) => i).filter((i) => !received.has(i))
 }
-export function matchesUpload(file: File, digest: string, expected: UploadFile) {
-  return file.name === expected.name && file.size === expected.size && digest === expected.sha256
+export function matchesUpload(file: File, expected: UploadFile) {
+  return file.name === expected.name && file.size === expected.size
 }

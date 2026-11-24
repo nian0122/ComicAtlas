@@ -3,6 +3,18 @@
   scrollbar-width: auto;
   scrollbar-color: auto;
 }
+/*
+ * 页面首次挂载时内容可能还撑不满视口，滚动条随后出现会挤窄内容宽度；
+ * 窗口滚动的虚拟封面网格按宽度换行，宽度回缩会让列表整体重排并冲掉恢复的滚动位置。
+ * 始终预留滚动条槽位，宽度不再随滚动条有无变化。
+ */
+html {
+  scrollbar-gutter: stable;
+}
+/* 短视频是固定全屏层，不为根滚动条预留槽位，避免页面右侧留下窄边。 */
+html:has(.feed-page) {
+  scrollbar-gutter: auto;
+}
 ::-webkit-scrollbar {
   width: var(--atlas-scrollbar-size);
   height: var(--atlas-scrollbar-size);

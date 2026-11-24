@@ -34,7 +34,7 @@ func (application *Application) serveCoverSelection(response http.ResponseWriter
 	}
 	selection, err := application.Covers.SelectCover(request.Context(), resource[1], body.Version, body.MediaID)
 	if err != nil {
-		return applicationError(response, err), true
+		return imageError(response, err), true
 	}
 	writeJSON(response, 200, DataResponse[mediadomain.CoverSelection]{Data: selection})
 	return 200, true

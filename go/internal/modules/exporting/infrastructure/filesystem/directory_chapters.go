@@ -25,11 +25,14 @@ func (move *directoryExecution) moveGroup(ctx context.Context, group *directoryG
 	}
 	parents := map[string]bool{path.Dir(target): true, target: true}
 	if whole {
+		if err = move.writeNameReceipt(ctx, group, "whole"); err != nil {
+			return err
+		}
 		source := path.Dir(present[0].entry.Source)
 		if info, err := move.entry(target); err != nil {
 			return err
 		} else if info != nil {
-			folder, err := move.files.root.Open(target)
+			folder, err := move.files.rootFor(target).Open(target)
 			if err != nil {
 				return err
 			}
@@ -41,7 +44,7 @@ func (move *directoryExecution) moveGroup(ctx context.Context, group *directoryG
 			if len(names) != 0 {
 				return exportdomain.ErrConflict
 			}
-			if err = move.files.root.Remove(target); err != nil {
+			if err = move.files.rootFor(target).Remove(target); err != nil {
 				return err
 			}
 		}
@@ -76,7 +79,7 @@ func (move *directoryExecution) moveGroup(ctx context.Context, group *directoryG
 			item.location = destination
 		}
 	}
-	if err = move.normalizeNames(ctx, present); err != nil {
+	if err = move.normalizeNames(ctx, group, present); err != nil {
 		return err
 	}
 	return move.syncParents(parents)
@@ -122,7 +125,7 @@ func (move *directoryExecution) wholeChapter(ctx context.Context, items []*direc
 	return true, nil
 }
 
-func (move *directoryExecution) normalizeNames(ctx context.Context, items []*directoryItem) error {
+func (move *directoryExecution) normalizeNames(ctx context.Context, group *directoryGroup, items []*directoryItem) error {
 	pending := make([]*directoryItem, 0, len(items))
 	for _, item := range items {
 		if item.location != move.base+"/"+item.target {
@@ -144,6 +147,11 @@ func (move *directoryExecution) normalizeNames(ctx context.Context, items []*dir
 	}
 	if err := move.files.syncDirectory(path.Dir(items[0].location)); err != nil {
 		return err
+	}
+	if group.phase == "whole" {
+		if err := move.writeNameReceipt(ctx, group, "renaming"); err != nil {
+			return err
+		}
 	}
 	for _, item := range items {
 		target := move.base + "/" + item.target

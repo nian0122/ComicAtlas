@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { comicApi, ReadingCover, type Term } from '@/entities/comic'
-import { historyApi, type HistoryVO } from '@/entities/history'
+import type { HistoryVO } from '@/entities/history'
 import { storeToRefs } from 'pinia'
 import { useLibraryPage } from '../model/library-state'
 import { AppButton } from '@/shared/ui/button'
-import { AppPagination } from '@/shared/ui/pagination'
+import { PagedList } from '@/shared/ui/pagination'
 import { AppSearch } from '@/shared/ui/search'
 import { ReadingState } from '@/shared/ui/reading'
 import { VirtualGrid } from '@/shared/ui/virtual-grid'
@@ -16,24 +16,15 @@ const route = useRoute(),
   categories = ref<Term[]>([]),
   tags = ref<Term[]>([]),
   filterError = ref(''),
-  loadMoreError = ref(''),
-  recent = ref<HistoryVO[]>([]),
-  sentinel = ref<HTMLElement>()
-const { status } = storeToRefs(store)
-let debounce: ReturnType<typeof setTimeout> | undefined, observer: IntersectionObserver | undefined
+  loadMoreError = ref('')
+const { status, recent } = storeToRefs(store)
+let debounce: ReturnType<typeof setTimeout> | undefined
 const basePage = ref(1)
 const loadedPage = ref(1)
 const pageSize = computed(() => Math.max(1, Number(store.query.pageSize) || 48))
 const pages = computed(() =>
   store.total === null ? 0 : Math.max(1, Math.ceil(store.total / Math.max(1, pageSize.value))),
 )
-const pageGroups = computed(() => {
-  const size = pageSize.value
-  return Array.from({ length: Math.ceil(store.list.length / size) }, (_, index) => ({
-    page: basePage.value + index,
-    items: store.list.slice(index * size, (index + 1) * size),
-  }))
-})
 const selectedTags = computed(() =>
   (store.query.tagId ?? []).map((id) => ({ id, name: tags.value.find((item) => item.id === id)?.name || '所选标签' })),
 )
@@ -119,7 +110,6 @@ async function loadNext() {
   if (!store.list.length || store.list.length >= store.total) return
   const next = loadedPage.value + 1
   if (next > pages.value) return
-  const before = store.list.length
   loadMoreError.value = ''
   loadedPage.value = next
   store.query.page = next
@@ -129,44 +119,11 @@ async function loadNext() {
     store.error = ''
     loadedPage.value = next - 1
     store.query.page = next - 1
-    return
-  }
-  if (store.list.length <= before) return
-  await nextTick()
-  const node = sentinel.value
-  if (node && node.getBoundingClientRect().top <= window.innerHeight + 600 && store.list.length < store.total) {
-    void loadNext()
   }
 }
 function retryMore() {
   loadMoreError.value = ''
   void loadNext()
-}
-function observeSentinel() {
-  observer?.disconnect()
-  if (!sentinel.value || !store.list.length || store.total === null) return
-  if (store.list.length >= store.total) return
-  observer = new IntersectionObserver(
-    (entries) => {
-      if (entries.some((entry) => entry.isIntersecting)) void loadNext()
-    },
-    { rootMargin: '600px 0px' },
-  )
-  observer.observe(sentinel.value)
-}
-watch(
-  [() => store.list.length, () => store.total],
-  () => {
-    void nextTick(observeSentinel)
-  },
-  { flush: 'post' },
-)
-async function loadRecent() {
-  try {
-    recent.value = (await historyApi.page(1, 8)).items
-  } catch {
-    recent.value = []
-  }
 }
 async function loadFilters() {
   filterError.value = ''
@@ -185,12 +142,10 @@ onMounted(() => {
   }
   store.ensureLoaded()
   void loadFilters()
-  void loadRecent()
-  void nextTick(observeSentinel)
+  void store.loadRecent()
 })
 onBeforeUnmount(() => {
   clearTimeout(debounce)
-  observer?.disconnect()
 })
 </script>
 <template>
@@ -281,10 +236,6 @@ onBeforeUnmount(() => {
         </div>
       </div>
 
-      <div v-if="pages > 1 && store.list.length" class="lib-pager">
-        <AppPagination :page="basePage" :pages="pages" :disabled="store.loading" label="漫画库分页" @change="goPage" />
-      </div>
-
       <p v-if="filterError" class="ca-inline-error" role="alert">
         {{ filterError }}<AppButton variant="text" @click="loadFilters">重试加载筛选</AppButton>
       </p>
@@ -320,9 +271,23 @@ onBeforeUnmount(() => {
         action="重新加载"
         @action="store.fetchPage()"
       />
-      <div v-else-if="store.list.length" class="lib-pages">
-        <section v-for="group in pageGroups" :key="group.page" class="lib-page-block">
-          <VirtualGrid class="library-grid" :items="group.items" item-key="id">
+      <PagedList
+        v-else-if="store.list.length"
+        :items="store.list"
+        :page="basePage"
+        :page-size="pageSize"
+        :total="store.total ?? 0"
+        :loading="store.loading"
+        :loading-more="store.loading && store.list.length > 0"
+        :append-error="loadMoreError"
+        :disabled="store.loading"
+        label="漫画库分页"
+        @page-change="goPage"
+        @load-more="loadNext"
+        @retry="retryMore"
+      >
+        <template #default="{ items }">
+          <VirtualGrid class="library-grid" :items="items" item-key="id">
             <template #default="{ item }">
               <ReadingCover
                 :id="item.id"
@@ -336,17 +301,8 @@ onBeforeUnmount(() => {
               />
             </template>
           </VirtualGrid>
-          <div v-if="pages > 1" class="lib-pager">
-            <AppPagination
-              :page="group.page"
-              :pages="pages"
-              :disabled="store.loading"
-              label="漫画库分页"
-              @change="goPage"
-            />
-          </div>
-        </section>
-      </div>
+        </template>
+      </PagedList>
       <ReadingState
         v-else
         :title="hasQuery ? '没有找到相关作品' : '漫画库还很安静'"
@@ -359,16 +315,6 @@ onBeforeUnmount(() => {
           <AppButton class="is-refresh" @click="store.fetchPage()">刷新漫画库</AppButton>
         </div>
       </ReadingState>
-      <div
-        v-if="store.list.length && store.total !== null && store.list.length < store.total"
-        ref="sentinel"
-        class="lib-sentinel"
-        aria-hidden="true"
-      />
-      <p v-if="store.loading && store.list.length" class="lib-infinite-status" role="status">正在加载…</p>
-      <p v-if="loadMoreError" class="ca-inline-error" role="alert">
-        {{ loadMoreError }}<AppButton variant="text" @click="retryMore">重试加载</AppButton>
-      </p>
     </div>
   </section>
 </template>
@@ -385,35 +331,7 @@ onBeforeUnmount(() => {
   letter-spacing: 0.1em;
   color: var(--atlas-muted);
 }
-.lib-pager {
-  display: flex;
-  justify-content: center;
-  margin: 16px 0;
-}
-.lib-page-block .lib-pager {
-  margin: 24px 0 32px;
-}
-.lib-sentinel {
-  height: 1px;
-}
-.lib-infinite-status {
-  margin: 18px 0 6px;
-  color: var(--atlas-faint);
-  font-size: 10px;
-  letter-spacing: 0.12em;
-  text-align: center;
-}
-@media (min-width: 900px) {
-  .lib-pager {
-    display: flex;
-    justify-content: center;
-    margin: 20px 0 4px;
-  }
 
-  .lib-page-block .lib-pager {
-    margin: 28px 0 42px;
-  }
-}
 .lib-order-toggle {
   width: 26px;
   height: 34px;

@@ -15,8 +15,8 @@ type ArchiveSource struct {
 	MediaType  string `json:"mediaType"`
 	Quality    string `json:"quality"`
 	Path       string `json:"path"`
-	SHA256     string `json:"sha256"`
-	Size       int64  `json:"size"`
+
+	Size int64 `json:"size"`
 }
 
 // ArchiveMetadata 是导入与导出共享的可移植资料结构，不依赖任何一侧的应用服务。

@@ -27,14 +27,14 @@ func trashScopeSnapshot(ctx context.Context, tx *sql.Tx, kind, id string) (lifec
 	}
 	snapshot := lifecycledomain.NewTrashSnapshot(value.Target, catalog, reaction)
 	where, args := scopeWhere(value.Target)
-	rows, err := tx.QueryContext(ctx, `SELECT m.id,m.chapter_id,m.file_name,m.relative_path,m.media_type,m.content_type,m.sha256,m.hq_state,m.size,m.width,m.height,m.video_metadata
+	rows, err := tx.QueryContext(ctx, `SELECT m.id,m.chapter_id,m.file_name,m.relative_path,m.media_type,m.content_type,m.hq_state,m.size,m.width,m.height,m.video_metadata
  FROM active_media m JOIN active_chapters ch ON ch.id=m.chapter_id WHERE `+where+" ORDER BY m.id LIMIT ?", append(args, lifecycledomain.MaxTrashMembers+1)...)
 	if err != nil {
 		return value, nil, err
 	}
 	for rows.Next() {
 		var fact lifecycledomain.TrashMediaFact
-		if err = rows.Scan(&fact.ID, &fact.ChapterID, &fact.FileName, &fact.Path, &fact.MediaType, &fact.ContentType, &fact.SHA256, &fact.HQState, &fact.Size, &fact.Width, &fact.Height, &fact.VideoMetadata); err == nil {
+		if err = rows.Scan(&fact.ID, &fact.ChapterID, &fact.FileName, &fact.Path, &fact.MediaType, &fact.ContentType, &fact.HQState, &fact.Size, &fact.Width, &fact.Height, &fact.VideoMetadata); err == nil {
 			err = snapshot.AddMedia(fact)
 		}
 		if err != nil {

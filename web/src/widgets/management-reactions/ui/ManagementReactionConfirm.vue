@@ -9,7 +9,8 @@ import {
 } from '@/entities/managed-reaction'
 import { saveReactions } from '@/features/manage-reactions'
 import { getApiErrorMessage } from '@/shared/api/http'
-import { ManagementDialog, ManagementImage } from '@/shared/ui/management'
+import { ManagementImage } from '@/shared/ui/management'
+import { AppDialog } from '@/shared/ui/dialog'
 const props = defineProps<{ open: boolean; items: ReactionTarget[]; scope: 'active' | 'management' }>()
 const emit = defineEmits<{ close: []; saved: [result: SavedReaction[]] }>()
 const choice = ref<ReactionValue | ''>(''),
@@ -39,7 +40,7 @@ async function submit() {
 }
 </script>
 <template>
-  <ManagementDialog :open="open" title="修改所选标记" :busy="busy" @close="emit('close')">
+  <AppDialog :open="open" title="修改所选标记" :busy="busy" @close="emit('close')">
     <p>本次 {{ items.length }} 项。漫画、章节和媒体的标记相互独立，不会向下批量继承。</p>
     <p class="mw-muted">
       修改或清除只影响标记，不删除文件，也不恢复回收内容。任一对象已不存在或正在变更状态时，整批拒绝。
@@ -76,7 +77,7 @@ async function submit() {
         </button>
       </footer>
     </form>
-  </ManagementDialog>
+  </AppDialog>
 </template>
 <style scoped>
 .rating-confirm-items {

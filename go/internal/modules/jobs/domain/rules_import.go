@@ -1,7 +1,6 @@
 package domain
 
 import (
-	"crypto/sha256"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -32,7 +31,7 @@ func PrepareImport(input ImportInput, key string) (PreparedImport, error) {
 	if input.Type == "archive_import" {
 		identity = input.Type + "\x00" + identity + fmt.Sprint(explicit)
 	}
-	return PreparedImport{ReferenceID: input.ReferenceID, Resource: ResourceTask{Type: input.Type, SourcePath: source, Title: title, Payload: ""}, Explicit: explicit, RequestHash: fmt.Sprintf("%x", sha256.Sum256([]byte(identity)))}, nil
+	return PreparedImport{ReferenceID: input.ReferenceID, Resource: ResourceTask{Type: input.Type, SourcePath: source, Title: title, Payload: ""}, Explicit: explicit, RequestKey: identity}, nil
 }
 
 func ValidateImportSource(source string) error {

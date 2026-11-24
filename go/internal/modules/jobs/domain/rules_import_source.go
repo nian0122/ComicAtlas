@@ -6,6 +6,9 @@ func ImportSourcesOverlap(first, second string) bool {
 	return first == second || strings.HasPrefix(first, second+"/") || strings.HasPrefix(second, first+"/")
 }
 func CanRetryTask(task Task) bool {
+	if task.Type == "directory_preflight" {
+		return false // 旧预检已合并到单任务，只保留历史。
+	}
 	if task.Type == "lifecycle" && (task.Stage == StagePurgePreflightFailed || task.Stage == StageTrashPreparationFailed) {
 		return false
 	}

@@ -48,8 +48,7 @@ func openedRegular(root *os.Root, name string) (*os.File, os.FileInfo, error) {
 }
 
 func stream(ctx context.Context, input *os.File, output io.Writer, size int64) (domain.Object, error) {
-	value, err := streamcopy.Exact(ctx, input, output, size)
-	if err != nil {
+	if err := streamcopy.Exact(ctx, input, output, size); err != nil {
 		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 			return domain.Object{}, err
 		}
@@ -58,7 +57,7 @@ func stream(ctx context.Context, input *os.File, output io.Writer, size int64) (
 		}
 		return domain.Object{}, domain.ErrSource
 	}
-	return domain.Object{Size: value.Size, SHA256: value.SHA256}, nil
+	return domain.Object{Size: size}, nil
 }
 
 func unchanged(file *os.File, before os.FileInfo) error {
@@ -69,7 +68,7 @@ func unchanged(file *os.File, before os.FileInfo) error {
 	return nil
 }
 
-func digestFile(ctx context.Context, root *os.Root, name string) (domain.Object, error) {
+func measureFile(ctx context.Context, root *os.Root, name string) (domain.Object, error) {
 	if checkedPath(name, true) != nil {
 		return domain.Object{}, domain.ErrInvalid
 	}
@@ -85,11 +84,11 @@ func digestFile(ctx context.Context, root *os.Root, name string) (domain.Object,
 	return object, unchanged(file, info)
 }
 
-func (work *workspace) Digest(ctx context.Context, name string) (domain.Object, error) {
+func (work *workspace) Measure(ctx context.Context, name string) (domain.Object, error) {
 	if work.closed || work.root == nil {
 		return domain.Object{}, domain.ErrInvalid
 	}
-	return digestFile(ctx, work.root, name)
+	return measureFile(ctx, work.root, name)
 }
 
 func (work *workspace) File(ctx context.Context, name string) (domain.Entry, error) {
@@ -100,9 +99,10 @@ func (work *workspace) File(ctx context.Context, name string) (domain.Entry, err
 	if err != nil || entry.Kind != domain.File {
 		return domain.Entry{}, domain.ErrInvalid
 	}
-	object, err := work.Digest(ctx, name)
-	entry.SHA256 = object.SHA256
-	return entry, err
+	if _, err := work.Measure(ctx, name); err != nil {
+		return domain.Entry{}, err
+	}
+	return entry, nil
 }
 
 func (work *workspace) copyFile(ctx context.Context, source *os.Root, sourceName string, expected domain.Entry, restoring bool) (entry domain.Entry, result error) {
@@ -130,15 +130,11 @@ func (work *workspace) copyFile(ctx context.Context, source *os.Root, sourceName
 			result = domain.ErrIO
 		}
 	}()
-	object, err := stream(ctx, input, output, expected.Size)
-	if err != nil {
+	if _, err := stream(ctx, input, output, expected.Size); err != nil {
 		return entry, err
 	}
 	if err := unchanged(input, info); err != nil {
 		return entry, err
-	}
-	if restoring && object.SHA256 != expected.SHA256 {
-		return entry, domain.ErrInvalid
 	}
 	modified, err := time.Parse(time.RFC3339Nano, expected.ModifiedAt)
 	if err != nil {
@@ -151,6 +147,5 @@ func (work *workspace) copyFile(ctx context.Context, source *os.Root, sourceName
 		return entry, domain.ErrIO
 	}
 	entry = expected
-	entry.SHA256 = object.SHA256
 	return entry, ctx.Err()
 }

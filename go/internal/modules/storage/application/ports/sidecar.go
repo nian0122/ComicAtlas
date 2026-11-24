@@ -12,7 +12,7 @@ type SidecarLibrary interface {
 	SnapshotForSidecar(context.Context, string) (librarydomain.SidecarSnapshot, error)
 }
 type SidecarFiles interface {
-	PublishMetadata(context.Context, string, string, []byte, string) error
+	PublishMetadata(context.Context, string, string, []byte) error
 }
 type SidecarFence interface {
 	AcquireFileMutation(context.Context) (func(), error)
@@ -23,6 +23,6 @@ type SidecarRepository interface {
 	SidecarAdmission(string, bool) jobsports.Admission
 	SidecarRetry(string) persistence.WriteAction
 	SidecarResult(context.Context, string) (storagedomain.SidecarResult, error)
-	PrepareSidecar(context.Context, string, int64, string, string) error
-	SidecarCompletion(string, string) persistence.WriteAction
+	PrepareSidecar(context.Context, string, int64, string) error
+	SidecarCompletion(string) persistence.WriteAction
 }

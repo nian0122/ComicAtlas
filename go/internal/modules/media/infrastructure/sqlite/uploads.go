@@ -31,7 +31,7 @@ func scanUpload(scanner interface{ Scan(...any) error }) (mediadomain.UploadSess
 	}
 	return value, err
 }
-func (repo *repository) CreateUpload(ctx context.Context, value mediadomain.UploadSession, key, hash string, space mediadomain.UploadSpace, limits mediadomain.UploadLimits) (string, error) {
+func (repo *repository) CreateUpload(ctx context.Context, value mediadomain.UploadSession, key, requestKey string, space mediadomain.UploadSpace, limits mediadomain.UploadLimits) (string, error) {
 	tx, err := repo.database.Writer.BeginTx(ctx, nil)
 	if err != nil {
 		return "", err
@@ -39,9 +39,9 @@ func (repo *repository) CreateUpload(ctx context.Context, value mediadomain.Uplo
 	defer tx.Rollback()
 	if key != "" {
 		var id, stored string
-		err = tx.QueryRowContext(ctx, "SELECT id,request_hash FROM upload_sessions WHERE idempotency_key=?", key).Scan(&id, &stored)
+		err = tx.QueryRowContext(ctx, "SELECT id,request_key FROM upload_sessions WHERE idempotency_key=?", key).Scan(&id, &stored)
 		if err == nil {
-			if stored != hash {
+			if stored != requestKey {
 				return "", mediadomain.ErrUploadConflict
 			}
 			return id, nil
@@ -75,7 +75,7 @@ func (repo *repository) CreateUpload(ctx context.Context, value mediadomain.Uplo
 	}
 	if value.ReplaceMediaID != nil {
 		var source mediadomain.UploadPrevious
-		err = tx.QueryRowContext(ctx, "SELECT relative_path,sha256,size,hq_state FROM active_media AS media WHERE id=? AND chapter_id=?", *value.ReplaceMediaID, value.ChapterID).Scan(&source.Path, &source.SHA256, &source.Size, &source.State)
+		err = tx.QueryRowContext(ctx, "SELECT relative_path,size,hq_state FROM active_media AS media WHERE id=? AND chapter_id=?", *value.ReplaceMediaID, value.ChapterID).Scan(&source.Path, &source.Size, &source.State)
 		if errors.Is(err, sql.ErrNoRows) {
 			return "", mediadomain.ErrUploadNotFound
 		}
@@ -148,16 +148,16 @@ func (repo *repository) CreateUpload(ctx context.Context, value mediadomain.Uplo
 	if key != "" {
 		keyValue = key
 	}
-	if _, err = tx.ExecContext(ctx, `INSERT INTO upload_sessions(id,comic_id,chapter_id,replace_media_id,status,total_bytes,created_at,expires_at,request_hash,idempotency_key,previous_json) VALUES(?,?,?,?,'active',?,?,?,?,?,?)`, value.ID, value.ComicID, value.ChapterID, value.ReplaceMediaID, value.TotalBytes, value.CreatedAt, value.ExpiresAt, hash, keyValue, previous); err != nil {
+	if _, err = tx.ExecContext(ctx, `INSERT INTO upload_sessions(id,comic_id,chapter_id,replace_media_id,status,total_bytes,created_at,expires_at,request_key,idempotency_key,previous_json) VALUES(?,?,?,?,'active',?,?,?,?,?,?)`, value.ID, value.ComicID, value.ChapterID, value.ReplaceMediaID, value.TotalBytes, value.CreatedAt, value.ExpiresAt, requestKey, keyValue, previous); err != nil {
 		return "", err
 	}
-	statement, err := tx.PrepareContext(ctx, `INSERT INTO upload_files(session_id,id,position,name,name_key,size,sha256) VALUES(?,?,?,?,?,?,?)`)
+	statement, err := tx.PrepareContext(ctx, `INSERT INTO upload_files(session_id,id,position,name,name_key,size) VALUES(?,?,?,?,?,?)`)
 	if err != nil {
 		return "", err
 	}
 	defer statement.Close()
 	for index, file := range value.Files {
-		if _, err = statement.ExecContext(ctx, value.ID, file.ID, index+1, file.Name, strings.ToLower(file.Name), file.Size, file.SHA256); err != nil {
+		if _, err = statement.ExecContext(ctx, value.ID, file.ID, index+1, file.Name, strings.ToLower(file.Name), file.Size); err != nil {
 			return "", err
 		}
 	}
@@ -173,7 +173,7 @@ func (repo *repository) UploadSession(ctx context.Context, id string) (mediadoma
 	if err != nil {
 		return value, err
 	}
-	rows, err := tx.QueryContext(ctx, "SELECT id,name,size,sha256,received_bytes,target_path FROM upload_files WHERE session_id=? ORDER BY position", id)
+	rows, err := tx.QueryContext(ctx, "SELECT id,name,size,received_bytes,target_path FROM upload_files WHERE session_id=? ORDER BY position", id)
 	if err != nil {
 		return value, err
 	}
@@ -182,12 +182,12 @@ func (repo *repository) UploadSession(ctx context.Context, id string) (mediadoma
 		var file mediadomain.UploadFile
 		var target *string
 		file.ReceivedParts = []int{}
-		if err = rows.Scan(&file.ID, &file.Name, &file.Size, &file.SHA256, &file.ReceivedBytes, &target); err != nil {
+		if err = rows.Scan(&file.ID, &file.Name, &file.Size, &file.ReceivedBytes, &target); err != nil {
 			rows.Close()
 			return value, err
 		}
 		if target != nil && *target != "" {
-			value.CleanupFiles = append(value.CleanupFiles, mediadomain.UploadRetired{Kind: "hq", Path: *target, SHA256: file.SHA256, Size: file.Size})
+			value.CleanupFiles = append(value.CleanupFiles, mediadomain.UploadCleanupFile{ID: file.ID, Path: *target, Size: file.Size})
 		}
 		positions[file.ID] = len(value.Files)
 		value.Files = append(value.Files, file)
@@ -228,7 +228,7 @@ func (repo *repository) UploadFile(ctx context.Context, id, fileID string) (medi
 	if err != nil {
 		return value, file, err
 	}
-	err = repo.database.Reader.QueryRowContext(ctx, "SELECT id,name,size,sha256,received_bytes FROM upload_files WHERE session_id=? AND id=?", id, fileID).Scan(&file.ID, &file.Name, &file.Size, &file.SHA256, &file.ReceivedBytes)
+	err = repo.database.Reader.QueryRowContext(ctx, "SELECT id,name,size,received_bytes FROM upload_files WHERE session_id=? AND id=?", id, fileID).Scan(&file.ID, &file.Name, &file.Size, &file.ReceivedBytes)
 	if errors.Is(err, sql.ErrNoRows) {
 		err = mediadomain.ErrUploadNotFound
 	}
@@ -236,7 +236,7 @@ func (repo *repository) UploadFile(ctx context.Context, id, fileID string) (medi
 }
 func (repo *repository) UploadPart(ctx context.Context, id, file string, index int) (*mediadomain.UploadPart, error) {
 	value := mediadomain.UploadPart{FileID: file, Part: index}
-	err := repo.database.Reader.QueryRowContext(ctx, "SELECT size,sha256 FROM upload_parts WHERE session_id=? AND file_id=? AND part=?", id, file, index).Scan(&value.Size, &value.SHA256)
+	err := repo.database.Reader.QueryRowContext(ctx, "SELECT size FROM upload_parts WHERE session_id=? AND file_id=? AND part=?", id, file, index).Scan(&value.Size)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
@@ -266,18 +266,18 @@ func (repo *repository) RecordUploadPart(ctx context.Context, id string, part me
 	if err = mediadomain.ValidateUploadPart(part, size); err != nil {
 		return err
 	}
-	var stored string
-	err = tx.QueryRowContext(ctx, "SELECT sha256 FROM upload_parts WHERE session_id=? AND file_id=? AND part=?", id, part.FileID, part.Part).Scan(&stored)
+	var stored int64
+	err = tx.QueryRowContext(ctx, "SELECT size FROM upload_parts WHERE session_id=? AND file_id=? AND part=?", id, part.FileID, part.Part).Scan(&stored)
 	if err == nil {
-		if stored != part.SHA256 {
-			return mediadomain.ErrUploadChecksum
+		if stored != part.Size {
+			return mediadomain.ErrUploadContentChanged
 		}
 		return nil
 	}
 	if !errors.Is(err, sql.ErrNoRows) {
 		return err
 	}
-	if _, err = tx.ExecContext(ctx, "INSERT INTO upload_parts VALUES(?,?,?,?,?)", id, part.FileID, part.Part, part.Size, part.SHA256); err != nil {
+	if _, err = tx.ExecContext(ctx, "INSERT INTO upload_parts(session_id,file_id,part,size) VALUES(?,?,?,?)", id, part.FileID, part.Part, part.Size); err != nil {
 		return err
 	}
 	if _, err = tx.ExecContext(ctx, "UPDATE upload_files SET received_bytes=received_bytes+? WHERE session_id=? AND id=?", part.Size, id, part.FileID); err != nil {

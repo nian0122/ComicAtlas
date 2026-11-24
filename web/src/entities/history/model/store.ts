@@ -7,6 +7,7 @@ export const useHistoryStore = defineStore('reading-history', () => {
   const list = ref<HistoryVO[]>([]),
     total = ref(0),
     page = ref(0),
+    basePage = ref(1),
     loading = ref(false),
     loadingMore = ref(false),
     error = ref(''),
@@ -28,6 +29,7 @@ export const useHistoryStore = defineStore('reading-history', () => {
         : data.items
       total.value = data.total
       page.value = target
+      if (!append) basePage.value = target
     } catch (reason) {
       if (current === generation) {
         if (append) loadMoreError.value = getApiErrorMessage(reason, '加载更多失败')
@@ -60,6 +62,7 @@ export const useHistoryStore = defineStore('reading-history', () => {
     list,
     total,
     page,
+    basePage,
     loading,
     loadingMore,
     error,

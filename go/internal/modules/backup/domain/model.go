@@ -20,7 +20,6 @@ type Entry struct {
 	Path       string
 	Kind       string
 	Size       int64
-	SHA256     string
 	ModifiedAt string
 }
 
@@ -31,14 +30,12 @@ type Summary struct {
 }
 
 type DatabaseInfo struct {
-	Format            string `json:"format"`
-	MigrationCount    int    `json:"migrationCount"`
-	MigrationChecksum string `json:"migrationChecksum"`
+	Format         string `json:"format"`
+	MigrationCount int    `json:"migrationCount"`
 }
 
 type Object struct {
-	Size   int64  `json:"size"`
-	SHA256 string `json:"sha256"`
+	Size int64 `json:"size"`
 }
 
 type Manifest struct {

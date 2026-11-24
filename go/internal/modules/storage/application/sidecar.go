@@ -145,20 +145,20 @@ func (service *Sidecars) Run(parent context.Context, task jobsdomain.Task) (comp
 		return completion, storagedomain.ErrConflict
 	}
 	observed := time.Now().UTC().Format(jobsdomain.TimestampFormat)
-	data, hash, err := storagedomain.AutomaticSidecarData(task.ID, snapshot, observed)
+	data, err := storagedomain.AutomaticSidecarData(task.ID, snapshot, observed)
 	if err != nil {
 		return completion, err
 	}
-	if err = service.repository.PrepareSidecar(ctx, task.ID, snapshot.Revision, hash, observed); err != nil {
+	if err = service.repository.PrepareSidecar(ctx, task.ID, snapshot.Revision, observed); err != nil {
 		return completion, err
 	}
 	if err = service.jobs.Publishing(ctx, task.ID, `{"version":1}`); err != nil {
 		return completion, err
 	}
-	if err = service.files.PublishMetadata(ctx, task.ComicID, task.ID, data, hash); err != nil {
+	if err = service.files.PublishMetadata(ctx, task.ComicID, task.ID, data); err != nil {
 		return completion, err
 	}
-	return jobsports.Completion{Persist: service.repository.SidecarCompletion(task.ID, hash)}, nil
+	return jobsports.Completion{Persist: service.repository.SidecarCompletion(task.ID)}, nil
 }
 
 func (service *Sidecars) Items(ctx context.Context, id string, page, size int) (storagedomain.SidecarPage, error) {

@@ -39,7 +39,7 @@ func (repo *repository) SelectEntries(ctx context.Context, selection lifecycledo
 }
 func selectEntries(ctx context.Context, tx *sql.Tx, selection lifecycledomain.EntrySelection) ([]lifecycledomain.SelectedEntry, error) {
 	query, args := entrySelectionQuery(selection)
-	// 只排序有界 ID 选集；大文件清单按行读取取摘要，不能随完整载荷进入排序器。
+	// 只排序有界 ID 选集；大文件清单按行读取取标识，不能随完整载荷进入排序器。
 	rows, err := tx.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, err

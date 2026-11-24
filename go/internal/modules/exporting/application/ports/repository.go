@@ -11,7 +11,7 @@ type Repository interface {
 	Cancelled(context.Context, string) (bool, error)
 	Title(context.Context, string) (string, error)
 	Admission(string, exportdomain.Request) jobsports.Admission
-	Load(context.Context, string) (exportdomain.Snapshot, string, error)
+	Load(context.Context, string) (exportdomain.Snapshot, error)
 	Completion(exportdomain.Manifest) persistence.WriteAction
 	Artifacts(context.Context, string) (exportdomain.ArtifactView, error)
 }

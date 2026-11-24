@@ -1,13 +1,14 @@
 package filesystem
 
 import (
+	"bytes"
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"io"
 	"os"
+	"path"
 	"path/filepath"
+	"strings"
 
 	mediaports "comicatlas.local/backend/internal/modules/media/application/ports"
 	mediadomain "comicatlas.local/backend/internal/modules/media/domain"
@@ -27,7 +28,7 @@ func (storage *Storage) ReceiveUploadPart(ctx context.Context, id string, file m
 	if !mediadomain.UploadID(file.ID, "uf_") || extent.Total != file.Size || extent.Start != int64(extent.Part)*mediadomain.UploadChunkBytes {
 		return part, mediadomain.ErrUploadValidation
 	}
-	if err = mediadomain.ValidateUploadPart(mediadomain.UploadPart{Part: extent.Part, Size: extent.Length, SHA256: file.SHA256}, file.Size); err != nil {
+	if err = mediadomain.ValidateUploadPart(mediadomain.UploadPart{Part: extent.Part, Size: extent.Length}, file.Size); err != nil {
 		return part, err
 	}
 	parent, err := uploadDirectory(id)
@@ -69,21 +70,57 @@ func (storage *Storage) ReceiveUploadPart(ctx context.Context, id string, file m
 	if _, err = output.Seek(extent.Start, io.SeekStart); err != nil {
 		return part, mediadomain.ErrUploadIO
 	}
-	hash := sha256.New()
 	buffer := make([]byte, 256<<10)
-	size, err := io.CopyBuffer(io.MultiWriter(output, hash), uploadReader{ctx: ctx, reader: io.LimitReader(input, extent.Length+1)}, buffer)
-	if err != nil {
-		if ctx.Err() != nil {
-			return part, ctx.Err()
+	old := make([]byte, len(buffer))
+	limited := uploadReader{ctx: ctx, reader: io.LimitReader(input, extent.Length+1)}
+	compare := previous != nil
+	if compare && previous.Size != extent.Length {
+		return part, mediadomain.ErrUploadContentChanged
+	}
+	var written int64
+	for {
+		if err := ctx.Err(); err != nil {
+			return part, err
 		}
-		return part, mediadomain.ErrUploadIO
+		size := int64(len(buffer))
+		if remaining := extent.Length - written; remaining < size {
+			size = remaining + 1
+		}
+		count, readErr := limited.Read(buffer[:size])
+		if count > 0 {
+			if written+int64(count) > extent.Length {
+				return part, mediadomain.ErrUploadValidation
+			}
+			if compare {
+				if _, err = output.ReadAt(old[:count], extent.Start+written); err != nil {
+					return part, mediadomain.ErrUploadIO
+				}
+				if !bytes.Equal(old[:count], buffer[:count]) {
+					return part, mediadomain.ErrUploadContentChanged
+				}
+			}
+			chunk := buffer[:count]
+			for len(chunk) > 0 {
+				n, writeErr := output.Write(chunk)
+				if writeErr != nil || n == 0 {
+					return part, mediadomain.ErrUploadIO
+				}
+				chunk = chunk[n:]
+			}
+			written += int64(count)
+		}
+		if readErr == io.EOF {
+			break
+		}
+		if readErr != nil {
+			if ctx.Err() != nil {
+				return part, ctx.Err()
+			}
+			return part, mediadomain.ErrUploadIO
+		}
 	}
-	if size != extent.Length {
+	if written != extent.Length {
 		return part, mediadomain.ErrUploadValidation
-	}
-	part.SHA256 = hex.EncodeToString(hash.Sum(nil))
-	if previous != nil && (previous.SHA256 != part.SHA256 || previous.Size != part.Size) {
-		return part, mediadomain.ErrUploadChecksum
 	}
 	if err = output.Sync(); err != nil {
 		return part, mediadomain.ErrUploadIO
@@ -126,7 +163,8 @@ func (storage *Storage) RemoveUpload(ctx context.Context, session mediadomain.Up
 	}
 	for _, file := range session.CleanupFiles {
 		comic, chapter, ok := mediadomain.HQOwner(file.Path)
-		if !ok || comic != session.ComicID || chapter != session.ChapterID {
+		name := path.Base(file.Path)
+		if !ok || comic != session.ComicID || chapter != session.ChapterID || !mediadomain.UploadID(file.ID, "uf_") || strings.TrimSuffix(name, path.Ext(name)) != file.ID || mediadomain.UploadMediaKind(name) == "" {
 			return mediadomain.ErrUploadConflict
 		}
 		if err := storage.existingParents(file.Path); err != nil {
@@ -137,13 +175,13 @@ func (storage *Storage) RemoveUpload(ctx context.Context, session mediadomain.Up
 		} else if err != nil {
 			return err
 		}
-		if err := storage.hashHQ(ctx, file.Path, mediadomain.HQReleaseItem{OriginalBytes: file.Size, SourceSHA256: file.SHA256}); err != nil {
+		if err := storage.verifyFileAttributes(ctx, file.Path, file.Size, 0); err != nil {
 			return err
 		}
 		if err := storage.root.Remove(file.Path); err != nil {
 			return err
 		}
-		if err := storage.syncParents(file.Path); err != nil {
+		if err := storage.syncDirectory(path.Dir(file.Path)); err != nil {
 			return err
 		}
 	}

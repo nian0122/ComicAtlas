@@ -5,6 +5,7 @@ import { importScanApi, type ImportBatch } from '@/entities/import-scan'
 import { taskApi, type Task } from '@/entities/task'
 import { getApiErrorMessage } from '@/shared/api/http'
 import { taskStatusLabels } from '@/shared/ui/management'
+import { AppPagination } from '@/shared/ui/pagination'
 const props = defineProps<{ batchId: string; initialPage: number }>()
 const emit = defineEmits<{ inspect: [id: string, reference: string]; page: [page: number]; ready: [] }>()
 const batch = ref<ImportBatch | null>(null),
@@ -113,11 +114,13 @@ onBeforeUnmount(() => {
       </li>
     </ol>
     <footer v-if="batch && batch.total > 20" class="mw-pagination">
-      <button class="mw-button" :disabled="page <= 1 || loading" @click="paginate(page - 1)">上一页</button
-      ><span>第 {{ page }} 页</span
-      ><button class="mw-button" :disabled="page * 20 >= batch.total || loading" @click="paginate(page + 1)">
-        下一页
-      </button>
+      <AppPagination
+        :page="page"
+        :pages="Math.ceil(batch.total / 20)"
+        :disabled="loading"
+        label="导入批次分页"
+        @change="paginate"
+      />
     </footer>
   </section>
 </template>

@@ -5,8 +5,6 @@ import (
 	exportdomain "comicatlas.local/backend/internal/modules/exporting/domain"
 	lifecycledomain "comicatlas.local/backend/internal/modules/lifecycle/domain"
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"io"
 	"os"
@@ -72,9 +70,8 @@ func (files *Files) resolveDirectoryTrash(ctx context.Context, comic string, ent
 	if err != nil || !os.SameFile(before, opened) || opened.Size() != before.Size() {
 		return value, exportdomain.ErrManifest
 	}
-	hash := sha256.New()
 	count := &directoryTrashCounter{input: io.LimitReader(input, lifecycledomain.MaxJournalBytes+1), ctx: ctx}
-	value.Journal, err = decodeDirectoryTrash(io.TeeReader(count, hash), remainingFiles)
+	value.Journal, err = decodeDirectoryTrash(count, remainingFiles)
 	if err != nil {
 		if ctx.Err() != nil {
 			return value, ctx.Err()
@@ -98,7 +95,7 @@ func (files *Files) resolveDirectoryTrash(ctx context.Context, comic string, ent
 	if current == nil || !os.SameFile(before, current) || !os.SameFile(before, after) || after.Size() != before.Size() || !before.ModTime().Equal(after.ModTime()) {
 		return value, exportdomain.ErrManifest
 	}
-	value.Manifest = exportdomain.DirectoryStoredFile{Path: name, Size: count.bytes, SHA256: hex.EncodeToString(hash.Sum(nil))}
+	value.Manifest = exportdomain.DirectoryStoredFile{Path: name, Size: count.bytes}
 	for _, item := range value.Journal.Files {
 		if err = ctx.Err(); err != nil {
 			return value, err

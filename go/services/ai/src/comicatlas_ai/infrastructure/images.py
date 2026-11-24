@@ -1,6 +1,5 @@
-"""串行核对摘要与完整解码；线程结束前不释放临时文件。"""
+"""串行核对长度与完整解码；线程结束前不释放临时文件。"""
 
-import hashlib
 from typing import BinaryIO
 
 from PIL import Image, UnidentifiedImageError
@@ -13,13 +12,12 @@ from .blocking import owned_work
 def _validate(sample: Sample, source: BinaryIO):
     try:
         source.seek(0)
-        digest, size = hashlib.sha256(), 0
+        size = 0
         while chunk := source.read(64 << 10):
             size += len(chunk)
             if size > MAX_PAGE_BYTES:
                 raise InvalidInput()
-            digest.update(chunk)
-        if size != sample.size or digest.hexdigest() != sample.sha256:
+        if size != sample.size:
             raise InvalidInput()
         source.seek(0)
         with Image.open(source, formats=("PNG", "JPEG", "WEBP")) as image:

@@ -14,7 +14,7 @@ type LQRepository interface {
 	Begin(context.Context, string) error
 	Batch(context.Context, string, int) ([]mediadomain.LQItem, error)
 	Progress(context.Context, string) (mediadomain.LQProgress, error)
-	Current(context.Context, string) (*mediadomain.LQRecord, string, error)
+	Current(context.Context, string) (*mediadomain.LQRecord, error)
 	Record(context.Context, string, mediadomain.LQItem, *mediadomain.LQRecord, string) error
 	Completion(string) persistence.WriteAction
 	Items(context.Context, string, int, int) (mediadomain.LQItemPage, error)
@@ -24,6 +24,7 @@ type LQRepository interface {
 }
 type LQStorage interface {
 	Generate(context.Context, string, mediadomain.LQItem, mediadomain.ImageSpec) (mediadomain.LQRecord, error)
+	Intact(context.Context, mediadomain.LQRecord) (bool, error)
 	Verify(context.Context, mediadomain.LQRecord) (bool, error)
 	Open(mediadomain.LQRecord) (*os.File, error)
 	Remove(string) error

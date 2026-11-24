@@ -1,14 +1,7 @@
 import { ref, shallowRef, computed, watch, onBeforeUnmount } from 'vue'
 import { uploadApi, type UploadSession } from '@/entities/upload'
 import { taskApi, type Task } from '@/entities/task'
-import {
-  uploadCommands,
-  hashFile,
-  validateFiles,
-  missingParts,
-  matchesUpload,
-  type UploadRequest,
-} from '@/features/upload-media'
+import { uploadCommands, validateFiles, missingParts, matchesUpload, type UploadRequest } from '@/features/upload-media'
 import { managementCommands } from '@/features/manage-items'
 import { getApiErrorMessage } from '@/shared/api/http'
 export interface UploadTarget {
@@ -28,19 +21,17 @@ export function useMediaUpload(
     session = ref<UploadSession | null>(null),
     files = shallowRef<File[]>([]),
     task = ref<Task | null>(null)
-  const phase = ref<'idle' | 'hashing' | 'sending' | 'request'>('idle'),
+  const phase = ref<'idle' | 'sending' | 'request'>('idle'),
     error = ref(''),
     notice = ref(''),
-    hashName = ref(''),
-    hashBytes = ref(0),
+    sendingName = ref(''),
     restoreId = ref(''),
     page = ref(1),
     acknowledged = ref(false),
     cancelConfirm = ref(false)
   const recent = ref<string[]>([]),
     storageWarning = ref('')
-  const key = ref(crypto.randomUUID()),
-    hashes = new Map<File, string>()
+  const key = ref(crypto.randomUUID())
   let controller: AbortController | null = null,
     disposed = false,
     polling = false,
@@ -78,7 +69,6 @@ export function useMediaUpload(
   }
   function resetFiles() {
     files.value = []
-    hashes.clear()
     page.value = 1
     acknowledged.value = false
     key.value = crypto.randomUUID()
@@ -157,7 +147,8 @@ export function useMediaUpload(
       resetFiles()
       restoreId.value = value.id
       remember(value.id)
-      notice.value = value.status === 'active' ? '请重新选择尚未传完的原文件，摘要核对后继续' : '会话状态已恢复'
+      notice.value =
+        value.status === 'active' ? '请重新选择尚未传完的原文件，按文件名和大小核对后继续' : '会话状态已恢复'
     })
   }
   watch(
@@ -176,21 +167,6 @@ export function useMediaUpload(
       }
     },
   )
-  async function digest(file: File, signal: AbortSignal) {
-    if (hashes.has(file)) return hashes.get(file)!
-    phase.value = 'hashing'
-    hashName.value = file.name
-    hashBytes.value = 0
-    const value = await hashFile(
-      file,
-      (n) => {
-        hashBytes.value = n
-      },
-      signal,
-    )
-    hashes.set(file, value)
-    return value
-  }
   async function transfer() {
     if (processing.value) return
     if (!session.value && !target.value) return
@@ -198,13 +174,11 @@ export function useMediaUpload(
     const signal = controller.signal
     error.value = ''
     notice.value = ''
-    phase.value = 'hashing'
+    phase.value = 'request'
     try {
       if (!session.value) {
         validateFiles(files.value, Boolean(target.value?.replaceMediaId))
-        const manifest = []
-        for (const file of files.value)
-          manifest.push({ name: file.name, size: file.size, sha256: await digest(file, signal) })
+        const manifest = files.value.map((file) => ({ name: file.name, size: file.size }))
         signal.throwIfAborted()
         const body: UploadRequest = {
           chapterId: target.value!.chapterId,
@@ -237,9 +211,7 @@ export function useMediaUpload(
         if (!parts.length) continue
         const local = files.value.find((f) => f.name === remote.name && f.size === remote.size)
         if (!local) throw new Error('请重新选择原文件：' + remote.name)
-        const digestValue = await digest(local, signal)
-        if (!matchesUpload(local, digestValue, remote))
-          throw new Error('文件摘要不一致，不能作为续传来源：' + remote.name)
+        if (!matchesUpload(local, remote)) throw new Error('文件名或大小不一致，不能作为续传来源：' + remote.name)
         const queue = [...parts]
         let failed = false
         const workers = Array.from({ length: Math.min(2, queue.length) }, async () => {
@@ -247,7 +219,7 @@ export function useMediaUpload(
             const part = queue.shift()!
             signal.throwIfAborted()
             phase.value = 'sending'
-            hashName.value = remote.name
+            sendingName.value = remote.name
             const start = part * active.chunkSize,
               blob = local.slice(start, start + active.chunkSize)
             try {
@@ -335,8 +307,7 @@ export function useMediaUpload(
     phase,
     error,
     notice,
-    hashName,
-    hashBytes,
+    sendingName,
     restoreId,
     page,
     acknowledged,

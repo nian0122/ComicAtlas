@@ -4,13 +4,13 @@ import type { Task } from '@/entities/task'
 export interface UploadRequest {
   chapterId: string
   replaceMediaId: string | null
-  files: { name: string; size: number; sha256: string }[]
+  files: { name: string; size: number }[]
 }
 export const uploadCommands = {
   create: (body: UploadRequest, key: string, signal?: AbortSignal) =>
     request<UploadSession>('/upload-sessions', { method: 'POST', body, idempotencyKey: key, signal }),
   part: (id: string, fileId: string, body: Blob, start: number, total: number, signal: AbortSignal) =>
-    request<{ fileId: string; part: number; size: number; sha256: string }>(
+    request<{ fileId: string; part: number; size: number }>(
       `/upload-sessions/${encodeURIComponent(id)}/files/${encodeURIComponent(fileId)}`,
       {
         method: 'PUT',

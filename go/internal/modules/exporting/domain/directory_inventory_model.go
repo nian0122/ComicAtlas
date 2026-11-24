@@ -35,9 +35,8 @@ type DirectoryChapter struct {
 }
 
 type DirectoryStoredFile struct {
-	Path   string `json:"path"`
-	Size   int64  `json:"size"`
-	SHA256 string `json:"sha256"`
+	Path string `json:"path"`
+	Size int64  `json:"size"`
 }
 
 type DirectoryMedia struct {
@@ -78,7 +77,6 @@ type DirectoryReaction struct {
 type DirectoryInventorySnapshot struct {
 	MutationVersion int64
 	Inventory       DirectoryInventory
-	SHA256          string
 	CanonicalBytes  int
 }
 

@@ -1,3 +1,6 @@
 export { storageApi } from './api'
 export { operationBlockers } from './model/capabilities'
+export { describeHqState, describeLqState, describeMediaState, describeObservedState } from './model/status'
+export { default as StorageUsageSummary } from './ui/StorageUsageSummary.vue'
 export type { Page, Inventory, Statistics, StorageObject, StorageQuery, ChapterStorageQuery } from './model/types'
+export type { StorageState, StorageTone } from './model/status'

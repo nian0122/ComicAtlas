@@ -10,7 +10,8 @@ import { getApiErrorMessage } from '@/shared/api/http'
 import { useHistoryStore } from '@/entities/history'
 import { CinemaViewport, readerPageSource, type ReaderImageQuality } from '@/widgets/cinema-viewport'
 import { AppButton } from '@/shared/ui/button'
-import { ReadingIcon, ReadingDialog, ReadingState } from '@/shared/ui/reading'
+import { ReadingIcon, ReadingState } from '@/shared/ui/reading'
+import { AppDialog } from '@/shared/ui/dialog'
 import { RecycleScroller } from 'vue-virtual-scroller'
 const route = useRoute(),
   store = useReaderStore(),
@@ -567,7 +568,7 @@ onBeforeUnmount(() => {
         </nav>
       </div>
     </footer>
-    <ReadingDialog class="cinema-tool-sheet" :open="sheet === 'jump'" title="跳转页码" @close="sheet = ''"
+    <AppDialog scope="reading" class="cinema-tool-sheet" :open="sheet === 'jump'" title="跳转页码" @close="sheet = ''"
       ><form novalidate @submit.prevent="submitPage">
         <label class="ca-field"
           >页码（1–{{ store.totalPages }}）<input
@@ -581,10 +582,11 @@ onBeforeUnmount(() => {
         /></label>
         <p v-if="invalid" class="ca-inline-error" role="alert">请输入 1–{{ store.totalPages }} 之间的整数页码</p>
         <AppButton class="cinema-jump-submit" variant="primary" type="submit">跳转</AppButton>
-      </form></ReadingDialog
+      </form></AppDialog
     >
-    <ReadingDialog
+    <AppDialog
       id="reader-settings"
+      scope="reading"
       class="cinema-tool-sheet"
       :open="sheet === 'settings'"
       title="阅读设置"
@@ -613,10 +615,11 @@ onBeforeUnmount(() => {
         }}
       </p>
       <label class="ca-check"><span>页面间留白</span><input v-model="gap" type="checkbox" /></label
-    ></ReadingDialog>
+    ></AppDialog>
     <ReadingMarkDialog id="reader-marks" :open="sheet === 'mark'" :targets="markTargets" @close="sheet = ''" />
-    <ReadingDialog
+    <AppDialog
       id="reader-catalog"
+      scope="reading"
       class="cinema-tool-sheet"
       :open="sheet === 'catalog'"
       title="章节目录"
@@ -639,7 +642,7 @@ onBeforeUnmount(() => {
             ><ReadingIcon v-if="item.id === store.chapterId" name="check" :size="17"
           /></AppButton> </template
       ></RecycleScroller>
-      <p v-if="!comic">章节目录暂不可用，请返回作品详情重试。</p></ReadingDialog
+      <p v-if="!comic">章节目录暂不可用，请返回作品详情重试。</p></AppDialog
     >
   </div>
 </template>

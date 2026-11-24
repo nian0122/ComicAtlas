@@ -9,8 +9,8 @@ import (
 	"github.com/mattn/go-sqlite3"
 )
 
-func (repo *sqliteRepository) RepairWriter(run recoverydomain.RepairRun, sidecar recoverydomain.Sidecar, attempt int, hash, recorded string) persistence.WriteAction {
-	proofErr := recoverydomain.ValidateRepairProof(run, attempt, hash)
+func (repo *sqliteRepository) RepairWriter(run recoverydomain.RepairRun, sidecar recoverydomain.Sidecar, attempt int, recorded string) persistence.WriteAction {
+	proofErr := recoverydomain.ValidateRepairProof(run, attempt)
 	plan, prepareErr := recoverydomain.PrepareRestore(run.ComicID, sidecar, run.TaskID, recorded)
 	policy, policyErr := recoverydomain.RepairVersionPolicy(recoverydomain.RepairRequest{Version: run.ExpectedVersion, StructureVersion: run.ExpectedStructureVersion}, plan.Snapshot.Detail.Version, plan.Snapshot.Detail.StructureVersion)
 	if run.MarkerTaskID != nil {
@@ -65,7 +65,7 @@ func (repo *sqliteRepository) RepairWriter(run recoverydomain.RepairRun, sidecar
 		if _, err = tx.ExecContext(ctx, "DELETE FROM comic_recovery_placeholders WHERE comic_id=?", run.ComicID); err != nil {
 			return err
 		}
-		_, err = tx.ExecContext(ctx, "UPDATE recovery_repairs SET completed=1,source_sha=?,completed_at=?,version=?,structure_version=?,preserved_metadata=? WHERE task_id=?", hash, recorded, policy.Version, policy.StructureVersion, policy.PreserveMetadata, run.TaskID)
+		_, err = tx.ExecContext(ctx, "UPDATE recovery_repairs SET completed=1,completed_at=?,version=?,structure_version=?,preserved_metadata=? WHERE task_id=?", recorded, policy.Version, policy.StructureVersion, policy.PreserveMetadata, run.TaskID)
 		return err
 	}
 }

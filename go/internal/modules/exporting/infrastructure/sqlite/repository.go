@@ -6,9 +6,7 @@ import (
 	jobsports "comicatlas.local/backend/internal/modules/jobs/application/ports"
 	"comicatlas.local/backend/internal/platform/persistence"
 	"context"
-	"crypto/sha256"
 	"database/sql"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 )
@@ -75,8 +73,7 @@ func (repo *repository) Admission(comic string, request exportdomain.Request) jo
 			if len(data) > exportdomain.MaxSnapshotBytes {
 				return exportdomain.ErrValidation
 			}
-			digest := sha256.Sum256(data)
-			if _, err = tx.ExecContext(ctx, "INSERT INTO export_requests(task_id,snapshot_json,snapshot_sha) VALUES(?,?,?)", id, string(data), hex.EncodeToString(digest[:])); err != nil {
+			if _, err = tx.ExecContext(ctx, "INSERT INTO export_requests(task_id,snapshot_json) VALUES(?,?)", id, string(data)); err != nil {
 				return err
 			}
 			_, err = tx.ExecContext(ctx, "UPDATE tasks SET title=? WHERE id=?", snapshot.Comic.Title, id)
@@ -84,36 +81,35 @@ func (repo *repository) Admission(comic string, request exportdomain.Request) jo
 		}
 	}
 }
-func (repo *repository) Load(ctx context.Context, id string) (exportdomain.Snapshot, string, error) {
+func (repo *repository) Load(ctx context.Context, id string) (exportdomain.Snapshot, error) {
 	var result exportdomain.Snapshot
-	var data, hash string
-	err := repo.database.Reader.QueryRowContext(ctx, "SELECT CASE WHEN length(CAST(snapshot_json AS BLOB))<=? THEN snapshot_json ELSE '' END,snapshot_sha FROM export_requests WHERE task_id=?", exportdomain.MaxSnapshotBytes, id).Scan(&data, &hash)
+	var data string
+	err := repo.database.Reader.QueryRowContext(ctx, "SELECT CASE WHEN length(CAST(snapshot_json AS BLOB))<=? THEN snapshot_json ELSE '' END FROM export_requests WHERE task_id=?", exportdomain.MaxSnapshotBytes, id).Scan(&data)
 	if errors.Is(err, sql.ErrNoRows) {
-		return result, "", exportdomain.ErrNotFound
+		return result, exportdomain.ErrNotFound
 	}
 	if err != nil {
-		return result, "", err
+		return result, err
 	}
-	digest := sha256.Sum256([]byte(data))
-	if hex.EncodeToString(digest[:]) != hash || json.Unmarshal([]byte(data), &result) != nil || exportdomain.ValidateSnapshot(result) != nil {
-		return result, "", exportdomain.ErrManifest
+	if json.Unmarshal([]byte(data), &result) != nil || exportdomain.ValidateSnapshot(result) != nil {
+		return result, exportdomain.ErrManifest
 	}
-	return result, hash, nil
+	return result, nil
 }
 func (repo *repository) Completion(manifest exportdomain.Manifest) persistence.WriteAction {
 	return func(ctx context.Context, tx *sql.Tx) error {
-		var hash string
-		if err := tx.QueryRowContext(ctx, "SELECT snapshot_sha FROM export_requests WHERE task_id=?", manifest.TaskID).Scan(&hash); err != nil {
+		var exists bool
+		if err := tx.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM export_requests WHERE task_id=?)", manifest.TaskID).Scan(&exists); err != nil {
 			return err
 		}
-		if hash != manifest.SnapshotSHA {
+		if !exists {
 			return exportdomain.ErrManifest
 		}
 		if _, err := tx.ExecContext(ctx, "DELETE FROM export_artifacts WHERE task_id=?", manifest.TaskID); err != nil {
 			return err
 		}
 		for index, artifact := range manifest.Artifacts {
-			if _, err := tx.ExecContext(ctx, "INSERT INTO export_artifacts(task_id,position,file_name,size,sha256,last_segment) VALUES(?,?,?,?,?,?)", manifest.TaskID, index+1, artifact.FileName, artifact.Size, artifact.SHA256, artifact.LastSegment); err != nil {
+			if _, err := tx.ExecContext(ctx, "INSERT INTO export_artifacts(task_id,position,file_name,size,modified_ns,last_segment) VALUES(?,?,?,?,?,?)", manifest.TaskID, index+1, artifact.FileName, artifact.Size, artifact.Modified, artifact.LastSegment); err != nil {
 				return err
 			}
 		}
@@ -136,13 +132,13 @@ func (repo *repository) Artifacts(ctx context.Context, id string) (exportdomain.
 	}
 	view.Published = view.Status == "succeeded"
 	if view.Published {
-		rows, err := tx.QueryContext(ctx, "SELECT file_name,size,sha256,last_segment FROM export_artifacts WHERE task_id=? ORDER BY position", id)
+		rows, err := tx.QueryContext(ctx, "SELECT file_name,size,modified_ns,last_segment FROM export_artifacts WHERE task_id=? ORDER BY position", id)
 		if err != nil {
 			return view, err
 		}
 		for rows.Next() {
 			var item exportdomain.Artifact
-			if err = rows.Scan(&item.FileName, &item.Size, &item.SHA256, &item.LastSegment); err != nil {
+			if err = rows.Scan(&item.FileName, &item.Size, &item.Modified, &item.LastSegment); err != nil {
 				rows.Close()
 				return view, err
 			}

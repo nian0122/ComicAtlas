@@ -49,7 +49,6 @@ export function taskTypeLabel(type: string) {
     lifecycle: '回收与恢复',
     lifecycle_audit: '生命周期核对',
     directory_move: '移出到目录',
-    directory_preflight: '目录预检',
     disk_recovery: '磁盘恢复',
     recovery_repair: '恢复修复',
     ai_analysis: '分析媒体',
@@ -91,17 +90,4 @@ export function taskStageLabel(stage: string) {
     validating: '校验中',
   }
   return stage ? (labels[stage] ?? `未识别阶段（${stage}）`) : '尚未开始'
-}
-export function registrationLabel(state: string) {
-  const labels: Record<string, string> = {
-    empty: '无登记文件',
-    available: '原件已登记',
-    mixed: '部分原件已释放',
-    releasing: '原件释放中',
-    released: '原件已释放',
-    missing: '副本未就绪',
-    partial: '部分副本就绪',
-    ready: '副本已就绪',
-  }
-  return labels[state] ?? `未识别状态（${state}）`
 }

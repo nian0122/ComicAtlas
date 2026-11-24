@@ -17,7 +17,7 @@ func (files *Files) directoryEntry(name string) (os.FileInfo, error) {
 		}
 		return nil, err
 	}
-	info, err := files.root.Lstat(name)
+	info, err := files.rootFor(name).Lstat(name)
 	if errors.Is(err, os.ErrNotExist) {
 		return nil, nil
 	}
@@ -43,7 +43,7 @@ func (move *directoryExecution) mkdirParents(name string) error {
 			move.createdDirs[directory] = true
 			continue
 		}
-		if err = move.files.root.Mkdir(directory, 0750); err != nil {
+		if err = move.files.rootFor(directory).Mkdir(directory, 0750); err != nil {
 			return err
 		}
 		move.createdDirs[directory] = true
@@ -77,7 +77,7 @@ func (move *directoryExecution) entry(name string) (os.FileInfo, error) {
 		}
 		return nil, err
 	}
-	info, err := move.files.root.Lstat(name)
+	info, err := move.files.rootFor(name).Lstat(name)
 	if errors.Is(err, os.ErrNotExist) {
 		return nil, nil
 	}
@@ -88,7 +88,7 @@ func (move *directoryExecution) identity(name string) (string, error) {
 	if err := move.safeParent(name); err != nil {
 		return "", err
 	}
-	file, err := move.files.root.Open(name)
+	file, err := move.files.rootFor(name).Open(name)
 	if err != nil {
 		return "", err
 	}
@@ -106,16 +106,16 @@ func (move *directoryExecution) rename(ctx context.Context, source, target strin
 	if err := move.safeParent(target); err != nil {
 		return err
 	}
-	info, err := move.files.root.Lstat(source)
+	info, err := move.files.rootFor(source).Lstat(source)
 	if err != nil {
 		return err
 	}
-	from, err := move.files.root.Open(path.Dir(source))
+	from, err := move.files.rootFor(source).Open(path.Dir(source))
 	if err != nil {
 		return err
 	}
 	defer from.Close()
-	to, err := move.files.root.Open(path.Dir(target))
+	to, err := move.files.rootFor(target).Open(path.Dir(target))
 	if err != nil {
 		return err
 	}

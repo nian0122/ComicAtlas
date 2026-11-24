@@ -3,6 +3,7 @@ package domain
 const MaxFileResultBatch = 128
 
 type FileResult struct {
+	Directory  bool   `json:"directory,omitempty"`
 	Position   int    `json:"position"`
 	EntryID    string `json:"entryId"`
 	Role       string `json:"role"`

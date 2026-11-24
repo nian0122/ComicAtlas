@@ -186,8 +186,8 @@ func uploadFailure(err error) string {
 	switch {
 	case errors.Is(err, context.DeadlineExceeded):
 		return jobsdomain.FailureUploadTimeout
-	case errors.Is(err, mediadomain.ErrUploadChecksum):
-		return jobsdomain.FailureUploadChecksum
+	case errors.Is(err, mediadomain.ErrUploadContentChanged):
+		return jobsdomain.FailureUploadContentMismatch
 	case errors.Is(err, mediadomain.ErrUnavailable):
 		return jobsdomain.FailureVideoUnavailable
 	case errors.Is(err, mediadomain.ErrUploadConflict), errors.Is(err, mediadomain.ErrLQConflict):

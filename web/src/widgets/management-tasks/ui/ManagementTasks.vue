@@ -387,14 +387,10 @@ function clearFilters() {
         </button>
       </div>
       <button
-        v-if="
-          ['directory_preflight', 'directory_move'].includes(selected.type) &&
-          selected.targetType === 'directory_preview' &&
-          selected.targetId
-        "
+        v-if="selected.type === 'directory_move' && selected.targetType === 'directory_preview' && selected.targetId"
         class="mw-button"
         :disabled="busy"
-        @click="emit('directory', selected.targetId)"
+        @click="emit('directory', selected.id)"
       >
         查看文件夹移出流程
       </button>

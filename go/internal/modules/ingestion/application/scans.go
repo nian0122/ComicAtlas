@@ -6,9 +6,8 @@ import (
 	jobsapp "comicatlas.local/backend/internal/modules/jobs/application"
 	jobsports "comicatlas.local/backend/internal/modules/jobs/application/ports"
 	jobsdomain "comicatlas.local/backend/internal/modules/jobs/domain"
+	"comicatlas.local/backend/internal/platform/stableid"
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"sort"
@@ -32,8 +31,7 @@ func (service *ScanService) Submit(ctx context.Context, root, key string) (jobsd
 	data, _ := json.Marshal(struct {
 		SourcePath string `json:"sourcePath"`
 	}{root})
-	sum := sha256.Sum256([]byte(root))
-	return service.jobs.CreateResource(ctx, jobsdomain.ResourceTask{Type: "directory_scan", TargetType: "import_root", TargetID: hex.EncodeToString(sum[:]), Title: "导入候选扫描", Payload: string(data)}, key, service.repository.Admission(root))
+	return service.jobs.CreateResource(ctx, jobsdomain.ResourceTask{Type: "directory_scan", TargetType: "import_root", TargetID: stableid.Hex(root), Title: "导入候选扫描", Payload: string(data)}, key, service.repository.Admission(root))
 }
 func (service *ScanService) Run(ctx context.Context, task jobsdomain.Task) (completion jobsports.Completion, resultErr error) {
 	deferCtx, cancel := context.WithTimeout(ctx, 15*time.Minute)

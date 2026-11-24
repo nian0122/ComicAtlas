@@ -18,8 +18,7 @@ func ValidateResourceTask(request ResourceTask, key string) error {
 	validTarget = validTarget || request.Type == "archive_export" && request.TargetType == "comic" && request.TargetID == request.ComicID && request.ComicID != ""
 	validTarget = validTarget || (request.Type == "storage_refresh" || request.Type == "disk_recovery") && request.TargetType == "storage" && request.TargetID == "media" && request.ComicID == "" && request.Payload == "{}"
 	validTarget = validTarget || request.Type == "directory_scan" && request.TargetType == "import_root" && request.ComicID == ""
-	validTarget = validTarget || request.Type == "directory_move" && request.TargetType == "directory_preview" && request.ComicID == "" && request.Payload == "{}" && key != ""
-	validTarget = validTarget || request.Type == "directory_preflight" && request.TargetType == "directory_preview" && request.ComicID == "" && request.Payload == "{}"
+	validTarget = validTarget || request.Type == "directory_move" && request.TargetType == "directory_preview" && request.ComicID == "" && request.Payload == "{}"
 	if !validTarget || request.SourcePath != "" || request.TargetID == "" || len(request.TargetID) > 128 || len(request.ComicID) > 128 || len(request.Title) > 500 || len(key) > 128 || len(request.Payload) > 4096 || !json.Valid([]byte(request.Payload)) {
 		return ErrValidation
 	}

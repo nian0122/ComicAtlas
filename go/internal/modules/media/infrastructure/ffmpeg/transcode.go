@@ -2,10 +2,7 @@ package ffmpeg
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
-	"io"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -121,7 +118,7 @@ func (encoder *Encoder) Encode(parent context.Context, request mediadomain.Video
 	if err = mediadomain.ValidateTranscodeOutput(source, artifact.Video); err != nil {
 		return artifact, err
 	}
-	artifact.Size, artifact.SHA256, err = videoDigest(ctx, filename)
+	artifact.Size, artifact.Modified, err = videoAttributes(ctx, filename)
 	if err != nil {
 		return artifact, err
 	}
@@ -193,13 +190,15 @@ func (encoder *Encoder) arguments(source, filename string, mode EncoderMode, gpu
 			quality = 31
 		}
 		args = append(args, "-c:v", "h264_nvenc", "-preset", "p5", "-tune", "hq", "-rc", "vbr",
-			"-cq", strconv.Itoa(quality), "-b:v", "0", "-pix_fmt", "yuv420p")
+			"-cq", strconv.Itoa(quality), "-b:v", "0", "-bf", "0", "-pix_fmt", "yuv420p")
 	} else {
 		args = append(args, "-c:v", "libx264", "-preset", "veryfast", "-crf", "23", "-threads", "1", "-pix_fmt", "yuv420p")
 	}
 	if !gpuDecode {
 		args = append(args, "-vf", "pad=ceil(iw/2)*2:ceil(ih/2)*2")
 	}
+	// 部分源的音频 DTS 非单调，muxer 会直接中止；统一重整音频时间戳。
+	args = append(args, "-af", "aresample=async=1:first_pts=0")
 	args = append(args, "-c:a", "aac", "-b:a", "128k", "-ac", "2",
 		"-movflags", "+faststart", "-max_muxing_queue_size", "1024", "-fs", strconv.FormatInt(mediadomain.MaxTranscodeBytes+1, 10),
 		"-f", "mp4", "-n", filename)
@@ -226,48 +225,13 @@ func verifySourceIdentity(filename string, expected os.FileInfo) error {
 	return nil
 }
 
-// videoDigest 按固定缓冲读取，并通过文件身份、大小及修改时间排除读取期间变化。
-func videoDigest(ctx context.Context, filename string) (int64, string, error) {
+func videoAttributes(ctx context.Context, filename string) (int64, int64, error) {
+	if err := ctx.Err(); err != nil {
+		return 0, 0, err
+	}
 	info, err := os.Lstat(filename)
 	if err != nil || !info.Mode().IsRegular() || info.Size() < 1 || info.Size() > mediadomain.MaxTranscodeBytes {
-		return 0, "", mediadomain.ErrTranscodeOutput
+		return 0, 0, mediadomain.ErrTranscodeOutput
 	}
-	file, err := os.OpenFile(filename, os.O_RDONLY, 0)
-	if err != nil {
-		return 0, "", mediadomain.ErrTranscodeOutput
-	}
-	defer file.Close()
-	opened, err := file.Stat()
-	if err != nil || !os.SameFile(info, opened) {
-		return 0, "", mediadomain.ErrTranscodeOutput
-	}
-	digest := sha256.New()
-	buffer := make([]byte, 256<<10)
-	var size int64
-	for {
-		if err = ctx.Err(); err != nil {
-			return 0, "", err
-		}
-		count, readErr := file.Read(buffer)
-		if count > 0 {
-			size += int64(count)
-			if size > mediadomain.MaxTranscodeBytes {
-				return 0, "", mediadomain.ErrTranscodeLimit
-			}
-			_, _ = digest.Write(buffer[:count])
-		}
-		if readErr == io.EOF {
-			break
-		}
-		if readErr != nil {
-			return 0, "", mediadomain.ErrTranscodeOutput
-		}
-	}
-	final, err := file.Stat()
-	current, pathErr := os.Lstat(filename)
-	if err != nil || pathErr != nil || !os.SameFile(info, current) || size != info.Size() || final.Size() != info.Size() ||
-		!final.ModTime().Equal(info.ModTime()) || !current.ModTime().Equal(info.ModTime()) {
-		return 0, "", mediadomain.ErrTranscodeOutput
-	}
-	return size, hex.EncodeToString(digest.Sum(nil)), nil
+	return info.Size(), info.ModTime().UnixNano(), nil
 }

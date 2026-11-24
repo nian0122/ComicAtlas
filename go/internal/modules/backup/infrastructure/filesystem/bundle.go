@@ -57,8 +57,8 @@ func (source *bundle) Manifest(ctx context.Context) (domain.Manifest, error) {
 	return domain.DecodeManifest(data)
 }
 
-func (source *bundle) Digest(ctx context.Context, name string) (domain.Object, error) {
-	return digestFile(ctx, source.root, name)
+func (source *bundle) Measure(ctx context.Context, name string) (domain.Object, error) {
+	return measureFile(ctx, source.root, name)
 }
 
 func (source *bundle) Check(ctx context.Context, expected domain.Entry) error {
@@ -70,12 +70,11 @@ func (source *bundle) Check(ctx context.Context, expected domain.Entry) error {
 		return domain.ErrInvalid
 	}
 	if entry.Kind == domain.File {
-		object, err := source.Digest(ctx, entry.Path)
-		if err != nil {
-			return err
-		}
-		if object.SHA256 != expected.SHA256 {
+		if entry.ModifiedAt != expected.ModifiedAt {
 			return domain.ErrInvalid
+		}
+		if _, err := source.Measure(ctx, entry.Path); err != nil {
+			return err
 		}
 	}
 	return ctx.Err()

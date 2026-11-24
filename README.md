@@ -1,12 +1,12 @@
-# ComicAtlas 3.0.0-rc.3
+# ComicAtlas 3.0.0-rc.4
 
 ComicAtlas 是个人漫画仓库，支持导入 ZIP、CBZ 和本地目录，管理漫画与章节，阅读图片和视频，以及记录进度、收藏和评价。本版使用 Go、SQLite 和 Vue。
 
-当前为 3.0.0 预发布版。浏览器测试仍有未通过的场景，详见发布说明。
+当前为 3.0.0 预发布版，变更和升级说明见本版发布说明。
 
 ## 安装
 
-1. 安装并启动 Docker Desktop，或安装 Docker Engine 和 Compose 插件。下载本版本的源码压缩包并解压，或检出 `v3.0.0-rc.3`。
+1. 安装并启动 Docker Desktop，或安装 Docker Engine 和 Compose 插件。下载本版本的源码压缩包并解压，或检出 `v3.0.0-rc.4`。
 2. 将 `.env.example` 复制为 `.env`。将 `COMICATLAS_STORAGE_ROOT` 设置为 Docker 主机上的专用绝对路径。在该目录内创建 `imports` 和 `media`。Windows 路径可使用 `C:/comicatlas-storage` 这种写法。
 3. 确认容器用户 UID/GID `10001:10001` 对两个子目录可读写。Linux 上可以用 `sudo chown 10001:10001 /srv/comicatlas-storage/{imports,media}` 设置刚创建的子目录，按需替换路径。
 4. 在项目目录执行 `docker compose up -d --build --wait`。首次构建需要网络。
@@ -20,7 +20,7 @@ ComicAtlas 是个人漫画仓库，支持导入 ZIP、CBZ 和本地目录，管�
 - 可选 AI 分析需要兼容的模型服务。在 `.env` 中设置模型提供方和模型参数，将 `COMICATLAS_AI_ENDPOINT` 设为 `http://ai:8080`，再运行 `docker compose --profile ai up -d --build --wait`。
 - 查看服务状态和日志可使用 `docker compose ps` 和 `docker compose logs --tail=100`。
 
-旧版 MySQL 数据需要单独迁移。首次尝试新版时，请使用新的存储目录并保留旧库备份。详见 [3.0.0-rc.3 发布说明](docs/releases/v3.0.0-rc.3.md)和 [OpenAPI 文档](go/docs/openapi.json)。
+旧版 MySQL 数据需要单独迁移。首次尝试新版时，请使用新的存储目录并保留旧库备份。详见 [3.0.0-rc.4 发布说明](docs/releases/v3.0.0-rc.4.md)和 [OpenAPI 文档](go/docs/openapi.json)。
 
 ## 许可证
 

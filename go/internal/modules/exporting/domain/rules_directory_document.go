@@ -82,7 +82,7 @@ func directoryTrashArray(writer io.Writer, rows []DirectoryTrash) error {
 }
 
 // 文档数组逐项编码，单个大回收记录也逐候选编码，不先构造整份 JSON 再判断预算。
-func directoryDocument(value DirectoryInventory, stamp string, files []DirectoryPlacement) ([]byte, error) {
+func directoryDocument(value DirectoryInventory, files []DirectoryPlacement) ([]byte, error) {
 	writer := &directoryDocumentBuffer{}
 	if _, err := io.WriteString(writer, "{"); err != nil {
 		return nil, err
@@ -90,7 +90,7 @@ func directoryDocument(value DirectoryInventory, stamp string, files []Directory
 	for index, field := range []struct {
 		name  string
 		value any
-	}{{"version", 1}, {"kind", "directory_move"}, {"inventorySha256", stamp}} {
+	}{{"version", 1}, {"kind", "directory_move"}} {
 		if err := directoryField(writer, field.name, field.value, index > 0); err != nil {
 			return nil, err
 		}

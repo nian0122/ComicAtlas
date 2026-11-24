@@ -8,12 +8,13 @@ type LQRequest struct {
 }
 type LQScope struct{ Type, ID, ComicID, Title string }
 type LQItem struct {
-	MediaID      string  `json:"mediaId"`
-	Position     int     `json:"position"`
-	Status       string  `json:"status"`
-	ErrorCode    *string `json:"errorCode"`
-	SourcePath   string  `json:"-"`
-	SourceSHA256 string  `json:"-"`
+	MediaID        string  `json:"mediaId"`
+	Position       int     `json:"position"`
+	Status         string  `json:"status"`
+	ErrorCode      *string `json:"errorCode"`
+	SourcePath     string  `json:"-"`
+	SourceSize     int64   `json:"-"`
+	SourceModified int64   `json:"-"`
 }
 type LQItemPage struct {
 	Items    []LQItem `json:"items"`
@@ -24,7 +25,6 @@ type LQItemPage struct {
 type LQRecord struct {
 	MediaID       string `json:"mediaId"`
 	Path          string `json:"-"`
-	SHA256        string `json:"-"`
 	TaskID        string `json:"taskId,omitempty"`
 	Size          int64
 	Width, Height int
@@ -33,11 +33,10 @@ type LQRecord struct {
 	Provenance    *LQProvenance `json:"provenance,omitempty"`
 }
 
-// LQProvenance 声明登记来源，不代表编码任务或由该资料摘要生成的字节。
+// LQProvenance 声明登记来源，不代表编码任务或由该资料生成的字节。
 type LQProvenance struct {
-	Origin          string `json:"origin"`
-	ReferenceSHA256 string `json:"referenceSha256,omitempty"`
-	OriginalState   string `json:"originalState,omitempty"`
+	Origin        string `json:"origin"`
+	OriginalState string `json:"originalState,omitempty"`
 }
 type LQProgress struct {
 	Total, Completed, Failed int

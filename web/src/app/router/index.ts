@@ -1,6 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { installReadingNavigation } from '@/features/reading-navigation'
-const positions = new Map<string, number>()
+import { readScrollPosition, recordScrollPosition } from '@/shared/lib/scroll-restore'
 const router = createRouter({
   history: createWebHistory(),
   routes: [
@@ -51,11 +51,11 @@ const router = createRouter({
   ],
   scrollBehavior(to, _from, saved) {
     if (to.name === 'reader' || to.name === 'reader-video') return { top: 0 }
-    return saved || { top: positions.get(to.fullPath) ?? 0 }
+    return saved || { top: readScrollPosition(to.fullPath) }
   },
 })
 router.beforeEach((_to, from) => {
-  positions.set(from.fullPath, window.scrollY)
+  recordScrollPosition(from.fullPath, window.scrollY)
 })
 installReadingNavigation(router)
 export default router

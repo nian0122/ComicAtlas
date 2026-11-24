@@ -10,7 +10,7 @@ var (
 	ErrUploadNotFound          = errors.New("上传会话、文件或目标不存在")
 	ErrUploadExpired           = errors.New("上传会话已过期")
 	ErrUploadSpace             = errors.New("上传空间或活动会话预算不足")
-	ErrUploadChecksum          = errors.New("上传分片摘要不一致")
+	ErrUploadContentChanged    = errors.New("上传重传分片内容不一致")
 	ErrUploadIO                = errors.New("上传存储操作失败")
 	ErrTranscodeInvalid        = errors.New("视频编码参数无效")
 	ErrTranscodeLimit          = errors.New("视频超过编码资源限制")

@@ -27,8 +27,8 @@ type SelectedTarget struct {
 
 // TrashMediaFact 只记录目标身份和登记内容，不包含回收其他对象时会整理的页码。
 type TrashMediaFact struct {
-	ID, ChapterID, FileName, Path, MediaType, ContentType, SHA256, HQState string
-	Size                                                                   int64
-	Width, Height                                                          *int
-	VideoMetadata                                                          *string
+	ID, ChapterID, FileName, Path, MediaType, ContentType, HQState string
+	Size                                                           int64
+	Width, Height                                                  *int
+	VideoMetadata                                                  *string
 }

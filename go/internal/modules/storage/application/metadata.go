@@ -97,7 +97,7 @@ func (service *MetadataService) Run(parent context.Context, task jobsdomain.Task
 	if run.Next == nil {
 		return completion, storagedomain.ErrValidation
 	}
-	data, hash, err := storagedomain.MetadataSidecarData(task.ID, run)
+	data, err := storagedomain.MetadataSidecarData(task.ID, run)
 	if err != nil {
 		return completion, err
 	}
@@ -106,10 +106,10 @@ func (service *MetadataService) Run(parent context.Context, task jobsdomain.Task
 			return completion, err
 		}
 	}
-	if err = service.files.PublishMetadata(ctx, task.ComicID, task.ID, data, hash); err != nil {
+	if err = service.files.PublishMetadata(ctx, task.ComicID, task.ID, data); err != nil {
 		return completion, err
 	}
-	return jobsports.Completion{Persist: service.repository.MetadataCompletion(task.ID, hash)}, nil
+	return jobsports.Completion{Persist: service.repository.MetadataCompletion(task.ID)}, nil
 }
 func (service *MetadataService) Items(ctx context.Context, id string, page, size int) (storagedomain.MetadataPage, error) {
 	if page < 1 || page > 1000000 || size < 1 || size > 100 {

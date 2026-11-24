@@ -3,9 +3,9 @@ package domain
 const MaxDirectoryResultBatch = 64
 
 type DirectoryTaskRun struct {
-	TaskID, PreviewID, SHA256 string
-	Planning                  DirectoryPlanningResult
-	Completed                 bool
+	TaskID, PlanID string
+	Planning       DirectoryPlanningResult
+	Completed      bool
 }
 
 type DirectoryFileResult struct {
@@ -14,7 +14,7 @@ type DirectoryFileResult struct {
 	Source   string `json:"source"`
 	Target   string `json:"target"`
 	Size     int64  `json:"size"`
-	SHA256   string `json:"sha256"`
+	Modified int64  `json:"modified"`
 	State    string `json:"state"`
 }
 

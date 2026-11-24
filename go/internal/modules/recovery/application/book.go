@@ -76,7 +76,7 @@ func (service *BookService) Process(ctx context.Context, task jobsdomain.Task, c
 		if err = source.Recheck(ctx); err != nil {
 			return failure(err)
 		}
-		value.Status, value.SourceSHA256 = recoverydomain.ResultRestored, &document.SHA256
+		value.Status = recoverydomain.ResultRestored
 		return service.repository.CommitOutcome(ctx, value, write)
 	default:
 		return result, recoverydomain.ErrValidation

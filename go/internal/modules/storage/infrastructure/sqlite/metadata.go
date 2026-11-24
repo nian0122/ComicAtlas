@@ -15,7 +15,7 @@ import (
 var _ storageports.MetadataRepository = (*repository)(nil)
 
 func (repo *repository) MetadataAdmission(snapshot librarydomain.Snapshot, guard persistence.WriteAction) jobsports.Admission {
-	data, _, marshalErr := librarydomain.SnapshotData(snapshot)
+	data, marshalErr := librarydomain.SnapshotData(snapshot)
 	return func(id string) persistence.WriteAction {
 		return func(ctx context.Context, tx *sql.Tx) error {
 			if marshalErr != nil {
@@ -95,7 +95,7 @@ func (repo *repository) MetadataRun(ctx context.Context, id string) (storagedoma
 	return run, nil
 }
 func (repo *repository) PrepareMetadata(ctx context.Context, id string, next librarydomain.Snapshot, items []storagedomain.MediaObservation, observedAt string) error {
-	data, _, err := librarydomain.SnapshotData(next)
+	data, err := librarydomain.SnapshotData(next)
 	if err != nil {
 		return err
 	}
@@ -160,8 +160,8 @@ func (repo *repository) ActivateMetadata(ctx context.Context, id string, persist
 	if err = persist(ctx, tx); err != nil {
 		return err
 	}
-	if _, err = tx.ExecContext(ctx, `INSERT INTO media_observations(media_id,task_id,status,source_sha256) SELECT i.media_id,i.task_id,CASE WHEN i.status='discovered' THEN 'present' ELSE i.status END,m.sha256 FROM metadata_refresh_items i JOIN active_media m ON m.id=i.media_id WHERE i.task_id=?
-	 ON CONFLICT(media_id) DO UPDATE SET task_id=excluded.task_id,status=excluded.status,source_sha256=excluded.source_sha256`, id); err != nil {
+	if _, err = tx.ExecContext(ctx, `INSERT INTO media_observations(media_id,task_id,status,source_path,source_size,source_modified_ns) SELECT i.media_id,i.task_id,CASE WHEN i.status='discovered' THEN 'present' ELSE i.status END,m.relative_path,m.size,m.modified_ns FROM metadata_refresh_items i JOIN active_media m ON m.id=i.media_id WHERE i.task_id=?
+	 ON CONFLICT(media_id) DO UPDATE SET task_id=excluded.task_id,status=excluded.status,source_path=excluded.source_path,source_size=excluded.source_size,source_modified_ns=excluded.source_modified_ns`, id); err != nil {
 		return err
 	}
 	if _, err = tx.ExecContext(ctx, "UPDATE metadata_refresh_runs SET applied=1 WHERE task_id=?", id); err != nil {
@@ -169,9 +169,9 @@ func (repo *repository) ActivateMetadata(ctx context.Context, id string, persist
 	}
 	return tx.Commit()
 }
-func (repo *repository) MetadataCompletion(id, hash string) persistence.WriteAction {
+func (repo *repository) MetadataCompletion(id string) persistence.WriteAction {
 	return func(ctx context.Context, tx *sql.Tx) error {
-		result, err := tx.ExecContext(ctx, "UPDATE metadata_refresh_runs SET completed=1,sidecar_sha=? WHERE task_id=? AND applied=1", hash, id)
+		result, err := tx.ExecContext(ctx, "UPDATE metadata_refresh_runs SET completed=1 WHERE task_id=? AND applied=1", id)
 		if err != nil {
 			return err
 		}

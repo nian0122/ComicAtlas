@@ -1,7 +1,6 @@
 package domain
 
 import (
-	"encoding/hex"
 	"path"
 	"strings"
 	"time"
@@ -13,18 +12,12 @@ func ValidateLQProvenance(value *LQProvenance, task string) error {
 	if value == nil {
 		return nil
 	}
-	if value.ReferenceSHA256 != "" && !lqDigest(value.ReferenceSHA256) {
-		return ErrLQValidation
-	}
 	if value.OriginalState != "" && value.OriginalState != "missing" && value.OriginalState != "released" && value.OriginalState != "unbound" {
-		return ErrLQValidation
-	}
-	if value.OriginalState != "" && value.ReferenceSHA256 == "" {
 		return ErrLQValidation
 	}
 	switch value.Origin {
 	case "imported":
-		if task != "" || value.ReferenceSHA256 == "" {
+		if task != "" {
 			return ErrLQValidation
 		}
 	case "recovered":
@@ -62,16 +55,11 @@ func ValidateImportedLQ(value LQRecord) error {
 	if !utf8.ValidString(value.Path) || strings.ContainsFunc(value.Path, unicode.IsControl) {
 		return ErrLQValidation
 	}
-	if value.MediaID == "" || len(value.MediaID) > 128 || !value.Valid || value.TaskID != "" || value.Provenance == nil || value.Provenance.Origin != "imported" || ValidateLQProvenance(value.Provenance, value.TaskID) != nil || !lqDigest(value.SHA256) || value.Size < 1 || value.Size > 20<<30 || value.Width < 1 || value.Height < 1 || !ValidLQPath(value.Path) || path.Clean(value.Path) != value.Path || strings.ContainsAny(value.Path, ":\x00") || len(value.Path) > 2048 || path.Ext(value.Path) != ".webp" {
+	if value.MediaID == "" || len(value.MediaID) > 128 || !value.Valid || value.TaskID != "" || value.Provenance == nil || value.Provenance.Origin != "imported" || ValidateLQProvenance(value.Provenance, value.TaskID) != nil || value.Size < 1 || value.Size > 20<<30 || value.Width < 1 || value.Height < 1 || !ValidLQPath(value.Path) || path.Clean(value.Path) != value.Path || strings.ContainsAny(value.Path, ":\x00") || len(value.Path) > 2048 || path.Ext(value.Path) != ".webp" {
 		return ErrLQValidation
 	}
 	if value.Spec != nil && ValidateImageSpec(*value.Spec) != nil {
 		return ErrLQValidation
 	}
 	return nil
-}
-
-func lqDigest(value string) bool {
-	decoded, err := hex.DecodeString(value)
-	return err == nil && len(decoded) == 32 && strings.ToLower(value) == value
 }

@@ -4,9 +4,9 @@ import (
 	"bytes"
 	librarydomain "comicatlas.local/backend/internal/modules/library/domain"
 	storagedomain "comicatlas.local/backend/internal/modules/storage/domain"
+	"comicatlas.local/backend/internal/platform/prune"
 	"context"
 	"crypto/rand"
-	"crypto/sha256"
 	"encoding/hex"
 	"errors"
 	"io"
@@ -46,15 +46,11 @@ func (files *MetadataFiles) directory(name string) error {
 	}
 	return nil
 }
-func (files *MetadataFiles) PublishMetadata(ctx context.Context, comic, task string, data []byte, hash string) error {
+func (files *MetadataFiles) PublishMetadata(ctx context.Context, comic, task string, data []byte) error {
 	if !metadataKey(comic) || !metadataKey(task) || len(data) > 2*librarydomain.MaxSnapshotBytes {
 		return storagedomain.ErrValidation
 	}
-	digest := sha256.Sum256(data)
-	if hash != hex.EncodeToString(digest[:]) {
-		return storagedomain.ErrValidation
-	}
-	parent := "staging/metadata/" + task + "/" + comic
+	parent := "staging/metadata/" + task
 	if err := files.directory("metadata"); err != nil {
 		return err
 	}
@@ -106,6 +102,7 @@ func (files *MetadataFiles) PublishMetadata(ctx context.Context, comic, task str
 			return err
 		}
 	}
+	prune.EmptyDirectories(files.scanner.root, parent)
 	return nil
 }
 

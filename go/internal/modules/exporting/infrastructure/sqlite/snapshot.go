@@ -10,7 +10,7 @@ import (
 )
 
 func loadSnapshot(ctx context.Context, tx *sql.Tx, id string, request exportdomain.Request) (exportdomain.Snapshot, error) {
-	result := exportdomain.Snapshot{Version: 1, Request: request, Catalogs: []librarydomain.Catalog{}, Chapters: []librarydomain.Chapter{}, Sources: []exportdomain.Source{}}
+	result := exportdomain.Snapshot{Version: 2, Request: request, Catalogs: []librarydomain.Catalog{}, Chapters: []librarydomain.Chapter{}, Sources: []exportdomain.Source{}}
 	comic := &result.Comic
 	var categoryID, categoryName *string
 	var categoryVersion *int
@@ -89,14 +89,14 @@ func loadSnapshot(ctx context.Context, tx *sql.Tx, id string, request exportdoma
 	if err != nil {
 		return result, err
 	}
-	rows, err = tx.QueryContext(ctx, `SELECT m.id,m.chapter_id,m.page_number,m.file_name,m.media_type,m.relative_path,m.sha256,m.size,m.hq_state,COALESCE(l.relative_path,''),COALESCE(l.sha256,''),COALESCE(l.size,0),COALESCE(l.valid=1,0) FROM active_media m JOIN active_chapters ch ON ch.id=m.chapter_id LEFT JOIN image_lq l ON l.media_id=m.id WHERE ch.comic_id=? ORDER BY ch.global_order,m.page_number,m.id LIMIT ?`, id, exportdomain.MaxMedia+1)
+	rows, err = tx.QueryContext(ctx, `SELECT m.id,m.chapter_id,m.page_number,m.file_name,m.media_type,m.relative_path,m.size,CASE WHEN m.hq_state='available' AND m.size=0 AND l.original_state IN ('missing','unbound') THEN 'released' ELSE m.hq_state END,COALESCE(l.relative_path,''),COALESCE(l.size,0),COALESCE(l.valid=1,0) FROM active_media m JOIN active_chapters ch ON ch.id=m.chapter_id LEFT JOIN image_lq l ON l.media_id=m.id WHERE ch.comic_id=? ORDER BY ch.global_order,m.page_number,m.id LIMIT ?`, id, exportdomain.MaxMedia+1)
 	if err != nil {
 		return result, err
 	}
 	for rows.Next() {
 		var value exportdomain.Candidate
 		s := &value.Source
-		if err = rows.Scan(&s.MediaID, &s.ChapterID, &s.PageNumber, &s.FileName, &s.MediaType, &s.Path, &s.SHA256, &s.Size, &value.HQState, &value.LQPath, &value.LQSHA, &value.LQSize, &value.LQCurrent); err != nil {
+		if err = rows.Scan(&s.MediaID, &s.ChapterID, &s.PageNumber, &s.FileName, &s.MediaType, &s.Path, &s.Size, &value.HQState, &value.LQPath, &value.LQSize, &value.LQCurrent); err != nil {
 			rows.Close()
 			return result, err
 		}

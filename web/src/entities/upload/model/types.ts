@@ -3,7 +3,6 @@ export interface UploadFile {
   id: string
   name: string
   size: number
-  sha256: string
   receivedBytes: number
   receivedParts: number[]
 }

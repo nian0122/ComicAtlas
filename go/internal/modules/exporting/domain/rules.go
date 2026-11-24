@@ -57,7 +57,7 @@ func SelectSource(candidate Candidate) (Source, error) {
 		if value.MediaType != "image" || candidate.HQState != "released" || !candidate.LQCurrent {
 			return value, ErrSource
 		}
-		value.Path, value.SHA256, value.Size, value.Quality = candidate.LQPath, candidate.LQSHA, candidate.LQSize, "lq"
+		value.Path, value.Size, value.Quality = candidate.LQPath, candidate.LQSize, "lq"
 	}
 	if !validSource(value) {
 		return value, ErrSource
@@ -65,12 +65,12 @@ func SelectSource(candidate Candidate) (Source, error) {
 	return value, nil
 }
 func validSource(source Source) bool {
-	return sourcePath(source.Path, source.Quality) && (source.SHA256 == "" || digest(source.SHA256)) && source.Size >= 0 && source.Size <= 20<<30
+	return sourcePath(source.Path, source.Quality) && source.Size >= 0 && source.Size <= 20<<30
 }
 
 func ValidateSnapshot(snapshot Snapshot) error {
 	request, err := Normalize(snapshot.Request)
-	if err != nil || request != snapshot.Request || snapshot.Version != 1 || snapshot.Comic.ID == "" || len(snapshot.Sources) > MaxMedia || len(snapshot.Catalogs)+len(snapshot.Chapters) > MaxNodes {
+	if err != nil || request != snapshot.Request || snapshot.Version != 2 || snapshot.Comic.ID == "" || len(snapshot.Sources) > MaxMedia || len(snapshot.Catalogs)+len(snapshot.Chapters) > MaxNodes {
 		return ErrValidation
 	}
 	var total int64
@@ -95,8 +95,8 @@ func ValidateSnapshot(snapshot Snapshot) error {
 	}
 	return nil
 }
-func ValidateManifest(manifest Manifest, id, hash string, snapshot Snapshot) error {
-	if manifest.Version != 2 || manifest.TaskID != id || !TaskID(id) || manifest.SnapshotSHA != hash || len(manifest.Artifacts) < 1 || len(manifest.Artifacts) > 128 {
+func ValidateManifest(manifest Manifest, id string, snapshot Snapshot) error {
+	if manifest.Version != 4 || manifest.TaskID != id || !TaskID(id) || len(manifest.Artifacts) < 1 || len(manifest.Artifacts) > 128 {
 		return ErrManifest
 	}
 	request := snapshot.Request
@@ -111,7 +111,7 @@ func ValidateManifest(manifest Manifest, id, hash string, snapshot Snapshot) err
 		if last {
 			name = base + "." + request.Format
 		}
-		if artifact.FileName != name || artifact.Size <= 0 || !digest(artifact.SHA256) || artifact.LastSegment != last || artifact.Path != "" || request.PartBytes > 0 && artifact.Size > request.PartBytes {
+		if artifact.FileName != name || artifact.Size <= 0 || artifact.Modified == 0 || artifact.LastSegment != last || artifact.Path != "" || request.PartBytes > 0 && artifact.Size > request.PartBytes {
 			return ErrManifest
 		}
 		total += artifact.Size

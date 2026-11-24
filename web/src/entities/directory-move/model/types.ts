@@ -1,20 +1,8 @@
-type TaskStatus = 'queued' | 'running' | 'cancelling' | 'cancelled' | 'succeeded' | 'failed'
+export type TaskStatus = 'queued' | 'running' | 'cancelling' | 'cancelled' | 'succeeded' | 'failed'
 export interface DirectoryTarget {
   id: string
   title: string
   cover: string | null
-}
-export interface DirectoryPreview {
-  id: string
-  taskId: string
-  status: TaskStatus
-  ready: boolean
-  bookCount: number
-  confirmationToken?: string
-  expiresAt?: string
-  fileCount?: number
-  bytes?: number
-  moveTaskId?: string
 }
 export interface DirectoryResult {
   position: number
@@ -22,7 +10,7 @@ export interface DirectoryResult {
   source: string
   target: string
   size: number
-  sha256: string
+  modified: number
   state: string
 }
 export interface DirectoryResults {

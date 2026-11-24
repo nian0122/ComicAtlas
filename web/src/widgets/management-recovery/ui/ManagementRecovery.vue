@@ -2,7 +2,8 @@
 import { reactive } from 'vue'
 import type { Task } from '@/entities/task'
 import { recoveryLabels, recoveryErrors } from '@/entities/recovery'
-import { ManagementDialog, ManagementIcon, formatDate, taskStatusLabels } from '@/shared/ui/management'
+import { ManagementIcon, formatDate, taskStatusLabels } from '@/shared/ui/management'
+import { AppDialog } from '@/shared/ui/dialog'
 import { useRecovery } from '../model/use-recovery'
 const props = defineProps<{ mode: 'scan' | 'repair'; comicId: string; taskId: string; writable: boolean }>()
 const emit = defineEmits<{
@@ -16,7 +17,7 @@ const emit = defineEmits<{
 const w = reactive(useRecovery(props, (task) => emit('accepted', task)))
 </script>
 <template>
-  <ManagementDialog
+  <AppDialog
     :open="true"
     :title="mode === 'scan' ? '扫盘恢复' : '恢复占位补全'"
     :busy="w.busy"
@@ -250,7 +251,7 @@ const w = reactive(useRecovery(props, (task) => emit('accepted', task)))
       </div>
     </section>
     <p v-if="w.loading" role="status">正在读取实际恢复结果…</p>
-  </ManagementDialog>
+  </AppDialog>
 </template>
 <style scoped>
 .recovery-intro {

@@ -12,12 +12,16 @@ export interface RecyclePreview {
   url: string | null
 }
 
-export interface RecycleRequest {
-  scope: 'ids' | 'filter'
+export interface RecycleGroup {
   targetType: ReactionType
-  mediaType: '' | 'image' | 'video'
+  scope: 'ids' | 'filter'
   ids: string[]
+  mediaType: '' | 'image' | 'video'
   previews: RecyclePreview[]
+}
+
+export interface RecycleRequest {
+  groups: RecycleGroup[]
 }
 
 export function canRecycleDislike(item: RecyclableTarget) {

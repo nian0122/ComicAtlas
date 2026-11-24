@@ -3,6 +3,7 @@ package sqlite
 import (
 	"bytes"
 	lifecycledomain "comicatlas.local/backend/internal/modules/lifecycle/domain"
+	mediadomain "comicatlas.local/backend/internal/modules/media/domain"
 	"context"
 	"database/sql"
 	"encoding/json"
@@ -24,9 +25,9 @@ func candidates(ctx context.Context, tx *sql.Tx, value lifecycledomain.Target) (
 	where, args := scopeWhere(value)
 	join := " FROM active_media m JOIN active_chapters ch ON ch.id=m.chapter_id "
 	queries := []string{
-		"SELECT m.relative_path,m.size,m.sha256,(m.hq_state='released' AND m.sha256='')" + join + "WHERE (m.hq_state='available' OR (m.sha256='' AND m.hq_state='released')) AND " + where,
-		"SELECT l.relative_path,l.size,l.sha256,0" + join + "JOIN image_lq l ON l.media_id=m.id WHERE " + where,
-		"SELECT 'retired/uploads/'||s.id||'/'||r.kind||'.bin',r.size,r.sha256,0" + join + "JOIN upload_sessions s ON s.replace_media_id=m.id JOIN upload_retired r ON r.task_id=s.task_id WHERE r.status='moved' AND " + where,
+		"SELECT m.relative_path,m.size,(m.hq_state='released' OR (m.size=0 AND EXISTS(SELECT 1 FROM image_lq l WHERE l.media_id=m.id AND l.original_state IN ('missing','unbound'))))" + join + "WHERE m.hq_state IN ('available','released') AND " + where,
+		"SELECT l.relative_path,l.size,0" + join + "JOIN image_lq l ON l.media_id=m.id WHERE " + where,
+		"SELECT 'retired/uploads/'||s.id||'/'||r.kind||'.bin',r.size,0" + join + "JOIN upload_sessions s ON s.replace_media_id=m.id JOIN upload_retired r ON r.task_id=s.task_id WHERE r.status='moved' AND " + where,
 	}
 	for _, query := range queries {
 		rows, err := tx.QueryContext(ctx, query+" LIMIT ?", append(args, lifecycledomain.MaxFiles+1)...)
@@ -36,11 +37,11 @@ func candidates(ctx context.Context, tx *sql.Tx, value lifecycledomain.Target) (
 		for rows.Next() {
 			var item lifecycledomain.FileCandidate
 			var sourceAbsent int
-			if err = rows.Scan(&item.Path, &item.Size, &item.SHA256, &sourceAbsent); err != nil {
+			if err = rows.Scan(&item.Path, &item.Size, &sourceAbsent); err != nil {
 				rows.Close()
 				return nil, err
 			}
-			item = lifecycledomain.CandidateForFile(item.Path, item.Size, item.SHA256, sourceAbsent != 0)
+			item = lifecycledomain.CandidateForFile(item.Path, item.Size, sourceAbsent != 0)
 			items = append(items, item)
 			if len(items) > lifecycledomain.MaxFiles {
 				rows.Close()
@@ -54,8 +55,8 @@ func candidates(ctx context.Context, tx *sql.Tx, value lifecycledomain.Target) (
 		}
 	}
 	if value.Type == "comic" {
-		cover := lifecycledomain.FileCandidate{Path: "thumbs/" + value.ID + "/cover.webp", Size: -1}
-		err := tx.QueryRowContext(ctx, "SELECT size,sha256 FROM comic_covers WHERE comic_id=?", value.ID).Scan(&cover.Size, &cover.SHA256)
+		cover := lifecycledomain.FileCandidate{Path: mediadomain.CoverPath(value.ID), Size: -1}
+		err := tx.QueryRowContext(ctx, "SELECT size FROM comic_covers WHERE comic_id=?", value.ID).Scan(&cover.Size)
 		if err != nil && err != sql.ErrNoRows {
 			return nil, err
 		}

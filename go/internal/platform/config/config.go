@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net"
 	"net/url"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -19,6 +20,8 @@ type Config struct {
 	ImportDirectory       string
 	ImportHostRoot        string
 	MediaDirectory        string
+	ExportDirectory       string
+	SQLiteBackupDirectory string
 	LogLevel              slog.Level
 	BusyTimeout           time.Duration
 	ShutdownTimeout       time.Duration
@@ -29,6 +32,8 @@ type Config struct {
 	CwebpPath             string
 	DjpegPath             string
 	ImagePixels           int64
+	ImageConcurrency      int
+	ImageScratchDirectory string
 	UploadMinFreeBytes    int64
 	UploadMinFreePercent  int
 	TrashRetentionDays    int
@@ -110,6 +115,15 @@ func Load(getenv func(string) string) (Config, error) {
 	if errPixels != nil || configuration.ImagePixels < 1 || configuration.ImagePixels > 64000000 {
 		return Config{}, fmt.Errorf("IMAGE_MAX_DECODE_PIXELS 必须为 1..64000000")
 	}
+	configuration.ImageScratchDirectory = value("IMAGE_SCRATCH_DIR", filepath.Join(os.TempDir(), "comicatlas-image-scratch"))
+	if !filepath.IsAbs(configuration.ImageScratchDirectory) {
+		return Config{}, fmt.Errorf("IMAGE_SCRATCH_DIR 必须为绝对路径")
+	}
+	concurrency, errConcurrency := strconv.Atoi(value("IMAGE_CONCURRENCY", "4"))
+	configuration.ImageConcurrency = concurrency
+	if errConcurrency != nil || configuration.ImageConcurrency < 1 || configuration.ImageConcurrency > 8 {
+		return Config{}, fmt.Errorf("IMAGE_CONCURRENCY 必须为 1..8 的整数")
+	}
 	if configuration.FFprobePath != "" && !filepath.IsAbs(configuration.FFprobePath) {
 		return Config{}, fmt.Errorf("FFPROBE_PATH 必须为绝对路径")
 	}
@@ -126,6 +140,17 @@ func Load(getenv func(string) string) (Config, error) {
 		return Config{}, err
 	}
 	configuration.DataDirectory, configuration.ImportDirectory, configuration.MediaDirectory = directories.Data, directories.Import, directories.Media
+	configuration.ExportDirectory = directories.Export
+	if configuration.ExportDirectory != configuration.MediaDirectory {
+		relative, relErr := filepath.Rel(configuration.MediaDirectory, configuration.ExportDirectory)
+		if relErr == nil && relative != ".." && !strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
+			return Config{}, fmt.Errorf("EXPORT_DIR 不能位于媒体根内")
+		}
+	}
+	configuration.SQLiteBackupDirectory = value("SQLITE_BACKUP_DIR", "")
+	if configuration.SQLiteBackupDirectory != "" && !filepath.IsAbs(configuration.SQLiteBackupDirectory) {
+		return Config{}, fmt.Errorf("SQLITE_BACKUP_DIR 必须为绝对路径")
+	}
 	if err = configuration.LogLevel.UnmarshalText([]byte(value("LOG_LEVEL", "INFO"))); err != nil {
 		return Config{}, fmt.Errorf("LOG_LEVEL 无效: %w", err)
 	}

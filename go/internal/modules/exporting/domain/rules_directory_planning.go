@@ -8,11 +8,11 @@ func DirectoryInventoryIdentities(snapshots []DirectoryInventorySnapshot) ([]Dir
 	identities := make([]DirectoryInventoryIdentity, 0, len(snapshots))
 	bytes := 0
 	for _, snapshot := range snapshots {
-		stamp, size, err := DirectoryInventoryStamp(snapshot.Inventory)
+		size, err := DirectoryInventorySize(snapshot.Inventory)
 		if err != nil {
 			return nil, err
 		}
-		if stamp != snapshot.SHA256 || size != snapshot.CanonicalBytes {
+		if size != snapshot.CanonicalBytes {
 			return nil, ErrManifest
 		}
 		bytes += size
@@ -20,7 +20,7 @@ func DirectoryInventoryIdentities(snapshots []DirectoryInventorySnapshot) ([]Dir
 			return nil, ErrValidation
 		}
 		ids = append(ids, snapshot.Inventory.Comic.ID)
-		identities = append(identities, DirectoryInventoryIdentity{ComicID: snapshot.Inventory.Comic.ID, SHA256: stamp, MutationVersion: snapshot.MutationVersion})
+		identities = append(identities, DirectoryInventoryIdentity{ComicID: snapshot.Inventory.Comic.ID, MutationVersion: snapshot.MutationVersion})
 	}
 	if err := DirectoryIDs(ids); err != nil {
 		return nil, err
@@ -68,7 +68,7 @@ func BuildDirectoryPlans(snapshots []DirectoryInventorySnapshot, resolutions []D
 		if files > MaxDirectoryFiles || absences > MaxDirectoryAbsences || nodes > MaxNodes {
 			return nil, ErrValidation
 		}
-		data, err := directoryDocument(snapshot.Inventory, snapshot.SHA256, placements)
+		data, err := directoryDocument(snapshot.Inventory, placements)
 		if err != nil {
 			return nil, err
 		}
@@ -82,7 +82,7 @@ func BuildDirectoryPlans(snapshots []DirectoryInventorySnapshot, resolutions []D
 	if len(resolved) != 0 {
 		return nil, ErrManifest
 	}
-	if _, err := DirectoryPlanStamp(plans); err != nil {
+	if err := ValidateDirectoryPlans(plans); err != nil {
 		return nil, err
 	}
 	return plans, nil

@@ -9,11 +9,11 @@ import (
 
 func scanDirectoryResult(row interface{ Scan(...any) error }) (exportdomain.DirectoryFileResult, error) {
 	var value exportdomain.DirectoryFileResult
-	err := row.Scan(&value.Position, &value.ComicID, &value.Source, &value.Target, &value.Size, &value.SHA256, &value.State)
+	err := row.Scan(&value.Position, &value.ComicID, &value.Source, &value.Target, &value.Size, &value.Modified, &value.State)
 	return value, err
 }
 
-const directoryResultColumns = "position,CASE WHEN length(CAST(comic_id AS BLOB))<=128 THEN comic_id ELSE '' END,CASE WHEN length(CAST(source AS BLOB))<=2048 THEN source ELSE '' END,CASE WHEN length(CAST(target AS BLOB))<=2048 THEN target ELSE '' END,size,CASE WHEN length(sha256)<=64 THEN sha256 ELSE '' END,state"
+const directoryResultColumns = "position,CASE WHEN length(CAST(comic_id AS BLOB))<=128 THEN comic_id ELSE '' END,CASE WHEN length(CAST(source AS BLOB))<=2048 THEN source ELSE '' END,CASE WHEN length(CAST(target AS BLOB))<=2048 THEN target ELSE '' END,size,modified_ns,state"
 
 func (repo *repository) SaveDirectoryResults(ctx context.Context, id string, rows []exportdomain.DirectoryFileResult) error {
 	if err := exportdomain.ValidateDirectoryResultBatch(rows); err != nil {
@@ -29,7 +29,7 @@ func (repo *repository) SaveDirectoryResults(ctx context.Context, id string, row
 	if err != nil {
 		return err
 	}
-	statement, err := tx.PrepareContext(ctx, "INSERT INTO directory_move_results(task_id,position,comic_id,source,target,size,sha256,state) VALUES(?,?,?,?,?,?,?,?) ON CONFLICT(task_id,position) DO NOTHING")
+	statement, err := tx.PrepareContext(ctx, "INSERT INTO directory_move_results(task_id,position,comic_id,source,target,size,modified_ns,state) VALUES(?,?,?,?,?,?,?,?) ON CONFLICT(task_id,position) DO NOTHING")
 	if err != nil {
 		return err
 	}
@@ -39,7 +39,7 @@ func (repo *repository) SaveDirectoryResults(ctx context.Context, id string, row
 		if exportdomain.ValidateDirectoryCompletedResult(next, next.Position) != nil || next.Position > count {
 			return exportdomain.ErrManifest
 		}
-		result, err := statement.ExecContext(ctx, id, next.Position, next.ComicID, next.Source, next.Target, next.Size, next.SHA256, next.State)
+		result, err := statement.ExecContext(ctx, id, next.Position, next.ComicID, next.Source, next.Target, next.Size, next.Modified, next.State)
 		if err != nil {
 			return err
 		}

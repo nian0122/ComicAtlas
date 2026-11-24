@@ -3,13 +3,8 @@ import { computed, reactive } from 'vue'
 import type { Task } from '@/entities/task'
 import type { StorageObject } from '@/entities/storage'
 import type { BatchPreview } from '@/features/manage-items'
-import {
-  BatchPreviewList,
-  BatchPreviewSummary,
-  ManagementDialog,
-  ManagementIcon,
-  ManagementImage,
-} from '@/shared/ui/management'
+import { BatchPreviewList, BatchPreviewSummary, ManagementIcon, ManagementImage } from '@/shared/ui/management'
+import { AppDialog } from '@/shared/ui/dialog'
 import { useLqDialog, type LqTarget } from '../model/use-lq-dialog'
 const props = defineProps<{
   open: boolean
@@ -33,7 +28,7 @@ const batchRows = computed(() =>
 </script>
 
 <template>
-  <ManagementDialog :open="open" title="生成轻量副本" size="form" :busy="w.submitting" @close="emit('close')">
+  <AppDialog :open="open" title="生成轻量副本" size="form" :busy="w.submitting" @close="emit('close')">
     <p class="mw-muted">
       轻量副本是阅读用的 WebP 副本（长边不超过 3840、质量
       70），不会修改原件，也不会改变阅读进度。确认后提交后台任务，逐张结果在任务中心查看。
@@ -114,7 +109,7 @@ const batchRows = computed(() =>
           />
           <span id="lq-missing-copy" class="lq-mode-copy">
             <strong>补齐缺失副本 <span class="lq-badge">推荐</span></strong>
-            <small>保留已有有效副本，只补齐缺失或失效的副本。生成时按需补算原件摘要。</small>
+            <small>保留已有有效副本，只补齐缺失或失效的副本。生成时按需读取原件文件属性。</small>
             <em v-if="w.known && w.mode === 'missing' && w.prediction">
               将生成 {{ w.prediction.generate }} 张，跳过 {{ w.prediction.skip }} 张<template
                 v-if="w.prediction.unavailable"
@@ -172,7 +167,7 @@ const batchRows = computed(() =>
         <ManagementIcon v-if="w.submitting" name="loading" class="mw-spin" :size="14" />{{ w.submitLabel }}
       </button>
     </footer>
-  </ManagementDialog>
+  </AppDialog>
 </template>
 
 <style scoped>

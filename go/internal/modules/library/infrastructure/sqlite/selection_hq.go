@@ -26,7 +26,7 @@ func selectHQFacts(ctx context.Context, tx *sql.Tx, items []librarydomain.Select
 		return err
 	}
 	rows, err := tx.QueryContext(ctx, `SELECT c.id,COUNT(m.id),COALESCE(SUM(m.hq_state='available'),0),COALESCE(SUM(m.hq_state='released'),0),
- COALESCE(SUM(m.hq_state='releasing'),0),COALESCE(SUM(m.hq_state='available' AND m.sha256=''),0),
+ COALESCE(SUM(m.hq_state='releasing'),0),
  COALESCE(SUM(m.hq_state='available' AND (COALESCE(l.valid,0)=0)),0),
  COALESCE(SUM(CASE WHEN m.hq_state='available' THEN m.size ELSE 0 END),0),
  EXISTS(SELECT 1 FROM tasks t WHERE t.comic_id=c.id AND t.type IN('image_lq','hq_release','archive_export','video_transcode','media_upload','metadata_refresh') AND t.status IN('queued','running','cancelling')),
@@ -42,7 +42,7 @@ func selectHQFacts(ctx context.Context, tx *sql.Tx, items []librarydomain.Select
 		var id string
 		var counts mediadomain.HQImageCounts
 		var active, upload, prepared bool
-		if err = rows.Scan(&id, &counts.Images, &counts.Available, &counts.Released, &counts.Releasing, &counts.MissingSourceSHA256, &counts.MissingLQ, &counts.OriginalBytes, &active, &upload, &prepared); err != nil {
+		if err = rows.Scan(&id, &counts.Images, &counts.Available, &counts.Released, &counts.Releasing, &counts.MissingLQ, &counts.OriginalBytes, &active, &upload, &prepared); err != nil {
 			return err
 		}
 		preview := mediadomain.HQSelectionPreview(id, counts, active, upload, prepared)

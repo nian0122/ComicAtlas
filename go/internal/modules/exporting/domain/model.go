@@ -8,25 +8,24 @@ import (
 type Request = librarydomain.ArchiveRequest
 type Source = librarydomain.ArchiveSource
 type Candidate struct {
-	Source        Source
-	HQState       string
-	LQPath, LQSHA string
-	LQSize        int64
-	LQCurrent     bool
+	Source    Source
+	HQState   string
+	LQPath    string
+	LQSize    int64
+	LQCurrent bool
 }
 type Snapshot = librarydomain.ArchiveMetadata
 type Artifact struct {
 	FileName    string `json:"fileName"`
 	Size        int64  `json:"size"`
-	SHA256      string `json:"sha256"`
+	Modified    int64  `json:"modified"`
 	LastSegment bool   `json:"lastSegment"`
 	Path        string `json:"path,omitempty"`
 }
 type Manifest struct {
-	Version     int        `json:"version"`
-	TaskID      string     `json:"taskId"`
-	SnapshotSHA string     `json:"snapshotSha256"`
-	Artifacts   []Artifact `json:"artifacts"`
+	Version   int        `json:"version"`
+	TaskID    string     `json:"taskId"`
+	Artifacts []Artifact `json:"artifacts"`
 }
 type ArtifactView struct {
 	TaskID    string     `json:"taskId"`

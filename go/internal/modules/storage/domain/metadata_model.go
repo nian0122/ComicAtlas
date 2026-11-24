@@ -14,7 +14,7 @@ type MediaObservation struct {
 	Status      string                  `json:"status"`
 	ErrorCode   *string                 `json:"errorCode"`
 	StoragePath string                  `json:"storagePath"`
-	SHA256      string                  `json:"sha256"`
+	Modified    int64                   `json:"modified"`
 	Size        int64                   `json:"size"`
 	Inspection  *mediadomain.Inspection `json:"inspection"`
 	LQValid     *bool                   `json:"lqValid"`
@@ -41,22 +41,20 @@ type MetadataPage struct {
 	Total    int            `json:"total"`
 }
 type MetadataSidecar struct {
-	Producer       string                 `json:"producer,omitempty"`
-	SyncRevision   int64                  `json:"syncRevision,omitempty"`
-	ObservedAt     string                 `json:"observedAt"`
-	Version        int                    `json:"version"`
-	TaskID         string                 `json:"taskId"`
-	BaselineSHA256 string                 `json:"baselineSha256"`
-	Snapshot       librarydomain.Snapshot `json:"snapshot"`
-	Observations   []MediaObservation     `json:"observations"`
+	Producer     string                 `json:"producer,omitempty"`
+	SyncRevision int64                  `json:"syncRevision,omitempty"`
+	ObservedAt   string                 `json:"observedAt"`
+	Version      int                    `json:"version"`
+	TaskID       string                 `json:"taskId"`
+	Snapshot     librarydomain.Snapshot `json:"snapshot"`
+	Observations []MediaObservation     `json:"observations"`
 }
 
 type AutomaticMetadataSidecar struct {
-	Producer       string          `json:"producer"`
-	SyncRevision   int64           `json:"syncRevision"`
-	ObservedAt     string          `json:"observedAt"`
-	Version        int             `json:"version"`
-	TaskID         string          `json:"taskId"`
-	BaselineSHA256 string          `json:"baselineSha256"`
-	Snapshot       json.RawMessage `json:"snapshot"`
+	Producer     string          `json:"producer"`
+	SyncRevision int64           `json:"syncRevision"`
+	ObservedAt   string          `json:"observedAt"`
+	Version      int             `json:"version"`
+	TaskID       string          `json:"taskId"`
+	Snapshot     json.RawMessage `json:"snapshot"`
 }

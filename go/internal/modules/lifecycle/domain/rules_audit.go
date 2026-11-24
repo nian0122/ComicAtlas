@@ -1,8 +1,8 @@
 package domain
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
+	"bytes"
+	"comicatlas.local/backend/internal/platform/stableid"
 	"encoding/json"
 	"path"
 	"sort"
@@ -21,12 +21,12 @@ func AuditStamp(value AuditSnapshot) (string, int, error) {
 	}
 	items := append([]AuditEntry{}, value.Entries...)
 	sort.Slice(items, func(i, j int) bool { return items[i].Entry.ID < items[j].Entry.ID })
-	hash := sha256.New()
+	var buffer bytes.Buffer
 	header, _ := json.Marshal([]any{value.Requested.ID, value.OwnerTaskID, value.OwnerState, value.OwnerAttempt, value.OwnerFinishedAt, value.Operation, value.Superseded})
-	hash.Write(header)
+	buffer.Write(header)
 	count := 0
 	for _, item := range items {
-		if ValidateCandidates(item.Candidates) != nil || !validDigest(item.PlanHash) {
+		if ValidateCandidates(item.Candidates) != nil || !validStamp(item.PlanStamp) {
 			return "", 0, ErrJournal
 		}
 		count += len(item.Candidates)
@@ -35,10 +35,10 @@ func AuditStamp(value AuditSnapshot) (string, int, error) {
 		}
 		entry := item.Entry
 		entry.CoverURL = nil
-		data, _ := json.Marshal([]any{entry, item.PlanHash, item.ObjectState})
-		hash.Write(data)
+		data, _ := json.Marshal([]any{entry, item.PlanStamp, item.ObjectState})
+		buffer.Write(data)
 	}
-	return hex.EncodeToString(hash.Sum(nil)), count, nil
+	return stableid.Hex(buffer.String()), count, nil
 }
 
 func AuditEntryState(entry AuditEntry, journal JournalObservation) (bool, bool) {

@@ -10,7 +10,7 @@ import (
 	"strings"
 )
 
-// ProbeOpened 在调用期间借用文件；调用者负责根内选择、摘要与完成后来源复核。
+// ProbeOpened 在调用期间借用文件；调用者负责根内选择、文件属性与完成后来源复核。
 func (probe *Prober) ProbeOpened(ctx context.Context, input *os.File, logicalName string) (value mediadomain.Probe, err error) {
 	defer func() { runtime.KeepAlive(input) }()
 	if err = ctx.Err(); err != nil {

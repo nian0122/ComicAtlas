@@ -46,13 +46,13 @@ func NormalizeTargetSelection(kind string, value TargetSelection) (TargetSelecti
 }
 
 func ValidateTrashStamp(expected, actual string) error {
-	if !validDigest(expected) || expected != actual {
+	if !validStamp(expected) || expected != actual {
 		return ErrScopeChanged
 	}
 	return nil
 }
 
-func ValidTrashStamp(stamp string) bool { return validDigest(stamp) }
+func ValidTrashStamp(stamp string) bool { return validStamp(stamp) }
 
 func TrashSelectionBlocker(err error) (string, bool) {
 	if errors.Is(err, ErrNotFound) {

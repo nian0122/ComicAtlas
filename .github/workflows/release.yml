@@ -1,0 +1,29 @@
+name: 发布源码镜像构建
+on:
+  push:
+    branches: [main, 'feature/release-*']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  image:
+    strategy:
+      fail-fast: false
+      matrix:
+        component: [go, web, ai]
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: 校验部署配置
+        env:
+          COMICATLAS_STORAGE_ROOT: /tmp/comicatlas-release
+        run: docker compose --profile ai config --quiet
+      - name: 构建发布源码镜像
+        shell: bash
+        run: |
+          context=./${{ matrix.component }}
+          if [ '${{ matrix.component }}' = ai ]; then context=./go/services/ai; fi
+          docker build --target runtime --tag comicatlas-${{ matrix.component }}:release "$context"

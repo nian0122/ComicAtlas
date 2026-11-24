@@ -53,9 +53,9 @@ type Preview struct {
 	CompletedAt        *string                     `json:"completedAt"`
 }
 type Record struct {
-	ConfirmationHash string
-	Preview          Preview
-	OptionsJSON      string
+	Confirmation string
+	Preview      Preview
+	OptionsJSON  string
 }
 type Item struct {
 	TargetStamp     string                        `json:"targetStamp,omitempty"`

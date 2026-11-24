@@ -11,6 +11,7 @@ export type {
   BatchItem,
   BatchOperation,
   BatchRequest,
+  StructureNodeResult,
   TargetFilter,
   TargetSelection,
   TrashOperation,

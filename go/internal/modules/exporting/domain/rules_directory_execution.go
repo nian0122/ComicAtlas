@@ -13,19 +13,19 @@ func ValidateDirectoryResult(row DirectoryFileResult) error {
 		return ErrManifest
 	}
 	if row.State == "initially_missing" {
-		if row.Size != 0 || row.SHA256 != "" {
+		if row.Size != 0 || row.Modified != 0 {
 			return ErrManifest
 		}
 		return nil
 	}
-	if row.State != "moved" || !digest(row.SHA256) {
+	if row.State != "moved" {
 		return ErrManifest
 	}
 	return nil
 }
 
 func ValidateDirectoryCompletedResult(row DirectoryFileResult, position int) error {
-	if ValidateDirectoryResult(row) != nil || row.Position != position {
+	if ValidateDirectoryResult(row) != nil || row.Position != position || row.State == "moved" && row.Modified == 0 {
 		return ErrManifest
 	}
 	return nil

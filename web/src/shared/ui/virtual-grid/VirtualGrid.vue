@@ -1,6 +1,7 @@
 <script setup lang="ts" generic="T">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { WindowScroller } from 'vue-virtual-scroller'
+import { useVirtualFocus } from '@/shared/lib/virtual-focus'
 import { computeVirtualGridLayout } from './model/layout'
 
 const props = withDefaults(
@@ -36,11 +37,6 @@ const scroller = ref<{ updateVisibleItems: (itemsChanged: boolean, checkPosition
 const width = ref(0)
 const compact = ref(false)
 let scrollFrame = 0
-const focusState = {
-  element: null as HTMLElement | null,
-  key: '',
-  lastPointerDown: 0,
-}
 let observer: ResizeObserver | undefined
 let media: MediaQueryList | undefined
 
@@ -68,9 +64,11 @@ function syncCompact(event?: MediaQueryListEvent) {
 function keyOf(item: T) {
   return item && typeof item === 'object' ? String((item as Record<string, unknown>)[props.itemKey]) : String(item)
 }
-function onPointerDown() {
-  focusState.lastPointerDown = performance.now()
-}
+/* 焦点恢复与页块、目录树共用同一规则：回收后仍属于同一 item 才交还焦点。 */
+const { onFocusIn, onFocusOut } = useVirtualFocus({
+  keyOf: (element) => element.closest<HTMLElement>('[data-virtual-key]')?.dataset.virtualKey ?? '',
+  within: () => root.value,
+})
 function onScroll() {
   if (scrollFrame) return
   scrollFrame = requestAnimationFrame(() => {
@@ -83,38 +81,12 @@ function onScroll() {
     scroller.value?.updateVisibleItems(false, false)
   })
 }
-function onFocusIn(event: FocusEvent) {
-  const target = event.target as HTMLElement
-  const key = target.closest<HTMLElement>('[data-virtual-key]')?.dataset.virtualKey
-  if (key === undefined) {
-    focusState.element = null
-    return
-  }
-  focusState.element = target
-  focusState.key = key
-}
-function onFocusOut(event: FocusEvent) {
-  const element = event.target as HTMLElement
-  if (element !== focusState.element) return
-  const key = focusState.key
-  focusState.element = null
-  if (event.relatedTarget || !document.hasFocus()) return
-  // 点击离开时保留用户意图；只有虚拟列表重排导致的无目标失焦才恢复。
-  if (performance.now() - focusState.lastPointerDown < 300) return
-  requestAnimationFrame(() => {
-    if (document.activeElement !== document.body || !element.isConnected) return
-    if (element.closest<HTMLElement>('[data-virtual-key]')?.dataset.virtualKey !== key) return
-    if (!root.value?.contains(element)) return
-    element.focus({ preventScroll: true })
-  })
-}
 
 onMounted(() => {
   measure()
   media = window.matchMedia(`(max-width: ${Math.max(0, props.breakpoint - 1)}px)`)
   syncCompact()
   media.addEventListener('change', syncCompact)
-  document.addEventListener('pointerdown', onPointerDown, true)
   window.addEventListener('scroll', onScroll, { passive: true })
   if (typeof ResizeObserver === 'undefined' || !root.value) return
   observer = new ResizeObserver((entries) => {
@@ -126,7 +98,6 @@ onMounted(() => {
 onBeforeUnmount(() => {
   observer?.disconnect()
   media?.removeEventListener('change', syncCompact)
-  document.removeEventListener('pointerdown', onPointerDown, true)
   window.removeEventListener('scroll', onScroll)
   cancelAnimationFrame(scrollFrame)
 })

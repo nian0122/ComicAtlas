@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { reactive, watch } from 'vue'
 import { AppButton } from '@/shared/ui/button'
-import { ReadingDialog, ReadingIcon } from '@/shared/ui/reading'
+import { ReadingIcon } from '@/shared/ui/reading'
+import { AppDialog } from '@/shared/ui/dialog'
 import { nextMark, type ReadingMarkTarget } from '../model/marks'
 import { useReadingMarks } from '../model/use-reading-marks'
 
@@ -35,7 +36,13 @@ watch(signature, () => {
 })
 </script>
 <template>
-  <ReadingDialog :open="open" title="标记" class="cinema-tool-sheet reading-mark-sheet" @close="emit('close')">
+  <AppDialog
+    scope="reading"
+    :open="open"
+    title="标记"
+    class="cinema-tool-sheet reading-mark-sheet"
+    @close="emit('close')"
+  >
     <div v-if="marks.loading" class="reading-mark-status" role="status">正在读取标记…</div>
     <div v-else-if="marks.error" class="reading-mark-status is-error" role="alert">
       <span>{{ marks.error }}</span>
@@ -72,7 +79,7 @@ watch(signature, () => {
       </div>
       <p class="reading-mark-hint">作品、章节和当前媒体的标记彼此独立；再次点击已选标记即可清除。</p>
     </template>
-  </ReadingDialog>
+  </AppDialog>
 </template>
 <style scoped>
 .reading-mark-status {

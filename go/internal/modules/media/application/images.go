@@ -7,14 +7,18 @@ import (
 	"time"
 )
 
-// ImageService 由入口共享，LQ、缩略图及回收封面共用同一个串行像素处理许可。
+// ImageService 由入口共享，LQ、缩略图及回收封面共用有界像素处理许可。
+// 并发上限同时约束内存与暂存空间；它不是按任务创建的独立许可。
 type ImageService struct {
 	renderer mediaports.ImageRenderer
 	slot     chan struct{}
 }
 
-func NewImages(renderer mediaports.ImageRenderer) *ImageService {
-	return &ImageService{renderer: renderer, slot: make(chan struct{}, 1)}
+func NewImages(renderer mediaports.ImageRenderer, concurrency int) *ImageService {
+	if concurrency < 1 {
+		concurrency = 1
+	}
+	return &ImageService{renderer: renderer, slot: make(chan struct{}, concurrency)}
 }
 func (service *ImageService) Render(parent context.Context, request mediadomain.ImageRequest) (mediadomain.ImageArtifact, error) {
 	if err := mediadomain.ValidateImageSpec(request.Spec); err != nil {

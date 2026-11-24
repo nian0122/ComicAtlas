@@ -1,10 +1,10 @@
 package domain
 
 import (
+	"bytes"
 	librarydomain "comicatlas.local/backend/internal/modules/library/domain"
 	mediadomain "comicatlas.local/backend/internal/modules/media/domain"
-	"crypto/sha256"
-	"encoding/hex"
+	"comicatlas.local/backend/internal/platform/stableid"
 	"encoding/json"
 	"path"
 	"reflect"
@@ -15,31 +15,11 @@ import (
 	"unicode/utf8"
 )
 
-// DiscoveredImageID 由漫画、章节、路径和图片内容摘要派生登记 ID。图片确认后会计算
-// 完整摘要，内容寻址避免同一路径被不同内容复用身份。
-func DiscoveredImageID(comic, chapter, name, hash string) string {
-	digest := sha256.Sum256([]byte("metadata-discovery-v1\x00" + comic + "\x00" + chapter + "\x00" + name + "\x00" + hash))
-	return "media_" + hex.EncodeToString(digest[:16])
+// DiscoveredMediaID 由漫画、章节和路径派生媒体 ID。
+func DiscoveredMediaID(comic, chapter, name string) string {
+	return "media_" + stableid.Hex("metadata-discovery\x00"+comic+"\x00"+chapter+"\x00"+name)
 }
 
-// DiscoveredVideoID 由漫画、章节和路径派生视频登记 ID。视频核对不读取整段内容，
-// 因此登记身份不能依赖内容摘要。
-func DiscoveredVideoID(comic, chapter, name string) string {
-	digest := sha256.Sum256([]byte("metadata-discovery-v2\x00" + comic + "\x00" + chapter + "\x00" + name))
-	return "media_" + hex.EncodeToString(digest[:16])
-}
-
-// discoveredIdentityMatches 校验发现项身份。图片确认后按内容寻址；视频按路径派生
-// ID 且摘要必须未知。
-func discoveredIdentityMatches(comic, chapter string, item MediaObservation) bool {
-	if item.MediaID == nil || item.Inspection == nil {
-		return false
-	}
-	if item.Inspection.MediaType == "video" {
-		return item.SHA256 == "" && *item.MediaID == DiscoveredVideoID(comic, chapter, item.StoragePath)
-	}
-	return len(item.SHA256) == 64 && *item.MediaID == DiscoveredImageID(comic, chapter, item.StoragePath, item.SHA256)
-}
 func DiscoveryNameAllowed(name string) bool {
 	if name == "" || len(name) > 255 || !utf8.ValidString(name) || strings.ContainsAny(name, "/\\:") {
 		return false
@@ -79,23 +59,11 @@ func MetadataNames(snapshot librarydomain.Snapshot) map[string]bool {
 	return result
 }
 
-func ObservedMediaStatus(item librarydomain.StoredMedia, info mediadomain.Inspection, size int64, hash string) string {
-	if item.Hash != hash || item.Size != size || item.Width == nil || item.Height == nil || *item.Width != info.Width || *item.Height != info.Height || item.ContentType != info.ContentType || !reflect.DeepEqual(item.Video, info.Video) {
+func ObservedMediaStatus(item librarydomain.StoredMedia, info mediadomain.Inspection, size, modified int64) string {
+	if item.Modified != 0 && item.Modified != modified || item.Size != size || item.Width != nil && *item.Width != info.Width || item.Height != nil && *item.Height != info.Height || item.ContentType != info.ContentType || item.Video != nil && !reflect.DeepEqual(item.Video, info.Video) {
 		return "changed"
 	}
 	return "present"
-}
-
-// observationHashValid 允许视频在内容变化后清空已失效的摘要；其余情况必须给出
-// 完整 SHA-256，不能把未知摘要伪装成内容校验值。
-func observationHashValid(status, hash string, media librarydomain.StoredMedia) bool {
-	if len(hash) == 64 {
-		return true
-	}
-	if hash != "" || media.MediaType != "video" {
-		return false
-	}
-	return status == "changed" || media.Hash == ""
 }
 
 func ApplyObservations(baseline librarydomain.Snapshot, items []MediaObservation) (librarydomain.Snapshot, error) {
@@ -143,7 +111,7 @@ func ApplyObservations(baseline librarydomain.Snapshot, items []MediaObservation
 				return next, ErrValidation
 			}
 			chapter := *item.ChapterID
-			if !discoveredIdentityMatches(baseline.Detail.ID, chapter, item) || names[chapter+"\x00"+strings.ToLower(item.FileName)] || counts[chapter] >= mediadomain.MaxUploadFiles {
+			if id != DiscoveredMediaID(baseline.Detail.ID, chapter, item.StoragePath) || names[chapter+"\x00"+strings.ToLower(item.FileName)] || counts[chapter] >= mediadomain.MaxUploadFiles {
 				return next, ErrValidation
 			}
 			info := item.Inspection
@@ -153,7 +121,7 @@ func ApplyObservations(baseline librarydomain.Snapshot, items []MediaObservation
 			pages[chapter]++
 			counts[chapter]++
 			names[chapter+"\x00"+strings.ToLower(item.FileName)] = true
-			next.Media = append(next.Media, librarydomain.StoredMedia{Media: librarydomain.Media{ID: id, ChapterID: chapter, PageNumber: pages[chapter], FileName: item.FileName, MediaType: info.MediaType, ContentType: info.ContentType, Size: item.Size, Width: &info.Width, Height: &info.Height, Video: info.Video, HQState: "available", StorageState: "present"}, StoragePath: item.StoragePath, Hash: item.SHA256})
+			next.Media = append(next.Media, librarydomain.StoredMedia{Media: librarydomain.Media{ID: id, ChapterID: chapter, PageNumber: pages[chapter], FileName: item.FileName, MediaType: info.MediaType, ContentType: info.ContentType, Size: item.Size, Width: &info.Width, Height: &info.Height, Video: info.Video, HQState: "available", StorageState: "present"}, StoragePath: item.StoragePath, Modified: item.Modified})
 			changedChapters[chapter] = true
 			continue
 		}
@@ -167,7 +135,7 @@ func ApplyObservations(baseline librarydomain.Snapshot, items []MediaObservation
 		}
 		switch item.Status {
 		case "present", "changed":
-			if item.Inspection == nil || item.Size < 1 || !observationHashValid(item.Status, item.SHA256, *media) {
+			if item.Inspection == nil || item.Size < 1 {
 				return next, ErrValidation
 			}
 			info := item.Inspection
@@ -177,7 +145,7 @@ func ApplyObservations(baseline librarydomain.Snapshot, items []MediaObservation
 			if info.MediaType != media.MediaType {
 				return next, ErrValidation
 			}
-			media.Size, media.Hash, media.SHA256 = item.Size, item.SHA256, item.SHA256
+			media.Size, media.Modified = item.Size, item.Modified
 			media.Width, media.Height = &info.Width, &info.Height
 			media.ContentType, media.Video = info.ContentType, info.Video
 			if item.Status == "changed" {
@@ -212,30 +180,28 @@ func ApplyObservations(baseline librarydomain.Snapshot, items []MediaObservation
 		}
 		return a.ID < b.ID
 	})
-	_, _, err := librarydomain.SnapshotData(next)
+	_, err := librarydomain.SnapshotData(next)
 	return next, err
 }
-func MetadataSidecarData(taskID string, run MetadataRun) ([]byte, string, error) {
+func MetadataSidecarData(taskID string, run MetadataRun) ([]byte, error) {
 	if run.Next == nil {
-		return nil, "", ErrValidation
+		return nil, ErrValidation
 	}
-	_, baselineHash, err := librarydomain.SnapshotData(run.Baseline)
-	if err != nil {
-		return nil, "", err
+	if _, err := librarydomain.SnapshotData(run.Baseline); err != nil {
+		return nil, err
 	}
-	data, err := json.Marshal(MetadataSidecar{Version: 1, TaskID: taskID, ObservedAt: run.ObservedAt, BaselineSHA256: baselineHash, Snapshot: *run.Next, Observations: run.Observations})
+	data, err := json.Marshal(MetadataSidecar{Version: 1, TaskID: taskID, ObservedAt: run.ObservedAt, Snapshot: *run.Next, Observations: run.Observations})
 	if err != nil {
-		return nil, "", err
+		return nil, err
 	}
 	if len(data) > 2*librarydomain.MaxSnapshotBytes {
-		return nil, "", ErrScanLimit
+		return nil, ErrScanLimit
 	}
-	digest := sha256.Sum256(data)
-	return data, hex.EncodeToString(digest[:]), nil
+	return data, nil
 }
 
 func ValidateMetadataRun(run MetadataRun) error {
-	if _, _, err := librarydomain.SnapshotData(run.Baseline); err != nil {
+	if _, err := librarydomain.SnapshotData(run.Baseline); err != nil {
 		return err
 	}
 	if run.Next == nil {
@@ -251,15 +217,15 @@ func ValidateMetadataRun(run MetadataRun) error {
 	if err != nil {
 		return err
 	}
-	_, hash, err := librarydomain.SnapshotData(expected)
+	expectedData, err := librarydomain.SnapshotData(expected)
 	if err != nil {
 		return err
 	}
-	_, stored, err := librarydomain.SnapshotData(*run.Next)
+	storedData, err := librarydomain.SnapshotData(*run.Next)
 	if err != nil {
 		return err
 	}
-	if hash != stored {
+	if !bytes.Equal(expectedData, storedData) {
 		return ErrValidation
 	}
 	return nil

@@ -41,10 +41,10 @@ func UploadMayAbandon(status, taskStatus string) bool {
 func UploadRetirePlan(prior UploadPrior) []UploadRetired {
 	items := []UploadRetired{}
 	if prior.Previous.State == "available" {
-		items = append(items, UploadRetired{Kind: "hq", Path: prior.Previous.Path, SHA256: prior.Previous.SHA256, Size: prior.Previous.Size})
+		items = append(items, UploadRetired{Kind: "hq", Path: prior.Previous.Path, Size: prior.Previous.Size})
 	}
 	if prior.LQ != nil {
-		items = append(items, UploadRetired{Kind: "lq", Path: prior.LQ.Path, SHA256: prior.LQ.SHA256, Size: prior.LQ.Size})
+		items = append(items, UploadRetired{Kind: "lq", Path: prior.LQ.Path, Size: prior.LQ.Size})
 	}
 	return items
 }

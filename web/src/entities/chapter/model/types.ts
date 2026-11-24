@@ -12,6 +12,7 @@ export interface ChapterResponse {
     fileName: string
     size: number
     hqState: string
+    storageState: string
     previewUrl: string | null
     lq: { state: string; available: boolean; contentUrl: string | null } | null
   }[]

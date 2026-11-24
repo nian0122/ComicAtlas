@@ -33,8 +33,6 @@ func AddFile(usage *ObservedUsage, path string, size int64) error {
 		bucket = &usage.Covers
 	case "metadata":
 		bucket = &usage.Metadata
-	case "temp":
-		bucket = &usage.Temp
 	case "trash":
 		bucket = &usage.Trash
 	case "exports":

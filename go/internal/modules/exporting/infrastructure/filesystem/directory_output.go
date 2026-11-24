@@ -28,7 +28,10 @@ func (move *directoryExecution) prepareOutput(ctx context.Context) error {
 		}
 		move.published = true
 		move.base = "exports/" + move.id
-		return move.checkControl(ctx, exportdomain.DirectoryMarkerName, move.controls[exportdomain.DirectoryMarkerName])
+		if err := move.checkControl(ctx, exportdomain.DirectoryMarkerName, move.controls[exportdomain.DirectoryMarkerName]); err != nil {
+			return err
+		}
+		return move.readNameReceipts(ctx)
 	}
 	if stage != nil {
 		if !stage.IsDir() {
@@ -39,7 +42,7 @@ func (move *directoryExecution) prepareOutput(ctx context.Context) error {
 			return err
 		}
 		if marker == nil {
-			folder, err := move.files.root.Open(move.base)
+			folder, err := move.files.rootFor(move.base).Open(move.base)
 			if err != nil {
 				return err
 			}
@@ -80,7 +83,7 @@ func (move *directoryExecution) prepareOutput(ctx context.Context) error {
 			return err
 		}
 	}
-	return nil
+	return move.readNameReceipts(ctx)
 }
 
 func (move *directoryExecution) ensureControl(ctx context.Context, name string, data []byte) (err error) {
@@ -164,7 +167,7 @@ func (move *directoryExecution) checkControl(ctx context.Context, name string, d
 
 func (move *directoryExecution) walkOutput(ctx context.Context, visit func(string, fs.DirEntry) error) error {
 	count, seenDirectories, seenControls := 0, 0, 0
-	err := fs.WalkDir(move.files.root.FS(), move.base, func(name string, entry fs.DirEntry, walkErr error) error {
+	err := fs.WalkDir(move.files.rootFor(move.base).FS(), move.base, func(name string, entry fs.DirEntry, walkErr error) error {
 		if walkErr != nil {
 			return walkErr
 		}
@@ -172,7 +175,7 @@ func (move *directoryExecution) walkOutput(ctx context.Context, visit func(strin
 			return err
 		}
 		count++
-		if count > len(move.directories)+len(move.controls)+len(move.items) {
+		if count > len(move.directories)+len(move.controls)+2*len(move.receipts)+len(move.items) {
 			return exportdomain.ErrConflict
 		}
 		relative := "."
@@ -192,6 +195,11 @@ func (move *directoryExecution) walkOutput(ctx context.Context, visit func(strin
 		if data, ok := move.controls[relative]; ok {
 			seenControls++
 			return move.checkControl(ctx, relative, data)
+		}
+		for _, phase := range []string{"whole", "renaming"} {
+			if group := move.receipts[strings.TrimSuffix(relative, "."+phase)]; group != nil && relative == group.receipt+"."+phase {
+				return move.checkControl(ctx, relative, move.nameReceipt(group, phase))
+			}
 		}
 		return visit(relative, entry)
 	})
@@ -248,7 +256,7 @@ func (move *directoryExecution) finishOutput(ctx context.Context) error {
 		return err
 	}
 	defer from.Close()
-	to, err := move.files.root.Open("exports")
+	to, err := move.files.exports.Open("exports")
 	if err != nil {
 		return err
 	}
@@ -263,16 +271,15 @@ func (move *directoryExecution) finishOutput(ctx context.Context) error {
 		return err
 	}
 	move.stats.Renames++
-	actual, err := move.files.directoryEntry("exports/" + move.id)
-	if err != nil || actual == nil || !os.SameFile(info, actual) {
-		return exportdomain.ErrManifest
+	move.base = "exports/" + move.id
+	if err = move.checkControl(ctx, exportdomain.DirectoryMarkerName, move.controls[exportdomain.DirectoryMarkerName]); err != nil {
+		return err
 	}
 	for _, name := range []string{"exports/" + move.id, "exports", "staging/exports"} {
 		if err = move.files.syncDirectory(name); err != nil {
 			return err
 		}
 	}
-	move.base = "exports/" + move.id
 	move.published = true
 	return nil
 }

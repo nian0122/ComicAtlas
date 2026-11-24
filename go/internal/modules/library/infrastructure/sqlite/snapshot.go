@@ -1,6 +1,7 @@
 package sqlite
 
 import (
+	"bytes"
 	librarydomain "comicatlas.local/backend/internal/modules/library/domain"
 	mediadomain "comicatlas.local/backend/internal/modules/media/domain"
 	"comicatlas.local/backend/internal/platform/persistence"
@@ -17,8 +18,8 @@ func readSnapshot(ctx context.Context, tx *sql.Tx, id string) (librarydomain.Sna
 	if err != nil {
 		return value, err
 	}
-	rows, err := tx.QueryContext(ctx, `SELECT m.id,m.chapter_id,m.page_number,m.file_name,m.relative_path,m.sha256,m.media_type,m.content_type,m.size,m.width,m.height,m.video_metadata,m.hq_state,CASE WHEN m.hq_state='released' THEN 'released' WHEN obs.source_sha256=m.sha256 THEN obs.status ELSE 'unknown' END,
- l.relative_path,l.sha256,COALESCE(l.task_id,''),l.size,l.width,l.height,l.max_long_edge,l.quality,l.valid,l.origin,l.source_reference,l.original_state
+	rows, err := tx.QueryContext(ctx, `SELECT m.id,m.chapter_id,m.page_number,m.file_name,m.relative_path,m.modified_ns,m.media_type,m.content_type,m.size,m.width,m.height,m.video_metadata,m.hq_state,CASE WHEN m.hq_state='released' THEN 'released' WHEN obs.source_path=m.relative_path AND obs.source_size=m.size AND obs.source_modified_ns=m.modified_ns THEN obs.status ELSE 'unknown' END,
+ l.relative_path,COALESCE(l.task_id,''),l.size,l.width,l.height,l.max_long_edge,l.quality,l.valid,l.origin,l.original_state
 	 FROM active_media m JOIN active_chapters ch ON ch.id=m.chapter_id LEFT JOIN image_lq l ON l.media_id=m.id LEFT JOIN media_observations obs ON obs.media_id=m.id WHERE ch.comic_id=? ORDER BY ch.global_order,m.page_number,m.id LIMIT ?`, id, librarydomain.MaxSnapshotMedia+1)
 	if err != nil {
 		return value, err
@@ -26,16 +27,16 @@ func readSnapshot(ctx context.Context, tx *sql.Tx, id string) (librarydomain.Sna
 	defer rows.Close()
 	for rows.Next() {
 		var item librarydomain.StoredMedia
-		var video, lqPath, lqHash, lqTask *string
+		var video, lqPath, lqTask *string
 		var size *int64
 		var width, height, edge, quality *int
 		var valid *bool
-		var origin, reference, originalState *string
-		err = rows.Scan(&item.ID, &item.ChapterID, &item.PageNumber, &item.FileName, &item.StoragePath, &item.Hash, &item.MediaType, &item.ContentType, &item.Size, &item.Width, &item.Height, &video, &item.HQState, &item.StorageState, &lqPath, &lqHash, &lqTask, &size, &width, &height, &edge, &quality, &valid, &origin, &reference, &originalState)
+		var origin, originalState *string
+		err = rows.Scan(&item.ID, &item.ChapterID, &item.PageNumber, &item.FileName, &item.StoragePath, &item.Modified, &item.MediaType, &item.ContentType, &item.Size, &item.Width, &item.Height, &video, &item.HQState, &item.StorageState, &lqPath, &lqTask, &size, &width, &height, &edge, &quality, &valid, &origin, &originalState)
 		if err != nil {
 			return value, err
 		}
-		item.RelativePath, item.SHA256 = item.StoragePath, item.Hash
+		item.RelativePath = item.StoragePath
 		if video != nil {
 			item.Video = &mediadomain.Video{}
 			if err = json.Unmarshal([]byte(*video), item.Video); err != nil {
@@ -43,7 +44,7 @@ func readSnapshot(ctx context.Context, tx *sql.Tx, id string) (librarydomain.Sna
 			}
 		}
 		if lqPath != nil {
-			item.LQFile = &librarydomain.StoredLQ{LQRecord: mediadomain.LQRecord{MediaID: item.ID, TaskID: *lqTask, Size: *size, Width: *width, Height: *height, Valid: *valid}, StoragePath: *lqPath, Hash: *lqHash}
+			item.LQFile = &librarydomain.StoredLQ{LQRecord: mediadomain.LQRecord{MediaID: item.ID, TaskID: *lqTask, Size: *size, Width: *width, Height: *height, Valid: *valid}, StoragePath: *lqPath}
 			if edge != nil && quality != nil {
 				item.LQFile.Spec = &mediadomain.ImageSpec{MaxLongEdge: *edge, Quality: *quality}
 			}
@@ -52,14 +53,11 @@ func readSnapshot(ctx context.Context, tx *sql.Tx, id string) (librarydomain.Sna
 				if originalState != nil {
 					item.LQFile.Provenance.OriginalState = *originalState
 				}
-				if reference != nil {
-					item.LQFile.Provenance.ReferenceSHA256 = *reference
-				}
 			}
 		}
 		if item.LQFile != nil {
 			record := item.LQFile.LQRecord
-			item.StorageState = mediadomain.OriginalStorageState(item.Hash, item.StorageState, &record)
+			item.StorageState = mediadomain.OriginalStorageState(item.StorageState, &record)
 		}
 		value.Media = append(value.Media, item)
 	}
@@ -100,7 +98,7 @@ func readSnapshot(ctx context.Context, tx *sql.Tx, id string) (librarydomain.Sna
 func loadSnapshot(ctx context.Context, tx *sql.Tx, id string) (librarydomain.Snapshot, error) {
 	value, err := readSnapshot(ctx, tx, id)
 	if err == nil {
-		_, _, err = librarydomain.SnapshotData(value)
+		_, err = librarydomain.SnapshotData(value)
 	}
 	return value, err
 }
@@ -138,14 +136,14 @@ func (repo *sqliteRepository) SnapshotForSidecar(ctx context.Context, id string)
 	if err != nil {
 		return document, err
 	}
-	document.Data, document.SHA256, err = librarydomain.SnapshotData(value)
+	document.Data, err = librarydomain.SnapshotData(value)
 	if err != nil {
 		return document, err
 	}
 	return document, tx.Commit()
 }
 func (repo *sqliteRepository) SnapshotGuard(expected librarydomain.Snapshot) persistence.WriteAction {
-	_, hash, marshalErr := librarydomain.SnapshotData(expected)
+	expectedData, marshalErr := librarydomain.SnapshotData(expected)
 	return func(ctx context.Context, tx *sql.Tx) error {
 		if marshalErr != nil {
 			return marshalErr
@@ -157,11 +155,11 @@ func (repo *sqliteRepository) SnapshotGuard(expected librarydomain.Snapshot) per
 		if err != nil {
 			return err
 		}
-		_, actual, err := librarydomain.SnapshotData(current)
+		actual, err := librarydomain.SnapshotData(current)
 		if err != nil {
 			return err
 		}
-		if hash != actual {
+		if !bytes.Equal(expectedData, actual) {
 			return librarydomain.ErrConflict
 		}
 		return nil

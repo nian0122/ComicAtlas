@@ -13,23 +13,21 @@ import (
 
 var _ mediaports.HQRepository = (*repository)(nil)
 
-const hqCurrentColumns = "m.hq_state,m.relative_path,m.sha256,m.size,l.relative_path,l.sha256,l.size,l.valid,COALESCE(l.task_id,''),l.origin,l.source_reference,l.original_state"
+const hqCurrentColumns = "m.hq_state,m.relative_path,m.modified_ns,m.size,l.relative_path,l.size,l.width,l.height,l.valid,COALESCE(l.task_id,''),l.origin,l.original_state"
 
 func scanHQCurrent(scanner interface{ Scan(...any) error }) (mediadomain.HQCurrent, error) {
 	var current mediadomain.HQCurrent
-	var path, hash *string
+	var path *string
+	var width, height *int
 	var size *int64
 	var valid *bool
 	var task string
-	var origin, reference, originalState *string
-	err := scanner.Scan(&current.State, &current.SourcePath, &current.SourceSHA256, &current.Size, &path, &hash, &size, &valid, &task, &origin, &reference, &originalState)
+	var origin, originalState *string
+	err := scanner.Scan(&current.State, &current.SourcePath, &current.Modified, &current.Size, &path, &size, &width, &height, &valid, &task, &origin, &originalState)
 	if err == nil && path != nil {
-		current.LQ = &mediadomain.LQRecord{Path: *path, SHA256: *hash, Size: *size, Valid: *valid, TaskID: task}
+		current.LQ = &mediadomain.LQRecord{Path: *path, Size: *size, Width: *width, Height: *height, Valid: *valid, TaskID: task}
 		if origin != nil && *origin != "generated" {
 			current.LQ.Provenance = &mediadomain.LQProvenance{Origin: *origin}
-			if reference != nil {
-				current.LQ.Provenance.ReferenceSHA256 = *reference
-			}
 			if originalState != nil {
 				current.LQ.Provenance.OriginalState = *originalState
 			}
@@ -121,8 +119,8 @@ func (repo *repository) HQAdmission(scope mediadomain.LQScope) jobsports.Admissi
 				return mediadomain.ErrLQConflict
 			}
 			where, args := scopeWhere(scope)
-			_, err = tx.ExecContext(ctx, `INSERT INTO hq_release_items(task_id,media_id,position,source_path,source_sha256,original_bytes,lq_path,lq_sha256,lq_bytes)
-		 SELECT ?,m.id,row_number() OVER(ORDER BY ch.global_order,m.page_number,m.id),m.relative_path,m.sha256,m.size,l.relative_path,l.sha256,l.size
+			_, err = tx.ExecContext(ctx, `INSERT INTO hq_release_items(task_id,media_id,position,source_path,source_modified_ns,original_bytes,lq_path,lq_bytes,lq_width,lq_height)
+		 SELECT ?,m.id,row_number() OVER(ORDER BY ch.global_order,m.page_number,m.id),m.relative_path,m.modified_ns,m.size,l.relative_path,l.size,l.width,l.height
 		 FROM active_media m JOIN active_chapters ch ON ch.id=m.chapter_id JOIN image_lq l ON l.media_id=m.id WHERE m.media_type='image' AND m.hq_state='available' AND `+where, append([]any{taskID}, args...)...)
 			return err
 		}
@@ -133,11 +131,11 @@ func (repo *repository) HQBegin(ctx context.Context, id string) error {
 	return err
 }
 
-const hqItemColumns = "media_id,position,status,original_bytes,outcome,error_code,source_path,source_sha256,lq_path,lq_sha256,lq_bytes"
+const hqItemColumns = "media_id,position,status,original_bytes,outcome,error_code,source_path,source_modified_ns,lq_path,lq_bytes,lq_width,lq_height"
 
 func scanHQItem(scanner interface{ Scan(...any) error }) (mediadomain.HQReleaseItem, error) {
 	var item mediadomain.HQReleaseItem
-	err := scanner.Scan(&item.MediaID, &item.Position, &item.Status, &item.OriginalBytes, &item.Outcome, &item.ErrorCode, &item.SourcePath, &item.SourceSHA256, &item.LQ.Path, &item.LQ.SHA256, &item.LQ.Size)
+	err := scanner.Scan(&item.MediaID, &item.Position, &item.Status, &item.OriginalBytes, &item.Outcome, &item.ErrorCode, &item.SourcePath, &item.SourceModified, &item.LQ.Path, &item.LQ.Size, &item.LQ.Width, &item.LQ.Height)
 	item.LQ.Valid = true
 	if item.ErrorCode != nil {
 		task := jobsdomain.WithDiagnostics(jobsdomain.Task{Status: "failed", ErrorCode: item.ErrorCode})

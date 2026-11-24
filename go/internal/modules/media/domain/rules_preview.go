@@ -10,7 +10,7 @@ func PreviewSources(candidate ImageCandidate) []ImageSource {
 	if lqErr == nil {
 		result = append(result, lq)
 	}
-	if candidate.HQState == "available" && original.OriginalSHA256 != "" {
+	if candidate.HQState == "available" {
 		result = append(result, original)
 	}
 	return result

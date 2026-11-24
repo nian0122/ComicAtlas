@@ -26,10 +26,31 @@ func HQOwner(name string) (string, string, bool) {
 	return parts[1], parts[2], parts[3] != "" && parts[3] != "." && parts[3] != ".."
 }
 
-func DerivedPath(kind, source, media, revision, extension string) string {
+// LQPath 与旧系统一致，用 HQ 文件名替换扩展名生成轻量副本路径，
+// 例如 hq/212/684/68.jpg 对应 lq/212/684/68.webp。
+// 同一物理章节中只有扩展名不同的同名页面会得到同一路径，这种布局不允许发起 LQ 生成。
+func LQPath(source string) string {
 	comic, chapter, ok := HQOwner(source)
-	if !ok || !StorageKey(media) || !StorageKey(revision) || len(media)+len(revision)+len(extension)+2 > 255 || (kind != "hq" && kind != "lq") || (extension != "webp" && extension != "mp4") {
+	if !ok {
 		return ""
 	}
-	return kind + "/" + comic + "/" + chapter + "/" + media + "-" + revision + "." + extension
+	base := path.Base(source)
+	extension := path.Ext(base)
+	if extension == "" || extension == base {
+		return ""
+	}
+	stem := strings.TrimSuffix(base, extension)
+	if stem == "" || len(stem)+len(".webp") > 255 {
+		return ""
+	}
+	return "lq/" + comic + "/" + chapter + "/" + stem + ".webp"
+}
+
+// TranscodedPath 为视频转码产物生成 HQ 路径；产物不复用源文件名，避免与原件同名。
+func TranscodedPath(source, media, revision string) string {
+	comic, chapter, ok := HQOwner(source)
+	if !ok || !StorageKey(media) || !StorageKey(revision) || len(media)+len(revision)+len(".mp4")+2 > 255 {
+		return ""
+	}
+	return "hq/" + comic + "/" + chapter + "/" + media + "-" + revision + ".mp4"
 }

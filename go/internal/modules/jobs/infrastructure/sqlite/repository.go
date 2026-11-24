@@ -29,19 +29,19 @@ func (store *sqliteRepository) Get(ctx context.Context, id string) (jobsdomain.T
 	return scan(store.database.Reader.QueryRowContext(ctx, "SELECT "+columns+" FROM tasks WHERE id=?", id))
 }
 
-func (store *sqliteRepository) CreateTask(ctx context.Context, kind, source, title, key, requestHash string, explicit bool) (jobsdomain.Task, error) {
-	return store.create(ctx, jobsdomain.ResourceTask{Type: kind, SourcePath: source, Title: title}, key, requestHash, explicit, nil)
+func (store *sqliteRepository) CreateTask(ctx context.Context, kind, source, title, key, requestKey string, explicit bool) (jobsdomain.Task, error) {
+	return store.create(ctx, jobsdomain.ResourceTask{Type: kind, SourcePath: source, Title: title}, key, requestKey, explicit, nil)
 }
-func (store *sqliteRepository) CreateResourceTask(ctx context.Context, request jobsdomain.ResourceTask, key, hash string, admission jobsports.Admission) (jobsdomain.Task, error) {
-	return store.create(ctx, request, key, hash, false, admission)
+func (store *sqliteRepository) CreateResourceTask(ctx context.Context, request jobsdomain.ResourceTask, key, requestKey string, admission jobsports.Admission) (jobsdomain.Task, error) {
+	return store.create(ctx, request, key, requestKey, false, admission)
 }
-func (store *sqliteRepository) create(ctx context.Context, request jobsdomain.ResourceTask, key, requestHash string, explicit bool, admission jobsports.Admission) (jobsdomain.Task, error) {
+func (store *sqliteRepository) create(ctx context.Context, request jobsdomain.ResourceTask, key, requestKey string, explicit bool, admission jobsports.Admission) (jobsdomain.Task, error) {
 	tx, err := store.database.Writer.BeginTx(ctx, nil)
 	if err != nil {
 		return jobsdomain.Task{}, err
 	}
 	defer tx.Rollback()
-	id, err := store.createInTx(ctx, tx, request, key, requestHash, explicit, admission)
+	id, err := store.createInTx(ctx, tx, request, key, requestKey, explicit, admission)
 	if err != nil {
 		return jobsdomain.Task{}, err
 	}
@@ -50,14 +50,14 @@ func (store *sqliteRepository) create(ctx context.Context, request jobsdomain.Re
 	}
 	return store.Get(ctx, id)
 }
-func (store *sqliteRepository) createInTx(ctx context.Context, tx *sql.Tx, request jobsdomain.ResourceTask, key, requestHash string, explicit bool, admission jobsports.Admission) (string, error) {
+func (store *sqliteRepository) createInTx(ctx context.Context, tx *sql.Tx, request jobsdomain.ResourceTask, key, requestKey string, explicit bool, admission jobsports.Admission) (string, error) {
 	kind, source, title := request.Type, request.SourcePath, request.Title
 	var err error
 	if key != "" {
-		var hash, id string
-		err = tx.QueryRowContext(ctx, "SELECT request_hash,id FROM tasks WHERE idempotency_key=?", key).Scan(&hash, &id)
+		var stored, id string
+		err = tx.QueryRowContext(ctx, "SELECT request_key,id FROM tasks WHERE idempotency_key=?", key).Scan(&stored, &id)
 		if err == nil {
-			if hash != requestHash {
+			if stored != requestKey {
 				return "", jobsdomain.ErrConflict
 			}
 			return id, nil
@@ -125,8 +125,8 @@ func (store *sqliteRepository) createInTx(ctx context.Context, tx *sql.Tx, reque
 	if key != "" {
 		idempotency = key
 	}
-	_, err = tx.ExecContext(ctx, `INSERT INTO tasks(id,type,source_path,title,comic_id,status,stage,idempotency_key,request_hash,created_at,title_explicit,target_type,target_id,request_json)
-		VALUES(?,?,?,?,?,'queued','queued',?,?,?,?,?,?,?)`, id, kind, source, title, comicID, idempotency, requestHash, time.Now().UTC().Format(jobsdomain.TimestampFormat), explicit, request.TargetType, request.TargetID, payload)
+	_, err = tx.ExecContext(ctx, `INSERT INTO tasks(id,type,source_path,title,comic_id,status,stage,idempotency_key,request_key,created_at,title_explicit,target_type,target_id,request_json)
+		VALUES(?,?,?,?,?,'queued','queued',?,?,?,?,?,?,?)`, id, kind, source, title, comicID, idempotency, requestKey, time.Now().UTC().Format(jobsdomain.TimestampFormat), explicit, request.TargetType, request.TargetID, payload)
 	if err != nil {
 		return "", err
 	}
@@ -347,7 +347,7 @@ func (store *sqliteRepository) RetryGuarded(ctx context.Context, id string, guar
 			return err
 		}
 	}
-	if (kind == "directory_move" || kind == "directory_preflight" || kind == "recovery_repair" || kind == "ai_analysis") && guard == nil {
+	if (kind == "directory_move" || kind == "recovery_repair" || kind == "ai_analysis") && guard == nil {
 		return jobsdomain.ErrConflict
 	}
 	if err = blockLifecycleTask(ctx, tx, kind, comicID, id); err != nil {

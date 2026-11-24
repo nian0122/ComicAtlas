@@ -1,7 +1,6 @@
 const messages: Record<string, string> = {
   LQ_NOT_READY: '待释放图片缺少来源匹配的有效轻量副本',
   NO_HQ_IMAGES: '没有可释放的图片原件',
-  HQ_SOURCE_SHA256_MISSING: '图片原件缺少 SHA-256，请在漫画详情中核对媒体',
   HQ_STATE_INVALID: '图片原件状态不能用于释放',
   NO_IMAGES: '没有可处理的图片',
   TOO_MANY_IMAGES: '图片数量超出单次处理范围',

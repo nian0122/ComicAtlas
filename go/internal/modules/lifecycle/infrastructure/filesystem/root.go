@@ -13,9 +13,8 @@ import (
 
 // Files 在应用独占媒体根的前提下，串行执行本实例的清单及文件状态转换。
 type Files struct {
-	root   *os.Root
-	mutex  sync.Mutex
-	buffer [64 << 10]byte
+	root  *os.Root
+	mutex sync.Mutex
 }
 
 func New(directory string) (*Files, error) {
@@ -60,9 +59,42 @@ func (files *Files) stat(name string) (os.FileInfo, error) {
 	if err := files.parents(name, false); err != nil {
 		return nil, err
 	}
-	info, err := files.root.Lstat(filepath.FromSlash(name))
+	return statRegular(files.root, filepath.FromSlash(name))
+}
+
+func statRegular(root *os.Root, name string) (os.FileInfo, error) {
+	info, err := root.Lstat(name)
 	if err == nil && !info.Mode().IsRegular() {
 		return nil, lifecycledomain.ErrConflict
 	}
 	return info, err
+}
+
+// 同一章节的相邻页共用已核对的父目录句柄，页文件仍逐项检查。
+type pageDirectory struct {
+	name string
+	root *os.Root
+}
+
+func (dir *pageDirectory) close() {
+	if dir.root != nil {
+		_ = dir.root.Close()
+		dir.root = nil
+	}
+}
+
+func (dir *pageDirectory) stat(files *Files, name string) (os.FileInfo, error) {
+	parent := path.Dir(name)
+	if dir.root == nil || dir.name != parent {
+		dir.close()
+		if err := files.parents(name, false); err != nil {
+			return nil, err
+		}
+		root, err := files.root.OpenRoot(filepath.FromSlash(parent))
+		if err != nil {
+			return nil, err
+		}
+		dir.root, dir.name = root, parent
+	}
+	return statRegular(dir.root, path.Base(name))
 }

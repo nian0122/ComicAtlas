@@ -33,9 +33,6 @@ func ValidateTranscodeSelection(count, active, incomplete int) error {
 	return nil
 }
 func ValidateTranscodeRecord(record TranscodeRecord) error {
-	if err := ValidateVideoEncodeRequest(VideoEncodeRequest{SourceSize: record.Size, SourceSHA256: record.SHA256}); err != nil {
-		return ErrTranscodeOutput
-	}
 	if err := ValidateTranscodeSource(record.Video); err != nil {
 		return ErrTranscodeOutput
 	}
@@ -44,7 +41,7 @@ func ValidateTranscodeRecord(record TranscodeRecord) error {
 	}
 	if !strings.HasPrefix(record.StagePath, "staging/transcode/") || !ValidHQPath(record.Path) || strings.Contains(record.Path, "\\") ||
 		path.Clean(record.StagePath) != record.StagePath || strings.Contains(record.StagePath, "\\") ||
-		record.Size < 1 || record.Size > MaxTranscodeBytes || len(record.SHA256) != 64 || record.Video.Container != "mp4" ||
+		record.Size < 1 || record.Size > MaxTranscodeBytes || record.Modified == 0 || record.Video.Container != "mp4" ||
 		record.Video.VideoCodec != "h264" || record.Video.PlaybackHint != "browser_candidate" {
 		return ErrTranscodeOutput
 	}

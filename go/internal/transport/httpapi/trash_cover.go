@@ -26,7 +26,7 @@ func (application *Application) serveTrashCover(response http.ResponseWriter, re
 	}
 	response.Header().Set("Content-Type", cover.ContentType)
 	response.Header().Set("Cache-Control", "private, no-cache")
-	response.Header().Set("ETag", "\""+cover.SHA256+"\"")
+	response.Header().Set("ETag", "\""+cover.ETag+"\"")
 	tracked := &statusWriter{ResponseWriter: response, status: 200}
 	http.ServeContent(tracked, request, "cover", time.Time{}, bytes.NewReader(cover.Data))
 	return tracked.status, true

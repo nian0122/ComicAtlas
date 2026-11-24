@@ -76,10 +76,10 @@ func (repo *repository) SidecarResult(ctx context.Context, task string) (storage
 	return value, err
 }
 
-func (repo *repository) PrepareSidecar(ctx context.Context, task string, revision int64, hash, observed string) error {
-	result, err := repo.database.Writer.ExecContext(ctx, `UPDATE metadata_sync_runs SET observed_revision=?,observed_at=?,sidecar_sha=?
+func (repo *repository) PrepareSidecar(ctx context.Context, task string, revision int64, observed string) error {
+	result, err := repo.database.Writer.ExecContext(ctx, `UPDATE metadata_sync_runs SET observed_revision=?,observed_at=?
  WHERE task_id=? AND published=0 AND EXISTS(SELECT 1 FROM comic_sidecars s JOIN active_comics c ON c.id=s.comic_id JOIN tasks t ON t.id=s.last_task_id
- WHERE s.last_task_id=metadata_sync_runs.task_id AND s.revision>=? AND t.status='running')`, revision, observed, hash, task, revision)
+ WHERE s.last_task_id=metadata_sync_runs.task_id AND s.revision>=? AND t.status='running')`, revision, observed, task, revision)
 	if err != nil {
 		return err
 	}
@@ -93,15 +93,12 @@ func (repo *repository) PrepareSidecar(ctx context.Context, task string, revisio
 	return nil
 }
 
-func (repo *repository) SidecarCompletion(task, hash string) persistence.WriteAction {
+func (repo *repository) SidecarCompletion(task string) persistence.WriteAction {
 	return func(ctx context.Context, tx *sql.Tx) error {
-		var comic, expected string
+		var comic string
 		var revision int64
-		if err := tx.QueryRowContext(ctx, "SELECT comic_id,observed_revision,sidecar_sha FROM metadata_sync_runs WHERE task_id=? AND published=0", task).Scan(&comic, &revision, &expected); err != nil {
+		if err := tx.QueryRowContext(ctx, "SELECT comic_id,observed_revision FROM metadata_sync_runs WHERE task_id=? AND published=0", task).Scan(&comic, &revision); err != nil {
 			return err
-		}
-		if expected != hash {
-			return storagedomain.ErrConflict
 		}
 		result, err := tx.ExecContext(ctx, `UPDATE comic_sidecars SET published_revision=?,published_at=? WHERE comic_id=? AND last_task_id=? AND revision>=? AND published_revision<=?
  AND EXISTS(SELECT 1 FROM active_comics WHERE id=?)`, revision, time.Now().UTC().Format(jobsdomain.TimestampFormat), comic, task, revision, revision, comic)

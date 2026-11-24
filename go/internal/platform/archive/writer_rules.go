@@ -1,7 +1,6 @@
 package archive
 
 import (
-	"encoding/hex"
 	"errors"
 	"path"
 	"strings"
@@ -10,7 +9,6 @@ import (
 
 const MinPartBytes int64 = 64 << 10
 const MaxPartBytes int64 = 4<<30 - 1
-const emptySHA256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
 
 var ErrWriteLimit = errors.New("归档写入超出限制")
 var ErrSourceChanged = errors.New("归档来源与快照不符")
@@ -33,10 +31,10 @@ func validateWrite(directory string, options WriteOptions, entries []WriteEntry)
 	var total uint64
 	var directoryBytes int
 	for _, entry := range entries {
-		if !safeName(entry.Name) || !utf8.ValidString(entry.Name) || !validDigest(entry.SHA256) || strings.HasSuffix(entry.Name, "/") != entry.Directory {
+		if !safeName(entry.Name) || !utf8.ValidString(entry.Name) || strings.HasSuffix(entry.Name, "/") != entry.Directory {
 			return ErrInvalid
 		}
-		if entry.Directory && (entry.Size != 0 || entry.SHA256 != emptySHA256 || entry.Open != nil) || !entry.Directory && entry.Open == nil {
+		if entry.Directory && (entry.Size != 0 || entry.Open != nil) || !entry.Directory && entry.Open == nil {
 			return ErrInvalid
 		}
 		if entry.Size < 0 || uint64(entry.Size) > MaxFileBytes || uint64(entry.Size) > MaxTotalBytes-total {
@@ -68,12 +66,4 @@ func validateWrite(directory string, options WriteOptions, entries []WriteEntry)
 		}
 	}
 	return nil
-}
-
-func validDigest(value string) bool {
-	if len(value) != 64 {
-		return false
-	}
-	decoded, err := hex.DecodeString(value)
-	return err == nil && len(decoded) == 32 && strings.ToLower(value) == value
 }

@@ -40,7 +40,7 @@ func (source *snapshot) Copy(ctx context.Context, filename string) error {
 func (source *snapshot) Close() error { return snapshotError(source.source.Close()) }
 
 func snapshotInfo(info persistence.SnapshotInfo) domain.DatabaseInfo {
-	return domain.DatabaseInfo{Format: info.Format, MigrationCount: info.MigrationCount, MigrationChecksum: info.MigrationChecksum}
+	return domain.DatabaseInfo{Format: info.Format, MigrationCount: info.MigrationCount}
 }
 
 func snapshotError(err error) error {

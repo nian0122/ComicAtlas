@@ -85,7 +85,7 @@ export const fileFacts: Record<string, string> = {
   absent: '不存在',
   valid: '内容匹配',
   changed: '内容已变化',
-  unmeasured: '未记录原始摘要',
+  unmeasured: '未记录原始大小',
   present: '存在（未核对内容）',
   unsafe: '路径不安全',
   unreadable: '无法读取',

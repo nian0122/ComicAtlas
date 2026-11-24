@@ -50,7 +50,7 @@ func decodeDirectoryTrash(input io.Reader, maximumFiles int) (lifecycledomain.Fi
 				if err = decoder.Decode(&item); err != nil {
 					return value, exportdomain.ErrManifest
 				}
-				if lifecycledomain.ValidateCandidates([]lifecycledomain.FileCandidate{item.Source}) != nil || len(item.SHA256) > 64 || item.Size < 0 {
+				if lifecycledomain.ValidateCandidates([]lifecycledomain.FileCandidate{item.Source}) != nil || item.Size < 0 {
 					return value, exportdomain.ErrManifest
 				}
 				value.Files = append(value.Files, item)

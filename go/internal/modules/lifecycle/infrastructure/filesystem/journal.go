@@ -54,8 +54,11 @@ func (files *Files) load(id string) (lifecycledomain.FileJournal, error) {
 	}
 	decoder := json.NewDecoder(bytes.NewReader(data))
 	decoder.DisallowUnknownFields()
-	if decoder.Decode(&value) != nil || decoder.Decode(new(any)) != io.EOF || value.ID != id || lifecycledomain.ValidateJournal(value) != nil {
+	if decoder.Decode(&value) != nil || decoder.Decode(new(any)) != io.EOF || value.ID != id {
 		return lifecycledomain.FileJournal{}, lifecycledomain.ErrJournal
+	}
+	if err = lifecycledomain.ValidateJournal(value); err != nil {
+		return lifecycledomain.FileJournal{}, err
 	}
 	return value, nil
 }
@@ -152,7 +155,7 @@ func writeJournal(writer io.Writer, value lifecycledomain.FileJournal) error {
 	return err
 }
 
-// Prepare 为目录写入随目录搬移的凭证。只有独立文件需要内容摘要。
+// Prepare 为目录写入随目录搬移的凭证。独立文件记录大小和修改时间。
 func (files *Files) Prepare(ctx context.Context, id string, target lifecycledomain.Target, candidates []lifecycledomain.FileCandidate, visit func(lifecycledomain.FileResult) error) (lifecycledomain.FileJournal, error) {
 	files.mutex.Lock()
 	defer files.mutex.Unlock()
@@ -163,6 +166,11 @@ func (files *Files) Prepare(ctx context.Context, id string, target lifecycledoma
 	roots, err := lifecycledomain.TrashDirectories(target)
 	if err != nil || !lifecycledomain.ValidJournalID(id) || lifecycledomain.ValidateCandidates(candidates) != nil {
 		return value, lifecycledomain.ErrValidation
+	}
+	for _, candidate := range candidates {
+		if candidate.Directory {
+			return value, lifecycledomain.ErrValidation
+		}
 	}
 	previous, err := files.load(id)
 	if err == nil {
@@ -175,23 +183,30 @@ func (files *Files) Prepare(ctx context.Context, id string, target lifecycledoma
 		return value, err
 	}
 	items := append([]lifecycledomain.FileCandidate{}, candidates...)
+	if target.Type == "comic" {
+		items = lifecycledomain.DirectoryPlan(items, roots)
+	}
 	sort.Slice(items, func(i, j int) bool { return items[i].Path < items[j].Path })
 	value = lifecycledomain.FileJournal{Version: lifecycledomain.JournalVersion, ID: id, Phase: "prepared", Files: []lifecycledomain.RetainedFile{}, Moves: []lifecycledomain.MoveUnit{}}
-	for _, root := range roots {
-		_, err := files.moveInfo(root, true)
-		if err == nil {
-			value.Moves = append(value.Moves, lifecycledomain.MoveUnit{Path: root, Directory: true})
-		} else if !errors.Is(err, os.ErrNotExist) {
-			return value, err
+	if target.Type == "chapter" {
+		for _, root := range roots {
+			_, err := files.moveInfo(root, true)
+			if err == nil {
+				value.Moves = append(value.Moves, lifecycledomain.MoveUnit{Path: root, Directory: true})
+			} else if !errors.Is(err, os.ErrNotExist) {
+				return value, err
+			}
 		}
 	}
+	var pages pageDirectory
+	defer pages.close()
 	for index, item := range items {
 		if err = ctx.Err(); err != nil {
 			return value, err
 		}
 		file := lifecycledomain.RetainedFile{Source: item}
 		directory := false
-		if len(roots) != 0 && (strings.HasPrefix(item.Path, "hq/") || strings.HasPrefix(item.Path, "lq/")) {
+		if !item.Directory && len(roots) != 0 && (strings.HasPrefix(item.Path, "hq/") || strings.HasPrefix(item.Path, "lq/")) {
 			for _, root := range roots {
 				directory = directory || strings.HasPrefix(item.Path, root+"/")
 			}
@@ -199,7 +214,14 @@ func (files *Files) Prepare(ctx context.Context, id string, target lifecycledoma
 				return value, reportFile(visit, id, "trash", "preparing", index+1, file, lifecycledomain.ErrConflict)
 			}
 		}
-		info, err := files.stat(item.Path)
+		var info os.FileInfo
+		if item.Directory {
+			info, err = files.moveInfo(item.Path, true)
+		} else if directory {
+			info, err = pages.stat(files, item.Path)
+		} else {
+			info, err = files.stat(item.Path)
+		}
 		switch {
 		case errors.Is(err, os.ErrNotExist):
 			file.Missing = true
@@ -210,20 +232,13 @@ func (files *Files) Prepare(ctx context.Context, id string, target lifecycledoma
 		case item.Size >= 0 && item.Size != info.Size():
 			return value, reportFile(visit, id, "trash", "preparing", index+1, file, lifecycledomain.ErrChanged)
 		default:
-			file.Size, file.SHA256 = info.Size(), item.SHA256
-			if !directory {
-				proof := item.SHA256
-				if proof == "" {
-					size, digest, err := files.digest(ctx, item.Path)
-					if err == nil && size != info.Size() {
-						err = lifecycledomain.ErrChanged
-					}
-					if err != nil {
-						return value, reportFile(visit, id, "trash", "preparing", index+1, file, err)
-					}
-					proof = digest
-				}
-				value.Moves = append(value.Moves, lifecycledomain.MoveUnit{Path: item.Path, Size: info.Size(), Proof: proof})
+			if item.Directory {
+				value.Moves = append(value.Moves, lifecycledomain.MoveUnit{Path: item.Path, Directory: true})
+			} else {
+				file.Size = info.Size()
+			}
+			if !directory && !item.Directory {
+				value.Moves = append(value.Moves, lifecycledomain.MoveUnit{Path: item.Path, Size: info.Size(), Modified: info.ModTime().UnixNano()})
 			}
 		}
 		value.Files = append(value.Files, file)

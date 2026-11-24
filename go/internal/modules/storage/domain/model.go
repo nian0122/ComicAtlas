@@ -5,29 +5,28 @@ type Usage struct {
 	Bytes int64 `json:"bytes"`
 }
 type Inventory struct {
-	ScopeType                 string  `json:"scopeType"`
-	ScopeID                   *string `json:"scopeId"`
-	Comics                    int64   `json:"comics"`
-	Chapters                  int64   `json:"chapters"`
-	Images                    int64   `json:"images"`
-	Videos                    int64   `json:"videos"`
-	HQ                        Usage   `json:"hq"`
-	LQ                        Usage   `json:"lq"`
-	Covers                    Usage   `json:"covers"`
-	CurrentLQImages           int64   `json:"currentLqImages"`
-	AvailableImages           int64   `json:"availableImages"`
-	AvailableBytes            int64   `json:"availableBytes"`
-	MissingLQ                 int64   `json:"missingLq"`
-	MissingSourceSHA256Images int64   `json:"missingSourceSha256Images"`
-	ReleasedImages            int64   `json:"releasedImages"`
-	ReleasingImages           int64   `json:"releasingImages"`
+	ScopeType       string  `json:"scopeType"`
+	ScopeID         *string `json:"scopeId"`
+	Comics          int64   `json:"comics"`
+	Chapters        int64   `json:"chapters"`
+	Images          int64   `json:"images"`
+	Videos          int64   `json:"videos"`
+	HQ              Usage   `json:"hq"`
+	LQ              Usage   `json:"lq"`
+	Covers          Usage   `json:"covers"`
+	CurrentLQImages int64   `json:"currentLqImages"`
+	AvailableImages int64   `json:"availableImages"`
+	AvailableBytes  int64   `json:"availableBytes"`
+	MissingLQ       int64   `json:"missingLq"`
+
+	ReleasedImages  int64 `json:"releasedImages"`
+	ReleasingImages int64 `json:"releasingImages"`
 }
 type ObservedUsage struct {
 	HQ             Usage `json:"hq"`
 	LQ             Usage `json:"lq"`
 	Covers         Usage `json:"covers"`
 	Metadata       Usage `json:"metadata"`
-	Temp           Usage `json:"temp"`
 	Trash          Usage `json:"trash"`
 	Exports        Usage `json:"exports"`
 	Retired        Usage `json:"retired"`

@@ -50,8 +50,8 @@ func (repo *repository) ImportedLQWrite(record mediadomain.LQRecord, recordedAt 
 		if record.Provenance.OriginalState != "" {
 			originalState = record.Provenance.OriginalState
 		}
-		_, err = tx.ExecContext(ctx, `INSERT INTO image_lq(media_id,relative_path,sha256,size,width,height,max_long_edge,quality,valid,task_id,updated_at,origin,source_reference,original_state)
- VALUES(?,?,?,?,?,?,?,?,1,NULL,?,'imported',?,?)`, record.MediaID, record.Path, record.SHA256, record.Size, record.Width, record.Height, edge, quality, recordedAt, record.Provenance.ReferenceSHA256, originalState)
+		_, err = tx.ExecContext(ctx, `INSERT INTO image_lq(media_id,relative_path,size,width,height,max_long_edge,quality,valid,task_id,updated_at,origin,original_state)
+ VALUES(?,?,?,?,?,?,?,1,NULL,?,'imported',?)`, record.MediaID, record.Path, record.Size, record.Width, record.Height, edge, quality, recordedAt, originalState)
 		if err != nil {
 			return err
 		}

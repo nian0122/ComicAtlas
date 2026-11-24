@@ -20,7 +20,7 @@ func DecodeManifest(data []byte) (Manifest, error) {
 	for _, object := range []struct {
 		name string
 		keys []string
-	}{{"database", []string{"format", "migrationCount", "migrationChecksum"}}, {"catalog", []string{"size", "sha256"}}, {"summary", []string{"files", "directories", "bytes"}}} {
+	}{{"database", []string{"format", "migrationCount"}}, {"catalog", []string{"size"}}, {"summary", []string{"files", "directories", "bytes"}}} {
 		if _, err := exactObject(root[object.name], object.keys...); err != nil {
 			return value, err
 		}

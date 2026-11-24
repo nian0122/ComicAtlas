@@ -150,7 +150,7 @@ func (service *sqliteRepository) DeleteTerm(ctx context.Context, kind, id string
 		return err
 	}
 	if referenced > 0 {
-		return librarydomain.ErrConflict
+		return librarydomain.ErrReferenced
 	}
 	if _, err = tx.ExecContext(ctx, "DELETE FROM "+table+" WHERE id=?", id); err != nil {
 		return err

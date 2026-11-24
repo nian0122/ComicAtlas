@@ -1,19 +1,18 @@
 package domain
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
+	"bytes"
+	"comicatlas.local/backend/internal/platform/stableid"
 	"encoding/json"
 	"sort"
 	"time"
 )
 
-func ConfirmationHash(token string) (string, error) {
-	if !validDigest(token) {
+func ConfirmationToken(token string) (string, error) {
+	if !validProof(token) {
 		return "", ErrConfirmation
 	}
-	digest := sha256.Sum256([]byte(token))
-	return hex.EncodeToString(digest[:]), nil
+	return token, nil
 }
 
 func EvaluatePurge(scope PurgeScope, days int, now time.Time) (PurgePreview, error) {
@@ -23,16 +22,16 @@ func EvaluatePurge(scope PurgeScope, days int, now time.Time) (PurgePreview, err
 	}
 	items := append([]PurgeItem{}, scope.Items...)
 	sort.Slice(items, func(i, j int) bool { return items[i].Entry.ID < items[j].Entry.ID })
-	hash := sha256.New()
+	var buffer bytes.Buffer
 	header, _ := json.Marshal([]any{scope.Root.ID, days})
-	hash.Write(header)
+	buffer.Write(header)
 	seen := map[string]bool{}
 	rootFound := false
 	var eligible time.Time
 	for _, item := range items {
 		entry := item.Entry
 		entry.CoverURL = nil
-		if seen[entry.ID] || !ValidJournalID(entry.ID) || entry.State != "trashed" || entry.Target.ComicID != scope.Root.Target.ComicID || !validDigest(item.PlanHash) || ValidateCandidates(item.Candidates) != nil {
+		if seen[entry.ID] || !ValidJournalID(entry.ID) || entry.State != "trashed" || entry.Target.ComicID != scope.Root.Target.ComicID || !validStamp(item.PlanStamp) || ValidateCandidates(item.Candidates) != nil {
 			return value, ErrConflict
 		}
 		seen[entry.ID] = true
@@ -61,13 +60,13 @@ func EvaluatePurge(scope PurgeScope, days int, now time.Time) (PurgePreview, err
 				value.RegisteredBytes += file.Size
 			}
 		}
-		data, _ := json.Marshal([]any{entry, item.PlanHash})
-		hash.Write(data)
+		data, _ := json.Marshal([]any{entry, item.PlanStamp})
+		buffer.Write(data)
 	}
 	if !rootFound {
 		return value, ErrConflict
 	}
-	value.Stamp = hex.EncodeToString(hash.Sum(nil))
+	value.Stamp = stableid.Hex(buffer.String())
 	value.EligibleAt = eligible.UTC().Format(time.RFC3339Nano)
 	value.Allowed = !now.Before(eligible)
 	if !value.Allowed {

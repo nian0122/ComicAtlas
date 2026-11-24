@@ -21,7 +21,6 @@ type DirectoryFile struct {
 	Source   string `json:"source"`
 	Target   string `json:"target"`
 	Size     int64  `json:"size"`
-	SHA256   string `json:"sha256"`
 	Optional bool   `json:"optional"`
 }
 
@@ -37,12 +36,10 @@ type DirectoryObservation struct {
 	Source   string
 	Target   string
 	Size     int64
-	SHA256   string
 	Missing  bool
 }
 
 type DirectoryInspection struct {
-	PlanSHA256    string
 	Files         []DirectoryObservation
 	ObservedBytes int64
 }

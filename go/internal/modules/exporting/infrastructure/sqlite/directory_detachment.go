@@ -4,9 +4,7 @@ import (
 	exportdomain "comicatlas.local/backend/internal/modules/exporting/domain"
 	"comicatlas.local/backend/internal/platform/persistence"
 	"context"
-	"crypto/sha256"
 	"database/sql"
-	"encoding/hex"
 	"encoding/json"
 	"time"
 )
@@ -28,45 +26,23 @@ func (repo *repository) CompleteDirectoryRun(run exportdomain.DirectoryTaskRun, 
 		if manifest != directoryRunMarker(run) {
 			return exportdomain.ErrManifest
 		}
-		// 按位置流式重算逐项报告，不能只凭行数或检查点阶段删除漫画。
-		rows, err := tx.QueryContext(ctx, "SELECT "+directoryResultColumns+" FROM directory_move_results WHERE task_id=? ORDER BY position", run.TaskID)
-		if err != nil {
-			return err
-		}
-		hash := sha256.New()
-		encoder := json.NewEncoder(hash)
-		count := 0
+		// 结果行在写入时已校验位置和状态，并且不可改写；收尾只核对总数、字节和状态。
+		var count int
 		var bytes int64
-		for rows.Next() {
-			item, err := scanDirectoryResult(rows)
-			if err != nil {
-				rows.Close()
-				return err
-			}
-			count++
-			if exportdomain.ValidateDirectoryCompletedResult(item, count) != nil {
-				rows.Close()
-				return exportdomain.ErrManifest
-			}
-			bytes += item.Size
-			if err = encoder.Encode(item); err != nil {
-				rows.Close()
-				return err
-			}
-		}
-		err = rows.Err()
-		rows.Close()
-		if err != nil {
+		var valid int
+		if err := tx.QueryRowContext(ctx, `SELECT COUNT(*),COALESCE(SUM(size),0),
+ COALESCE(SUM(CASE WHEN state IN('moved','initially_missing') THEN 1 ELSE 0 END),0)
+ FROM directory_move_results WHERE task_id=?`, run.TaskID).Scan(&count, &bytes, &valid); err != nil {
 			return err
 		}
-		if count != seal.FileCount || bytes != seal.ObservedBytes || hex.EncodeToString(hash.Sum(nil)) != report.ResultSHA256 {
+		if count != seal.FileCount || bytes != seal.ObservedBytes || valid != count || report.FileCount != count || report.Bytes != bytes {
 			return exportdomain.ErrManifest
 		}
 		facts, err := guardDirectoryRun(ctx, tx, run)
 		if err != nil {
 			return err
 		}
-		now := time.Now().UTC().Format(directoryConfirmationTime)
+		now := time.Now().UTC().Format(directoryMoveTime)
 		for _, entry := range facts.TrashIDs {
 			if _, err = tx.ExecContext(ctx, "INSERT INTO directory_move_entries(task_id,entry_id) VALUES(?,?)", run.TaskID, entry); err != nil {
 				return err

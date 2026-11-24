@@ -2,8 +2,8 @@ package domain
 
 // HQImageCounts 是数据库快照中的图片状态计数，不代表磁盘完整性验证。
 type HQImageCounts struct {
-	Images, Available, Released, Releasing, Invalid, MissingLQ, MissingSourceSHA256 int
-	OriginalBytes                                                                   int64
+	Images, Available, Released, Releasing, Invalid, MissingLQ int
+	OriginalBytes                                              int64
 }
 
 type HQReleasePreview struct {
@@ -18,15 +18,15 @@ type HQReleasePreview struct {
 	Blockers      []string `json:"blockers"`
 }
 type HQReleaseItem struct {
-	MediaID       string   `json:"mediaId"`
-	Position      int      `json:"position"`
-	Status        string   `json:"status"`
-	OriginalBytes int64    `json:"originalBytes"`
-	Outcome       *string  `json:"outcome"`
-	ErrorCode     *string  `json:"errorCode"`
-	SourcePath    string   `json:"-"`
-	SourceSHA256  string   `json:"-"`
-	LQ            LQRecord `json:"-"`
+	MediaID        string   `json:"mediaId"`
+	Position       int      `json:"position"`
+	Status         string   `json:"status"`
+	OriginalBytes  int64    `json:"originalBytes"`
+	Outcome        *string  `json:"outcome"`
+	ErrorCode      *string  `json:"errorCode"`
+	SourcePath     string   `json:"-"`
+	SourceModified int64    `json:"-"`
+	LQ             LQRecord `json:"-"`
 }
 type HQReleasePage struct {
 	Items    []HQReleaseItem `json:"items"`
@@ -35,7 +35,8 @@ type HQReleasePage struct {
 	Total    int             `json:"total"`
 }
 type HQCurrent struct {
-	State, SourcePath, SourceSHA256 string
-	Size                            int64
-	LQ                              *LQRecord
+	State, SourcePath string
+	Modified          int64
+	Size              int64
+	LQ                *LQRecord
 }

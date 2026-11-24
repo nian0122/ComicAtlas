@@ -5,71 +5,106 @@ import (
 	exportports "comicatlas.local/backend/internal/modules/exporting/application/ports"
 	exportdomain "comicatlas.local/backend/internal/modules/exporting/domain"
 	"comicatlas.local/backend/internal/platform/archive"
+	"comicatlas.local/backend/internal/platform/relocate"
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path"
 	"path/filepath"
-	"slices"
 	"strings"
 	"sync"
 	"time"
 )
 
 type Files struct {
-	root, stage     *os.Root
-	directoryMutex  sync.Mutex
-	archiveMutex    sync.Mutex
-	archiveTask     string
-	archiveVerified map[string]os.FileInfo
+	root, stage, exports *os.Root
+	directoryMutex       sync.Mutex
 }
 
 var _ exportports.Files = (*Files)(nil)
 
-func New(directory string) (*Files, error) {
-	if err := os.MkdirAll(directory, 0750); err != nil {
+// New 打开媒体根和导出根。导出根可以位于媒体根之外（例如持久卷的 exports 兄弟目录），
+// 但两者必须位于同一文件系统，发布才能沿用重命名而不复制。
+func New(mediaDirectory, exportDirectory string) (*Files, error) {
+	if err := os.MkdirAll(mediaDirectory, 0750); err != nil {
 		return nil, err
 	}
-	root, err := os.OpenRoot(directory)
+	if err := os.MkdirAll(exportDirectory, 0750); err != nil {
+		return nil, err
+	}
+	root, err := os.OpenRoot(mediaDirectory)
 	if err != nil {
 		return nil, err
 	}
-	files := &Files{root: root}
+	exports, err := os.OpenRoot(exportDirectory)
+	if err != nil {
+		root.Close()
+		return nil, err
+	}
+	files := &Files{root: root, exports: exports}
 	for _, name := range []string{"staging/exports", "exports"} {
-		if err = root.MkdirAll(name, 0750); err != nil {
-			root.Close()
+		if err = files.rootFor(name).MkdirAll(name, 0750); err != nil {
+			files.Close()
 			return nil, err
 		}
 		if err = files.safeParents(name + "/placeholder"); err != nil {
-			root.Close()
+			files.Close()
 			return nil, err
 		}
 	}
 	files.stage, err = root.OpenRoot("staging/exports")
 	if err != nil {
-		root.Close()
+		files.Close()
 		return nil, err
 	}
-	for _, name := range []string{"staging/exports", "staging", "exports", "."} {
+	stageDirectory, err := root.Open("staging/exports")
+	if err != nil {
+		files.Close()
+		return nil, err
+	}
+	defer stageDirectory.Close()
+	exportDirectoryHandle, err := exports.Open("exports")
+	if err != nil {
+		files.Close()
+		return nil, err
+	}
+	defer exportDirectoryHandle.Close()
+	if err = sameDirectoryVolume(stageDirectory, exportDirectoryHandle); err != nil {
+		files.Close()
+		return nil, err
+	}
+	for _, name := range []string{"staging/exports", "staging", "."} {
 		if err = files.syncDirectory(name); err != nil {
 			files.Close()
 			return nil, err
 		}
 	}
+	if err = syncDirectoryOn(files.exports, "."); err != nil {
+		files.Close()
+		return nil, err
+	}
 	return files, nil
 }
-func (files *Files) Close() error { return errors.Join(files.stage.Close(), files.root.Close()) }
+func (files *Files) Close() error {
+	return errors.Join(files.stage.Close(), files.root.Close(), files.exports.Close())
+}
+
+// rootFor 把导出产物路径路由到导出根，其余来源与暂存路径留在媒体根。
+func (files *Files) rootFor(name string) *os.Root {
+	if name == "exports" || strings.HasPrefix(name, "exports/") {
+		return files.exports
+	}
+	return files.root
+}
 func (files *Files) safeParents(name string) error {
 	if !filepath.IsLocal(filepath.FromSlash(name)) || path.Clean(name) != name || strings.ContainsAny(name, "\\:") {
 		return exportdomain.ErrSource
 	}
 	parts := strings.Split(name, "/")
 	for index := 1; index < len(parts); index++ {
-		info, err := files.root.Lstat(strings.Join(parts[:index], "/"))
+		info, err := files.rootFor(name).Lstat(strings.Join(parts[:index], "/"))
 		if err != nil {
 			return err
 		}
@@ -121,22 +156,6 @@ func (files *Files) Build(ctx context.Context, id string, snapshot exportdomain.
 	if err := exportdomain.ValidateSnapshot(snapshot); err != nil {
 		return nil, err
 	}
-	snapshot.Sources = slices.Clone(snapshot.Sources)
-	var buffer []byte
-	for index := range snapshot.Sources {
-		source := &snapshot.Sources[index]
-		if source.SHA256 != "" {
-			continue
-		}
-		if buffer == nil {
-			buffer = make([]byte, 256<<10)
-		}
-		digest, err := files.measureSource(ctx, *source, buffer)
-		if err != nil {
-			return nil, err
-		}
-		source.SHA256 = digest
-	}
 	plan, err := exportdomain.Entries(snapshot)
 	if err != nil {
 		return nil, err
@@ -148,12 +167,9 @@ func (files *Files) Build(ctx context.Context, id string, snapshot exportdomain.
 	}
 	for _, item := range plan {
 		entry := archive.WriteEntry{Name: item.Name, Directory: item.Directory}
-		if item.Directory {
-			sum := sha256.Sum256(nil)
-			entry.SHA256 = hex.EncodeToString(sum[:])
-		} else if item.Source != nil {
+		if item.Source != nil {
 			source := *item.Source
-			entry.Size, entry.SHA256 = source.Size, source.SHA256
+			entry.Size = source.Size
 			entry.Open = func(ctx context.Context) (io.ReadCloser, error) {
 				reader, err := files.openSource(ctx, source)
 				if err != nil {
@@ -161,10 +177,9 @@ func (files *Files) Build(ctx context.Context, id string, snapshot exportdomain.
 				}
 				return wrap(reader), nil
 			}
-		} else {
+		} else if !item.Directory {
 			data := item.Data
-			sum := sha256.Sum256(data)
-			entry.Size, entry.SHA256 = int64(len(data)), hex.EncodeToString(sum[:])
+			entry.Size = int64(len(data))
 			entry.Open = func(context.Context) (io.ReadCloser, error) { return wrap(io.NopCloser(bytes.NewReader(data))), nil }
 		}
 		entries = append(entries, entry)
@@ -183,37 +198,12 @@ func (files *Files) Build(ctx context.Context, id string, snapshot exportdomain.
 		return nil, err
 	}
 	result := make([]exportdomain.Artifact, 0, len(artifacts))
-	receipts := map[string]os.FileInfo{}
 	for _, artifact := range artifacts {
-		result = append(result, exportdomain.Artifact{FileName: artifact.FileName, Size: artifact.Size, SHA256: artifact.SHA256, LastSegment: artifact.LastSegment})
-		receipts[artifact.FileName+"\x00"+artifact.SHA256] = artifact.VerifiedInfo.Info
+		result = append(result, exportdomain.Artifact{FileName: artifact.FileName, Size: artifact.Size, Modified: artifact.Modified, LastSegment: artifact.LastSegment})
 	}
-	files.archiveMutex.Lock()
-	files.archiveTask, files.archiveVerified = id, receipts
-	files.archiveMutex.Unlock()
 	return result, nil
 }
 
-func (files *Files) measureSource(ctx context.Context, source exportdomain.Source, buffer []byte) (digest string, err error) {
-	file, err := files.openSource(ctx, source)
-	if err != nil {
-		return "", err
-	}
-	defer func() { err = errors.Join(err, file.Close()) }()
-	opened, err := file.Stat()
-	if err != nil || opened.Size() != source.Size {
-		return "", exportdomain.ErrSource
-	}
-	digest, err = fileDigest(ctx, file, source.Size, buffer, exportdomain.ErrSource)
-	if err != nil {
-		return "", err
-	}
-	current, err := files.root.Lstat(source.Path)
-	if err != nil || !os.SameFile(opened, current) || current.Size() != opened.Size() || !current.ModTime().Equal(opened.ModTime()) {
-		return "", exportdomain.ErrSource
-	}
-	return digest, nil
-}
 func (files *Files) Cleanup(ctx context.Context, id string) error {
 	_, err := files.cleanup(ctx, id)
 	return err
@@ -328,7 +318,7 @@ func (files *Files) Publish(ctx context.Context, id string, artifacts []exportdo
 		return exportdomain.ErrValidation
 	}
 	target, stage := "exports/"+id, "staging/exports/"+id
-	if _, err := files.root.Lstat(target); err == nil {
+	if _, err := files.rootFor(target).Lstat(target); err == nil {
 		if err = files.verify(ctx, target, artifacts); err != nil {
 			return err
 		}
@@ -344,7 +334,7 @@ func (files *Files) Publish(ctx context.Context, id string, artifacts []exportdo
 		if err = ctx.Err(); err != nil {
 			return err
 		}
-		if err = files.root.Rename(stage, target); err != nil {
+		if err = files.publish(ctx, stage, target); err != nil {
 			return err
 		}
 	}
@@ -355,11 +345,36 @@ func (files *Files) Publish(ctx context.Context, id string, artifacts []exportdo
 	}
 	return nil
 }
+
+// publish 在媒体根暂存区和导出根之间做同卷、不覆盖的重命名，不做复制降级。
+func (files *Files) publish(ctx context.Context, stage, target string) error {
+	info, err := files.root.Lstat(stage)
+	if err != nil {
+		return err
+	}
+	if err = ctx.Err(); err != nil {
+		return err
+	}
+	from, err := files.root.Open("staging/exports")
+	if err != nil {
+		return err
+	}
+	defer from.Close()
+	to, err := files.exports.Open("exports")
+	if err != nil {
+		return err
+	}
+	defer to.Close()
+	if err = sameDirectoryVolume(from, to); err != nil {
+		return err
+	}
+	return relocate.NoReplace(from, to, path.Base(stage), path.Base(target), info)
+}
 func (files *Files) verify(ctx context.Context, directory string, artifacts []exportdomain.Artifact) error {
 	if err := files.safeParents(directory + "/placeholder"); err != nil {
 		return err
 	}
-	root, err := files.root.OpenRoot(directory)
+	root, err := files.rootFor(directory).OpenRoot(directory)
 	if err != nil {
 		return err
 	}
@@ -376,91 +391,20 @@ func (files *Files) verify(ctx context.Context, directory string, artifacts []ex
 	if len(names) != len(artifacts) {
 		return exportdomain.ErrManifest
 	}
-	buffer := make([]byte, 256<<10)
 	for _, artifact := range artifacts {
 		if artifact.FileName == "" || artifact.FileName == "." || path.Base(artifact.FileName) != artifact.FileName || strings.ContainsAny(artifact.FileName, "\\:") {
 			return exportdomain.ErrManifest
 		}
-		files.archiveMutex.Lock()
-		var receipt os.FileInfo
-		if directory == "staging/exports/"+files.archiveTask {
-			receipt = files.archiveVerified[artifact.FileName+"\x00"+artifact.SHA256]
-		}
-		files.archiveMutex.Unlock()
-		current, statErr := root.Lstat(artifact.FileName)
-		if statErr != nil {
-			return statErr
-		}
-		if receipt != nil && current.Mode().IsRegular() && os.SameFile(receipt, current) && current.Size() == artifact.Size && current.ModTime().Equal(receipt.ModTime()) {
-			continue
-		}
-		if err = verifyArtifact(ctx, root, artifact, buffer); err != nil {
+		if err := ctx.Err(); err != nil {
 			return err
 		}
+		current, err := root.Lstat(artifact.FileName)
+		if err != nil {
+			return err
+		}
+		if !current.Mode().IsRegular() || current.Size() != artifact.Size || current.ModTime().UnixNano() != artifact.Modified {
+			return exportdomain.ErrManifest
+		}
 	}
 	return nil
-}
-func verifyArtifact(ctx context.Context, root *os.Root, artifact exportdomain.Artifact, buffer []byte) (err error) {
-	before, err := root.Lstat(artifact.FileName)
-	if err != nil {
-		return err
-	}
-	if !before.Mode().IsRegular() || before.Size() != artifact.Size {
-		return exportdomain.ErrManifest
-	}
-	file, err := root.Open(artifact.FileName)
-	if err != nil {
-		return err
-	}
-	defer func() { err = errors.Join(err, file.Close()) }()
-	opened, err := file.Stat()
-	if err != nil {
-		return err
-	}
-	if !os.SameFile(opened, before) || opened.Size() != artifact.Size {
-		return exportdomain.ErrManifest
-	}
-	digest, err := fileDigest(ctx, file, artifact.Size, buffer, exportdomain.ErrManifest)
-	if err != nil {
-		return err
-	}
-	if digest != artifact.SHA256 {
-		return exportdomain.ErrManifest
-	}
-	after, err := file.Stat()
-	if err != nil {
-		return err
-	}
-	if after.Size() != opened.Size() || !after.ModTime().Equal(opened.ModTime()) {
-		return exportdomain.ErrManifest
-	}
-	return nil
-}
-
-func fileDigest(ctx context.Context, file *os.File, size int64, buffer []byte, sizeError error) (string, error) {
-	hash := sha256.New()
-	var count int64
-	for {
-		if err := ctx.Err(); err != nil {
-			return "", err
-		}
-		n, readErr := file.Read(buffer)
-		if n > 0 {
-			count += int64(n)
-			if count > size {
-				return "", sizeError
-			}
-			hash.Write(buffer[:n])
-		}
-		if errors.Is(readErr, io.EOF) {
-			break
-		}
-		if readErr != nil {
-			return "", readErr
-		}
-	}
-	if count != size {
-		return "", sizeError
-	}
-	return hex.EncodeToString(hash.Sum(nil)), nil
 }

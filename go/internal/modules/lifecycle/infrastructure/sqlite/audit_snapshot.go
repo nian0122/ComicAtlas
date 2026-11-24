@@ -52,7 +52,7 @@ func auditSnapshot(ctx context.Context, tx *sql.Tx, id string) (lifecycledomain.
 			rows.Close()
 			return value, lifecycledomain.ErrValidation
 		}
-		value.Entries = append(value.Entries, lifecycledomain.AuditEntry{Entry: item.Entry, Candidates: item.Candidates, PlanHash: item.PlanHash})
+		value.Entries = append(value.Entries, lifecycledomain.AuditEntry{Entry: item.Entry, Candidates: item.Candidates, PlanStamp: item.PlanStamp})
 	}
 	err = rows.Err()
 	rows.Close()

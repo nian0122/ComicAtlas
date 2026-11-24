@@ -49,18 +49,6 @@ func coverSource(ctx context.Context, tx *sql.Tx, id string) (mediadomain.ImageS
 	}
 	return imageSource(ctx, tx, selection.MediaID)
 }
-func (repo *repository) CoverSource(ctx context.Context, id string) (mediadomain.ImageSource, error) {
-	tx, err := repo.database.Writer.BeginTx(ctx, nil)
-	if err != nil {
-		return mediadomain.ImageSource{}, err
-	}
-	defer tx.Rollback()
-	source, err := coverSource(ctx, tx, id)
-	if err != nil {
-		return source, err
-	}
-	return source, tx.Commit()
-}
 func (repo *repository) CoverSelection(ctx context.Context, id string) (mediadomain.CoverSelection, error) {
 	tx, err := repo.database.Writer.BeginTx(ctx, nil)
 	if err != nil {
@@ -143,7 +131,11 @@ func (repo *repository) CoverMediaActive(ctx context.Context, comicID, media str
 	err := repo.database.Reader.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM active_media m JOIN active_chapters ch ON ch.id=m.chapter_id WHERE m.id=? AND ch.comic_id=? AND m.media_type='image')`, media, comicID).Scan(&active)
 	return active, err
 }
-func (repo *repository) SelectCover(ctx context.Context, id string, version int, media string) (mediadomain.CoverSelection, error) {
+func (repo *repository) SelectCover(ctx context.Context, id string, version int, source mediadomain.ImageSource, record mediadomain.CoverRecord, publish func() error) (mediadomain.CoverSelection, error) {
+	media := source.MediaID
+	if !mediadomain.ValidCover(record, source, id) {
+		return mediadomain.CoverSelection{}, mediadomain.ErrImageOutput
+	}
 	tx, err := repo.database.Writer.BeginTx(ctx, nil)
 	if err != nil {
 		return mediadomain.CoverSelection{}, err
@@ -174,11 +166,26 @@ func (repo *repository) SelectCover(ctx context.Context, id string, version int,
 	if err != nil {
 		return value, err
 	}
+	current, err := imageSource(ctx, tx, media)
+	if err != nil {
+		return value, err
+	}
+	if current != source {
+		return value, mediadomain.ErrLQConflict
+	}
+	if err = writeCover(ctx, tx, id, record); err != nil {
+		return value, err
+	}
+	if err = publish(); err != nil {
+		return value, err
+	}
 	return value, tx.Commit()
 }
-func (repo *repository) Cover(ctx context.Context, id string) (*mediadomain.CoverRecord, error) {
+
+// ActiveCover 只返回活动漫画的持久封面记录；隐藏漫画的封面不可读。
+func (repo *repository) ActiveCover(ctx context.Context, id string) (*mediadomain.CoverRecord, error) {
 	var record mediadomain.CoverRecord
-	err := repo.database.Reader.QueryRowContext(ctx, "SELECT media_id,source_key,relative_path,sha256,size,width,height FROM comic_covers WHERE comic_id=?", id).Scan(&record.MediaID, &record.SourceKey, &record.Path, &record.SHA256, &record.Size, &record.Width, &record.Height)
+	err := repo.database.Reader.QueryRowContext(ctx, "SELECT c.media_id,c.source_key,c.relative_path,c.size,c.width,c.height FROM comic_covers c JOIN active_comics a ON a.id=c.comic_id WHERE c.comic_id=?", id).Scan(&record.MediaID, &record.SourceKey, &record.Path, &record.Size, &record.Width, &record.Height)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
@@ -193,8 +200,7 @@ func (repo *repository) SaveFrameCover(ctx context.Context, id string, record me
 		return err
 	}
 	defer tx.Rollback()
-	_, err = tx.ExecContext(ctx, `INSERT INTO comic_covers(comic_id,media_id,source_key,relative_path,sha256,size,width,height) VALUES(?,?,?,?,?,?,?,?)
- ON CONFLICT(comic_id) DO UPDATE SET media_id=excluded.media_id,source_key=excluded.source_key,relative_path=excluded.relative_path,sha256=excluded.sha256,size=excluded.size,width=excluded.width,height=excluded.height`, id, record.MediaID, record.SourceKey, record.Path, record.SHA256, record.Size, record.Width, record.Height)
+	err = writeCover(ctx, tx, id, record)
 	if err != nil {
 		return err
 	}
@@ -217,10 +223,15 @@ func (repo *repository) SaveCover(ctx context.Context, id string, source mediado
 	if current != source {
 		return mediadomain.ErrLQConflict
 	}
-	_, err = tx.ExecContext(ctx, `INSERT INTO comic_covers(comic_id,media_id,source_key,relative_path,sha256,size,width,height) VALUES(?,?,?,?,?,?,?,?)
- ON CONFLICT(comic_id) DO UPDATE SET media_id=excluded.media_id,source_key=excluded.source_key,relative_path=excluded.relative_path,sha256=excluded.sha256,size=excluded.size,width=excluded.width,height=excluded.height`, id, record.MediaID, record.SourceKey, record.Path, record.SHA256, record.Size, record.Width, record.Height)
+	err = writeCover(ctx, tx, id, record)
 	if err != nil {
 		return err
 	}
 	return tx.Commit()
+}
+
+func writeCover(ctx context.Context, tx *sql.Tx, id string, record mediadomain.CoverRecord) error {
+	_, err := tx.ExecContext(ctx, `INSERT INTO comic_covers(comic_id,media_id,source_key,relative_path,size,width,height) VALUES(?,?,?,?,?,?,?)
+ ON CONFLICT(comic_id) DO UPDATE SET media_id=excluded.media_id,source_key=excluded.source_key,relative_path=excluded.relative_path,size=excluded.size,width=excluded.width,height=excluded.height`, id, record.MediaID, record.SourceKey, record.Path, record.Size, record.Width, record.Height)
+	return err
 }

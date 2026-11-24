@@ -17,7 +17,7 @@ func (service *Service) Verify(ctx context.Context, name string) (manifest domai
 	if err != nil {
 		return manifest, err
 	}
-	object, err := source.Digest(ctx, domain.CatalogPath)
+	object, err := source.Measure(ctx, domain.CatalogPath)
 	if err != nil {
 		return manifest, err
 	}
@@ -49,7 +49,7 @@ func (service *Service) Verify(ctx context.Context, name string) (manifest domai
 	if info != manifest.Database {
 		return manifest, domain.ErrInvalid
 	}
-	object, err = source.Digest(ctx, domain.CatalogPath)
+	object, err = source.Measure(ctx, domain.CatalogPath)
 	if err != nil {
 		return manifest, err
 	}

@@ -21,7 +21,6 @@ type Outcome struct {
 	TaskID, ComicID, Status string
 	TaskAttempt, TryCount   int
 	ErrorCode               *string
-	SourceSHA256            *string `json:"-"`
 	UpdatedAt               string
 }
 

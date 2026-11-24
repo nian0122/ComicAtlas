@@ -44,7 +44,8 @@ func (storage *Storage) publishFile(ctx context.Context, source, target string, 
 	if err := storage.syncPublishedFile(target); err != nil {
 		return err
 	}
-	return storage.syncDirectory(path.Dir(source))
+	// 源目录属于可重建暂存，崩溃遗留由启动清理处理，不再逐项同步。
+	return nil
 }
 
 func (storage *Storage) finishPublishedFile(ctx context.Context, source, target string, verify func(string) error) error {
@@ -88,7 +89,8 @@ func (storage *Storage) finishPublishedFile(ctx context.Context, source, target 
 	if err = storage.root.Remove(filepath.FromSlash(source)); err != nil {
 		return err
 	}
-	return storage.syncDirectory(path.Dir(source))
+	// 源目录属于可重建暂存，崩溃遗留由启动清理处理，不再逐项同步。
+	return nil
 }
 
 func (storage *Storage) syncPublishedFile(name string) error {
@@ -118,5 +120,5 @@ func (storage *Storage) syncPublishedFile(name string) error {
 	if !current.Mode().IsRegular() || !os.SameFile(current, before) || current.Size() != before.Size() || !current.ModTime().Equal(before.ModTime()) {
 		return mediadomain.ErrImageChanged
 	}
-	return storage.syncParents(name)
+	return storage.syncDirectory(path.Dir(name))
 }

@@ -3,30 +3,20 @@ package domain
 import (
 	"encoding/json"
 	"encoding/xml"
-	"fmt"
 	"path"
 	"sort"
 	"strings"
-	"unicode"
 )
 
-func label(value string, maximum int) string {
-	var result strings.Builder
-	for _, r := range value {
-		if unicode.IsControl(r) || strings.ContainsRune("/\\:<>\"|?*", r) {
-			r = '_'
-		}
-		if result.Len()+len(string(r)) > maximum {
-			break
-		}
-		result.WriteRune(r)
-	}
-	name := strings.Trim(result.String(), " .")
-	if name == "" {
-		return "untitled"
+// archiveStructuralName 避开归档根目录的固定文档名。
+func archiveStructuralName(value string, maximum int) string {
+	name := directoryStructuralName(value, maximum)
+	if strings.EqualFold(name, "ComicInfo.xml") {
+		name = "_" + name
 	}
 	return name
 }
+
 func Entries(snapshot Snapshot) ([]Entry, error) {
 	if err := ValidateSnapshot(snapshot); err != nil {
 		return nil, err
@@ -65,6 +55,28 @@ func Entries(snapshot Snapshot) ([]Entry, error) {
 			return a.id < b.id
 		})
 	}
+	var measure func(string) int
+	measure = func(parent string) int {
+		maximum := 0
+		for _, node := range children[parent] {
+			next := 1
+			if !node.chapter {
+				next += measure(node.id)
+			}
+			if next > maximum {
+				maximum = next
+			}
+		}
+		return maximum
+	}
+	depth := measure("")
+	if depth < 1 {
+		depth = 1
+	}
+	labelLimit := directoryStructuralLabelBytes("", depth)
+	if labelLimit == 0 {
+		return nil, ErrValidation
+	}
 	entries := []Entry{}
 	visited := map[string]bool{}
 	var walk func(string, string, int) error
@@ -72,13 +84,27 @@ func Entries(snapshot Snapshot) ([]Entry, error) {
 		if depth > 64 {
 			return ErrValidation
 		}
+		labels := make([]string, len(children[parent]))
+		counts := map[string]int{}
+		for index, node := range children[parent] {
+			label := archiveStructuralName(node.title, labelLimit)
+			labels[index] = label
+			counts[directoryNameKey(label)]++
+		}
+		used := map[string]bool{}
 		for index, node := range children[parent] {
 			if visited[node.id] {
 				return ErrValidation
 			}
 			visited[node.id] = true
-			name := path.Join(prefix, fmt.Sprintf("%05d-%s", index+1, label(node.title, 20)))
-			if len(name) > 1800 {
+			label := labels[index]
+			duplicate := counts[directoryNameKey(label)] > 1
+			if duplicate || used[directoryNameKey(label)] {
+				label = directoryUniqueName(label, node.id, used, duplicate)
+			}
+			used[directoryNameKey(label)] = true
+			name := path.Join(prefix, label)
+			if len(name) > DirectoryPathBytes {
 				return ErrValidation
 			}
 			entries = append(entries, Entry{Name: name + "/", Directory: true})
@@ -101,14 +127,38 @@ func Entries(snapshot Snapshot) ([]Entry, error) {
 	if len(visited) != len(all) {
 		return nil, ErrValidation
 	}
+	pageCounts := map[string]map[string]int{}
+	for _, source := range snapshot.Sources {
+		label := directoryPageLabel(source.FileName)
+		if pageCounts[source.ChapterID] == nil {
+			pageCounts[source.ChapterID] = map[string]int{}
+		}
+		pageCounts[source.ChapterID][directoryNameKey(label)]++
+	}
+	pageNames := make([]string, len(snapshot.Sources))
+	pageUsed := map[string]map[string]bool{}
+	for index, source := range snapshot.Sources {
+		label := directoryPageLabel(source.FileName)
+		used := pageUsed[source.ChapterID]
+		if used == nil {
+			used = map[string]bool{}
+			pageUsed[source.ChapterID] = used
+		}
+		duplicate := pageCounts[source.ChapterID][directoryNameKey(label)] > 1
+		if duplicate || used[directoryNameKey(label)] {
+			id := source.MediaID
+			if id == "" {
+				id = source.Path
+			}
+			label = directoryUniqueName(label, id, used, duplicate)
+		}
+		used[directoryNameKey(label)] = true
+		pageNames[index] = label
+	}
 	portable := snapshot
 	portable.Sources = append([]Source(nil), snapshot.Sources...)
-	missingDigestBytes := 0
 	for index := range snapshot.Sources {
 		source := snapshot.Sources[index]
-		if source.SHA256 == "" {
-			missingDigestBytes += 64
-		}
 		directory, ok := chapters[source.ChapterID]
 		if !ok {
 			return nil, ErrValidation
@@ -117,7 +167,10 @@ func Entries(snapshot Snapshot) ([]Entry, error) {
 		if ext == "" {
 			return nil, ErrValidation
 		}
-		name := path.Join(directory, fmt.Sprintf("%06d-%s%s", source.PageNumber, label(strings.TrimSuffix(source.FileName, path.Ext(source.FileName)), 100), ext))
+		name := path.Join(directory, pageNames[index]+ext)
+		if len(name) > DirectoryPathBytes {
+			return nil, ErrValidation
+		}
 		portable.Sources[index].Path = name
 		entries = append(entries, Entry{Name: name, Source: &snapshot.Sources[index]})
 	}
@@ -141,7 +194,7 @@ func Entries(snapshot Snapshot) ([]Entry, error) {
 	if err != nil {
 		return nil, err
 	}
-	if len(metadata)+missingDigestBytes > MaxSnapshotBytes {
+	if len(metadata) > MaxSnapshotBytes {
 		return nil, ErrValidation
 	}
 	entries = append([]Entry{{Name: "ComicInfo.xml", Data: append([]byte(xml.Header), xmlData...)}, {Name: "metadata.json", Data: metadata}}, entries...)

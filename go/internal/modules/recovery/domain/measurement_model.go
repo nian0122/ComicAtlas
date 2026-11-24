@@ -9,10 +9,11 @@ const MaxSourceObservations = 400000
 
 // Measurement 仅证明一次读取的结果，不代替数据库提交前的来源复核。
 type Measurement struct {
-	Path, SHA256 string
-	Size         int64
-	Image        *mediadomain.Inspection
-	Video        *mediadomain.Video
+	Path     string
+	Modified int64
+	Size     int64
+	Image    *mediadomain.Inspection
+	Video    *mediadomain.Video
 }
 
 // MediaVerification 只统计已核对字节的文件，不代表编码或恢复写入已通过。

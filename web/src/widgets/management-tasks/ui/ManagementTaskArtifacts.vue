@@ -38,13 +38,6 @@ async function copy(value: string) {
           <code>{{ item.path }}</code
           ><button class="mw-button" :aria-label="`复制${item.fileName}位置`" @click="copy(item.path)">复制位置</button>
         </div>
-        <details>
-          <summary>SHA-256 校验值</summary>
-          <code>{{ item.sha256 }}</code
-          ><button class="mw-button" :aria-label="`复制${item.fileName}校验值`" @click="copy(item.sha256)">
-            复制校验值
-          </button>
-        </details>
       </article>
     </template>
     <p v-if="copied" role="status">{{ copied }}</p>

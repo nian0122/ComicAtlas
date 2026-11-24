@@ -1,32 +1,27 @@
 package domain
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"reflect"
 )
 
-// OriginalAvailability 保留缺失、释放与无来源关联的区别；未知摘要必须有明确快照证据。
+// OriginalAvailability 根据原件登记状态和副本来源状态判断原件是否存在。
 func OriginalAvailability(media StoredMedia) string {
-	if media.Hash != "" {
+	if media.HQState == "released" {
 		return media.HQState
 	}
 	if media.MediaType != "image" || media.LQFile == nil || media.LQFile.Provenance == nil || media.LQFile.Provenance.OriginalState == "" {
-		return "unknown"
+		return media.HQState
 	}
 	state := media.LQFile.Provenance.OriginalState
-	if (state == "released") != (media.HQState == "released") {
-		return "unknown"
-	}
-	if media.HQState != "available" && media.HQState != "released" {
-		return "unknown"
+	if media.HQState != "available" || state == "released" || media.Modified != 0 || media.StorageState == "present" || media.StorageState == "changed" {
+		return media.HQState
 	}
 	return state
 }
 
 func StorageMediaChanged(before, after StoredMedia) bool {
-	return before.Hash != after.Hash || before.Size != after.Size || before.ContentType != after.ContentType || !reflect.DeepEqual(before.Width, after.Width) || !reflect.DeepEqual(before.Height, after.Height) || !reflect.DeepEqual(before.Video, after.Video)
+	return before.Modified != after.Modified || before.Size != after.Size || before.ContentType != after.ContentType || !reflect.DeepEqual(before.Width, after.Width) || !reflect.DeepEqual(before.Height, after.Height) || !reflect.DeepEqual(before.Video, after.Video)
 }
 
 func StorageChanges(before, after Snapshot) (StorageDelta, error) {
@@ -74,17 +69,16 @@ func StorageChanges(before, after Snapshot) (StorageDelta, error) {
 	return delta, nil
 }
 
-func SnapshotData(value Snapshot) ([]byte, string, error) {
+func SnapshotData(value Snapshot) ([]byte, error) {
 	if value.Version != 1 || len(value.Media)+len(value.SuppressedPaths) > MaxSnapshotMedia || len(value.Detail.Catalogs)+len(value.Detail.Chapters) > MaxStructureNodes {
-		return nil, "", ErrValidation
+		return nil, ErrValidation
 	}
 	data, err := json.Marshal(value)
 	if err != nil {
-		return nil, "", err
+		return nil, err
 	}
 	if len(data) > MaxSnapshotBytes {
-		return nil, "", ErrValidation
+		return nil, ErrValidation
 	}
-	digest := sha256.Sum256(data)
-	return data, hex.EncodeToString(digest[:]), nil
+	return data, nil
 }

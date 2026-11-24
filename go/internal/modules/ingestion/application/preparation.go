@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"os"
 	"path"
@@ -17,13 +16,64 @@ import (
 	"comicatlas.local/backend/internal/platform/relocate"
 )
 
-func importTempRoot(id string) string { return "temp/import/" + id }
+// preparationVersion 4 把业务布局提前固定，只使用 staging/import/{taskId} 一个任务工作区。
+const preparationVersion = 4
 
 func importTaskRoot(id string) string  { return "staging/import/" + id }
 func preparationRoot(id string) string { return importTaskRoot(id) + "/work" }
+func extractionRoot(id string) string  { return preparationRoot(id) + "/extract" }
+func nonMediaRoot(id string) string    { return preparationRoot(id) + "/nonmedia" }
 func publicationRoot(id string) string { return importTaskRoot(id) + "/ready" }
 
-// prepare 依次完成解压、来源整理、稳定 ID 分配和媒体分析；任何搬移后的错误都保留现场。
+const publicationMarker = ".comicatlas-import"
+
+func (directory *Directory) writePublicationMarker(stage, taskID string) error {
+	name := stage + "/" + publicationMarker
+	file, err := directory.media.OpenFile(name, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
+	if errors.Is(err, os.ErrExist) {
+		if err := directory.checkPublicationMarker(stage, taskID); err == nil {
+			return directory.syncMediaDirectory(stage)
+		}
+		return ingestiondomain.ErrPublishedChanged
+	}
+	if err != nil {
+		return storageFailure(err)
+	}
+	_, writeErr := io.WriteString(file, taskID)
+	if err = errors.Join(writeErr, file.Sync(), file.Close()); err != nil {
+		return storageFailure(err)
+	}
+	return directory.syncMediaDirectory(stage)
+}
+
+func (directory *Directory) checkPublicationMarker(base, taskID string) error {
+	name := base + "/" + publicationMarker
+	if err := safeParents(directory.media, name); err != nil {
+		return err
+	}
+	info, err := directory.media.Lstat(name)
+	if err != nil {
+		return publishedReadFailure(err)
+	}
+	if !info.Mode().IsRegular() || info.Size() != int64(len(taskID)) {
+		return ingestiondomain.ErrPublishedChanged
+	}
+	file, err := directory.media.Open(name)
+	if err != nil {
+		return publishedReadFailure(err)
+	}
+	data, readErr := io.ReadAll(io.LimitReader(file, int64(len(taskID)+1)))
+	if err = errors.Join(readErr, file.Close()); err != nil {
+		return publishedReadFailure(err)
+	}
+	if string(data) != taskID {
+		return ingestiondomain.ErrPublishedChanged
+	}
+	return nil
+}
+
+// prepare 先固化完整布局，再把媒体物化到 ready，最后在 ready 内分析。
+// 检查点只保存在 staging/import/{taskId}，解压、整理和发布都不再使用 temp。
 func (directory *Directory) prepare(ctx context.Context, task jobsdomain.Task, stage string) (librarydomain.Plan, error) {
 	root := preparationRoot(task.ID)
 	journal, err := directory.loadPreparation(task, root)
@@ -33,114 +83,19 @@ func (directory *Directory) prepare(ctx context.Context, task jobsdomain.Task, s
 	if err != nil {
 		return librarydomain.Plan{}, err
 	}
-	bySource := make(map[string]*ingestiondomain.PreparedFile, len(journal.Files))
-	analyzedHere := false
-	normalizedHere := false
-	for index := range journal.Files {
-		file := &journal.Files[index]
-		bySource[file.Source] = file
+	if err = directory.materialize(ctx, task, stage, &journal); err != nil {
+		return journal.Layout.Plan, err
 	}
-	if journal.Layout == nil {
-		if err = directory.normalize(ctx, task, root, &journal); err != nil {
-			return librarydomain.Plan{}, err
-		}
-		normalizedHere = true
-		names := make([]string, 0, len(journal.Files))
-		for _, file := range journal.Files {
-			names = append(names, file.Source)
-		}
-		layout, layoutErr := ingestiondomain.NormalizeLayout(task.ID, librarydomain.Comic{ID: task.ComicID, Title: task.Title, CreatedAt: task.CreatedAt}, names)
-		if layoutErr != nil {
-			return librarydomain.Plan{}, layoutErr
-		}
-		layout.Plan.ComicInfo = journal.ComicInfo
-		layout.Plan.Comic.Author = journal.Comic.Author
-		layout.Plan.Comic.Description = journal.Comic.Description
-		layout.Plan.Comic.CategoryName = journal.Comic.CategoryName
-		layout.Plan.Comic.Tags = journal.Comic.Tags
-		if !task.TitleExplicit && journal.Comic.Title != "" {
-			layout.Plan.Comic.Title = journal.Comic.Title
-		}
-		if journal.Document != nil {
-			copied := map[string]librarydomain.Media{}
-			for index, item := range layout.Plan.Media {
-				file := bySource[layout.Sources[item.ID]]
-				if file == nil {
-					return librarydomain.Plan{}, ingestiondomain.ErrManifest
-				}
-				if err = directory.inspectPrepared(ctx, root+"/"+file.Normalized, &item, file.Hash); err != nil {
-					return librarydomain.Plan{}, err
-				}
-				copied[file.Source] = item
-				layout.Plan.Media[index] = item
-			}
-			if err = restoreArchiveMetadata(task, &layout.Plan, *journal.Document, copied); err != nil {
-				return librarydomain.Plan{}, err
-			}
-			analyzedHere = true
-		}
-		journal.Layout = &layout
-		if err = directory.savePreparation(root, journal); err != nil {
-			return librarydomain.Plan{}, err
-		}
+	if err = directory.analyze(ctx, task, stage, &journal); err != nil {
+		return journal.Layout.Plan, err
 	}
-	plan := journal.Layout.Plan
-	if err = directory.media.MkdirAll(stage, 0750); err != nil {
-		return plan, storageFailure(err)
-	}
-	if err = directory.stageChapters(ctx, task, root, stage, journal); err != nil {
-		return plan, err
-	}
-	if err = directory.store.UpdateProgress(ctx, task.ID, "analyzing", len(plan.Media), 0); err != nil {
-		return plan, err
-	}
-	for index := range plan.Media {
-		if err = ctx.Err(); err != nil {
-			return plan, err
-		}
-		item := &plan.Media[index]
-		file := bySource[journal.Layout.Sources[item.ID]]
-		if file == nil {
-			return plan, ingestiondomain.ErrManifest
-		}
-		relative := strings.TrimPrefix(item.RelativePath, "hq/"+task.ComicID+"/")
-		target := stage + "/" + relative
-		if err = directory.checkMoved(directory.media, target, *file); err != nil {
-			return plan, err
-		}
-		if item.SHA256 == "" {
-			verifiedHash := ""
-			if normalizedHere {
-				verifiedHash = file.Hash
-			}
-			if err = directory.inspectPrepared(ctx, target, item, verifiedHash); err != nil {
-				return plan, err
-			}
-		} else if !analyzedHere {
-			if err = directory.checkHash(ctx, target, item.Size, item.SHA256); err != nil {
-				return plan, err
-			}
-		}
-		if file.Hash != "" && item.SHA256 != file.Hash {
-			return plan, ingestiondomain.ErrPublishedChanged
-		}
-		if index+1 == len(plan.Media) || plan.Media[index+1].ChapterID != item.ChapterID {
-			journal.Layout.Plan = plan
-			if err = directory.savePreparation(root, journal); err != nil {
-				return plan, err
-			}
-		}
-		if (index+1)%8 == 0 || index+1 == len(plan.Media) {
-			if err = directory.store.UpdateProgress(ctx, task.ID, "analyzing", len(plan.Media), index+1); err != nil {
-				return plan, err
-			}
-		}
-	}
-	return plan, nil
+	return journal.Layout.Plan, nil
 }
 
+// startPreparation 在搬移来源前完成扫描、资料读取和稳定布局分配。
+// 归档先解压到任务工作区再建立计划；目录直接建立计划，随后由 materialize 搬移。
 func (directory *Directory) startPreparation(ctx context.Context, task jobsdomain.Task, root string) (ingestiondomain.Preparation, error) {
-	journal := ingestiondomain.Preparation{Version: 2, TaskID: task.ID, SourcePath: task.SourcePath, Archive: task.Type == "archive_import", Files: []ingestiondomain.PreparedFile{}}
+	journal := ingestiondomain.Preparation{Version: preparationVersion, TaskID: task.ID, SourcePath: task.SourcePath, Archive: task.Type == "archive_import", Files: []ingestiondomain.PreparedFile{}}
 	var source *os.Root
 	var names []string
 	var err error
@@ -151,8 +106,8 @@ func (directory *Directory) startPreparation(ctx context.Context, task jobsdomai
 		}
 		defer selection.reader.Close()
 		journal.Comic, journal.ComicInfo, journal.Document = selection.metadata, selection.comicInfo, selection.document
-		extracted := importTempRoot(task.ID)
-		// 只允许在尚无整理计划时重建解压产物；原压缩包始终保留。
+		extracted := extractionRoot(task.ID)
+		// 只在尚无任务计划时重建解压产物；原压缩包始终保留。
 		if err = directory.media.RemoveAll(extracted); err != nil {
 			return journal, storageFailure(err)
 		}
@@ -209,15 +164,7 @@ func (directory *Directory) startPreparation(ctx context.Context, task jobsdomai
 		}
 		journal.Comic, journal.ComicInfo = metadata, info
 	}
-	// 同目录的媒体归入一个平铺章节；编号只是暂存位置，不是业务 ID。
-	groups := map[string]int{}
 	for _, name := range names {
-		parent := path.Dir(name)
-		number, ok := groups[parent]
-		if !ok {
-			number = len(groups) + 1
-			groups[parent] = number
-		}
 		file, openErr := source.Open(name)
 		if openErr != nil {
 			return journal, sourceFailure(openErr)
@@ -240,12 +187,121 @@ func (directory *Directory) startPreparation(ctx context.Context, task jobsdomai
 		if statErr != nil || idErr != nil {
 			return journal, errors.Join(statErr, idErr)
 		}
-		journal.Files = append(journal.Files, ingestiondomain.PreparedFile{Source: name, Normalized: fmt.Sprintf("chapters/%d/%s", number, path.Base(name)), Size: info.Size(), Modified: info.ModTime().UnixNano(), Identity: identity})
+		journal.Files = append(journal.Files, ingestiondomain.PreparedFile{Source: name, Size: info.Size(), Modified: info.ModTime().UnixNano(), Identity: identity})
 	}
+	layout, layoutErr := ingestiondomain.NormalizeLayout(task.ID, librarydomain.Comic{ID: task.ComicID, Title: task.Title, CreatedAt: task.CreatedAt}, names)
+	if layoutErr != nil {
+		return journal, layoutErr
+	}
+	layout.Plan.ComicInfo = journal.ComicInfo
+	layout.Plan.Comic.Author = journal.Comic.Author
+	layout.Plan.Comic.Description = journal.Comic.Description
+	layout.Plan.Comic.CategoryName = journal.Comic.CategoryName
+	layout.Plan.Comic.Tags = journal.Comic.Tags
+	if !task.TitleExplicit && journal.Comic.Title != "" {
+		layout.Plan.Comic.Title = journal.Comic.Title
+	}
+	if journal.Document != nil {
+		bySource := make(map[string]*ingestiondomain.PreparedFile, len(journal.Files))
+		for index := range journal.Files {
+			bySource[journal.Files[index].Source] = &journal.Files[index]
+		}
+		copied := map[string]librarydomain.Media{}
+		for index, item := range layout.Plan.Media {
+			file := bySource[layout.Sources[item.ID]]
+			if file == nil {
+				return journal, ingestiondomain.ErrManifest
+			}
+			if err = directory.inspectPrepared(ctx, extractionRoot(task.ID)+"/"+file.Source, &item); err != nil {
+				return journal, err
+			}
+			copied[file.Source] = item
+			layout.Plan.Media[index] = item
+		}
+		if err = restoreArchiveMetadata(task, &layout.Plan, *journal.Document, copied); err != nil {
+			return journal, err
+		}
+	}
+	if err = setTargets(&journal, layout, task.ComicID); err != nil {
+		return journal, err
+	}
+	journal.Layout = &layout
 	if err = directory.savePreparation(root, journal); err != nil {
 		return journal, err
 	}
 	return journal, nil
+}
+
+func setTargets(journal *ingestiondomain.Preparation, layout ingestiondomain.Layout, comicID string) error {
+	targets := make(map[string]string, len(layout.Plan.Media))
+	for _, item := range layout.Plan.Media {
+		source, ok := layout.Sources[item.ID]
+		if !ok {
+			return ingestiondomain.ErrManifest
+		}
+		target := strings.TrimPrefix(item.RelativePath, "hq/"+comicID+"/")
+		if target == item.RelativePath || strings.Count(target, "/") != 1 {
+			return ingestiondomain.ErrManifest
+		}
+		targets[source] = target
+	}
+	if len(targets) != len(journal.Files) {
+		return ingestiondomain.ErrManifest
+	}
+	for index := range journal.Files {
+		target, ok := targets[journal.Files[index].Source]
+		if !ok {
+			return ingestiondomain.ErrManifest
+		}
+		journal.Files[index].Target = target
+	}
+	return nil
+}
+
+// analyze 在 ready 中核验暂存文件并读取图片/视频资料；每章结束刷新检查点。
+func (directory *Directory) analyze(ctx context.Context, task jobsdomain.Task, stage string, journal *ingestiondomain.Preparation) error {
+	plan := journal.Layout.Plan
+	bySource := make(map[string]*ingestiondomain.PreparedFile, len(journal.Files))
+	for index := range journal.Files {
+		bySource[journal.Files[index].Source] = &journal.Files[index]
+	}
+	if err := directory.store.UpdateProgress(ctx, task.ID, "analyzing", len(plan.Media), 0); err != nil {
+		return err
+	}
+	for index := range plan.Media {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		item := &plan.Media[index]
+		file := bySource[journal.Layout.Sources[item.ID]]
+		if file == nil {
+			return ingestiondomain.ErrManifest
+		}
+		target := stage + "/" + strings.TrimPrefix(item.RelativePath, "hq/"+task.ComicID+"/")
+		if err := directory.checkMoved(directory.media, target, *file); err != nil {
+			return err
+		}
+		if item.Modified == 0 {
+			if err := directory.inspectPrepared(ctx, target, item); err != nil {
+				return err
+			}
+		}
+		if item.Size != file.Size || item.Modified != file.Modified {
+			return ingestiondomain.ErrPublishedChanged
+		}
+		if index+1 == len(plan.Media) || plan.Media[index+1].ChapterID != item.ChapterID {
+			journal.Layout.Plan = plan
+			if err := directory.savePreparation(preparationRoot(task.ID), *journal); err != nil {
+				return err
+			}
+		}
+		if (index+1)%8 == 0 || index+1 == len(plan.Media) {
+			if err := directory.store.UpdateProgress(ctx, task.ID, "analyzing", len(plan.Media), index+1); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 func (directory *Directory) extractStream(ctx context.Context, stream io.Reader, target string, size int64) error {
@@ -278,19 +334,42 @@ func (directory *Directory) loadPreparation(task jobsdomain.Task, root string) (
 	if err != nil {
 		return journal, err
 	}
-	if len(data) > 32<<20 || json.Unmarshal(data, &journal) != nil || journal.Version != 2 || journal.TaskID != task.ID || journal.SourcePath != task.SourcePath || journal.Archive != (task.Type == "archive_import") || len(journal.Files) == 0 || len(journal.Files) > MaxMedia {
+	if len(data) > 32<<20 || json.Unmarshal(data, &journal) != nil || journal.Version != preparationVersion || journal.TaskID != task.ID || journal.SourcePath != task.SourcePath || journal.Archive != (task.Type == "archive_import") || journal.Layout == nil || len(journal.Files) == 0 || len(journal.Files) > MaxMedia {
 		return journal, ingestiondomain.ErrManifest
 	}
-	for _, file := range journal.Files {
-		if !safeRelative(file.Source) || !safeRelative(file.Normalized) || !strings.HasPrefix(file.Normalized, "chapters/") || file.Size < 0 || file.Size > MaxFileBytes || file.Identity == "" {
+	if journal.Layout.Plan.Comic.ID != task.ComicID || len(journal.Layout.Plan.Media) != len(journal.Files) {
+		return journal, ingestiondomain.ErrManifest
+	}
+	bySource := make(map[string]*ingestiondomain.PreparedFile, len(journal.Files))
+	for index := range journal.Files {
+		file := &journal.Files[index]
+		if !safeRelative(file.Source) || !safeRelative(file.Target) || file.Size < 0 || file.Size > MaxFileBytes || file.Modified == 0 || !journal.Archive && file.Identity == "" {
 			return journal, ingestiondomain.ErrManifest
 		}
+		if bySource[file.Source] != nil {
+			return journal, ingestiondomain.ErrManifest
+		}
+		bySource[file.Source] = file
 	}
-	if journal.Layout != nil && journal.Layout.Plan.Comic.ID != task.ComicID {
-		return journal, ingestiondomain.ErrManifest
+	seen := make(map[string]bool, len(journal.Files))
+	for _, item := range journal.Layout.Plan.Media {
+		source, ok := journal.Layout.Sources[item.ID]
+		if !ok {
+			return journal, ingestiondomain.ErrManifest
+		}
+		file, ok := bySource[source]
+		if !ok {
+			return journal, ingestiondomain.ErrManifest
+		}
+		target := strings.TrimPrefix(item.RelativePath, "hq/"+task.ComicID+"/")
+		if target == item.RelativePath || file.Target != target || strings.Count(target, "/") != 1 || seen[target] {
+			return journal, ingestiondomain.ErrManifest
+		}
+		seen[target] = true
 	}
 	return journal, nil
 }
+
 func safeRelative(name string) bool {
 	return name != "." && path.Clean(name) == name && !strings.HasPrefix(name, "/") && name != ".." && !strings.HasPrefix(name, "../") && !strings.ContainsAny(name, "\\:\x00")
 }

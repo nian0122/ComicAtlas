@@ -14,7 +14,7 @@ import (
 )
 
 // UploadPublisherFiles 只发布已完成分片接收的暂存文件。
-// 内容完整性由接收分片时的服务端摘要保证；发布阶段不再重读整文件计算摘要。
+// 内容完整性由接收分片时按偏移比较已写入字节保证；发布阶段不再重读整文件。
 type UploadPublisherFiles struct {
 	files *Storage
 	probe mediaports.Probe
@@ -44,7 +44,7 @@ func (storage *UploadPublisherFiles) checkSize(name string, file mediadomain.Upl
 	}
 	info, err := storage.files.root.Lstat(filepath.FromSlash(name))
 	if err != nil || !info.Mode().IsRegular() || info.Size() != file.Size {
-		return mediadomain.ErrUploadChecksum
+		return mediadomain.ErrUploadContentChanged
 	}
 	return nil
 }
@@ -145,18 +145,18 @@ func (storage *UploadPublisherFiles) RetireUpload(ctx context.Context, id string
 	if err := storage.files.existingParents(item.Path); err != nil {
 		return "", err
 	}
-	_, sourceErr := storage.files.root.Lstat(filepath.FromSlash(item.Path))
-	_, targetErr := storage.files.root.Lstat(filepath.FromSlash(target))
-	old := mediadomain.UploadPublishFile{Size: item.Size, SHA256: item.SHA256}
+	source, sourceErr := storage.files.root.Lstat(filepath.FromSlash(item.Path))
+	retainedInfo, targetErr := storage.files.root.Lstat(filepath.FromSlash(target))
+	old := mediadomain.UploadPublishFile{Size: item.Size}
 	if targetErr == nil {
 		if err := storage.checkSize(target, old); err != nil {
 			return "", err
 		}
 		if sourceErr == nil {
-			if err := storage.checkSize(item.Path, old); err != nil {
-				return "", err
+			if !source.Mode().IsRegular() || !os.SameFile(source, retainedInfo) {
+				return "", mediadomain.ErrUploadConflict
 			}
-			if err := storage.files.root.Remove(filepath.FromSlash(item.Path)); err != nil {
+			if err := storage.files.finishPublishedFile(ctx, item.Path, target, func(name string) error { return storage.checkSize(name, old) }); err != nil {
 				return "", err
 			}
 		} else if !errors.Is(sourceErr, os.ErrNotExist) {
@@ -194,7 +194,7 @@ func (storage *UploadPublisherFiles) RetireUpload(ctx context.Context, id string
 	if err != nil {
 		return "", err
 	}
-	if err = storage.files.syncParents(target); err != nil {
+	if err = storage.files.syncDirectory(path.Dir(target)); err != nil {
 		return "", err
 	}
 	if err = storage.files.syncDirectory(path.Dir(item.Path)); err != nil {

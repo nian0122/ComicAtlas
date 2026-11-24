@@ -3,6 +3,7 @@ export interface FileRow {
   title: string
   kind: 'comic' | 'catalog' | 'chapter' | 'image' | 'video'
   subtitle: string
+  videoSource?: string
   cover: string | null
   previewImages: string[]
   bytes: number | null

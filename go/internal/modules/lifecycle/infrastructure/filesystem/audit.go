@@ -8,7 +8,10 @@ import (
 	"sort"
 )
 
-func (files *Files) auditState(ctx context.Context, name string, expected lifecycledomain.RetainedFile, verify bool) (string, os.FileInfo, error) {
+func (files *Files) auditState(ctx context.Context, name string, expected lifecycledomain.RetainedFile, modified int64, verify bool) (string, os.FileInfo, error) {
+	if err := ctx.Err(); err != nil {
+		return "", nil, err
+	}
 	info, err := files.stat(name)
 	if errors.Is(err, os.ErrNotExist) {
 		return "absent", nil, nil
@@ -25,29 +28,7 @@ func (files *Files) auditState(ctx context.Context, name string, expected lifecy
 	if expected.Source.SourceAbsent {
 		return "changed", info, nil
 	}
-	if expected.Source.Size >= 0 && info.Size() != expected.Source.Size || expected.Size >= 0 && info.Size() != expected.Size {
-		return "changed", info, nil
-	}
-	if expected.SHA256 == "" && expected.Source.SHA256 == "" || info.Size() > lifecycledomain.MaxFileBytes {
-		return "unmeasured", info, nil
-	}
-	size, digest, err := files.digest(ctx, name)
-	if ctx.Err() != nil {
-		return "", nil, ctx.Err()
-	}
-	if errors.Is(err, lifecycledomain.ErrChanged) {
-		return "changed", info, nil
-	}
-	if errors.Is(err, lifecycledomain.ErrConflict) {
-		return "unsafe", info, nil
-	}
-	if err != nil {
-		return "unreadable", info, nil
-	}
-	if expected.Source.Size >= 0 && size != expected.Source.Size || expected.Source.SHA256 != "" && digest != expected.Source.SHA256 {
-		return "changed", info, nil
-	}
-	if expected.Size >= 0 && size != expected.Size || expected.SHA256 != "" && digest != expected.SHA256 {
+	if expected.Source.Size >= 0 && info.Size() != expected.Source.Size || expected.Size >= 0 && info.Size() != expected.Size || modified != 0 && info.ModTime().UnixNano() != modified {
 		return "changed", info, nil
 	}
 	return "valid", info, nil
@@ -61,6 +42,8 @@ func (files *Files) Audit(ctx context.Context, id string, candidates []lifecycle
 	if !lifecycledomain.ValidJournalID(id) || lifecycledomain.ValidateCandidates(candidates) != nil {
 		return observation, lifecycledomain.ErrValidation
 	}
+	modifiedByPath := make(map[string]int64)
+	byPath := make(map[string]lifecycledomain.RetainedFile)
 	journal, err := files.load(id)
 	if errors.Is(err, os.ErrNotExist) {
 		observation.State = "missing"
@@ -70,6 +53,17 @@ func (files *Files) Audit(ctx context.Context, id string, candidates []lifecycle
 		observation.State = "mismatch"
 	} else {
 		observation.Phase = journal.Phase
+		for _, file := range journal.Files {
+			byPath[file.Source.Path] = file
+			if file.Source.Directory && file.Missing && journal.Phase != "purging" && journal.Phase != "purged" && files.verifyMissing(id, file.Source) != nil {
+				observation.MoveConflict = true
+			}
+		}
+		for _, unit := range journal.Moves {
+			if !unit.Directory {
+				modifiedByPath[unit.Path] = unit.Modified
+			}
+		}
 		if journal.Phase != "purging" && journal.Phase != "purged" {
 			for _, unit := range journal.Moves {
 				if err := ctx.Err(); err != nil {
@@ -94,18 +88,20 @@ func (files *Files) Audit(ctx context.Context, id string, candidates []lifecycle
 			return observation, err
 		}
 		expected := lifecycledomain.RetainedFile{Source: candidate, Size: -1}
-		if observation.State == "valid" {
-			expected = journal.Files[index]
+		file, standalone := byPath[candidate.Path]
+		if standalone {
+			expected = file
 		}
-		item := lifecycledomain.FileObservation{EntryID: id, Position: index + 1, JournalState: observation.State, JournalPhase: observation.Phase, Prepared: observation.State == "valid", InitiallyMissing: expected.Missing}
+		item := lifecycledomain.FileObservation{EntryID: id, Position: index + 1, JournalState: observation.State, JournalPhase: observation.Phase, Prepared: observation.State == "valid", InitiallyMissing: expected.Missing || candidate.SourceAbsent}
+		item.DirectoryMember = observation.State == "valid" && !standalone
 		item.Role, item.FileName = lifecycledomain.FileLabel(candidate.Path)
 		verifySource := observation.Phase != "purged" && observation.Phase != "purging" && observation.Phase != "trashed"
 		var source, retained os.FileInfo
-		item.SourceState, source, err = files.auditState(ctx, candidate.Path, expected, verifySource)
+		item.SourceState, source, err = files.auditState(ctx, candidate.Path, expected, modifiedByPath[candidate.Path], verifySource)
 		if err != nil {
 			return observation, err
 		}
-		item.RetainedState, retained, err = files.auditState(ctx, lifecycledomain.RetainedPath(id, candidate.Path), expected, observation.Phase != "purged")
+		item.RetainedState, retained, err = files.auditState(ctx, lifecycledomain.RetainedPath(id, candidate.Path), expected, modifiedByPath[candidate.Path], observation.Phase != "purged")
 		if err != nil {
 			return observation, err
 		}

@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { RouterLink } from 'vue-router'
+import { DynamicScroller, DynamicScrollerItem } from 'vue-virtual-scroller'
 import { comicCoverUrl } from '@/entities/comic'
 import type { Task, TaskItem } from '@/entities/task'
-import { ManagementDialog, ManagementImage, ManagementIcon } from '@/shared/ui/management'
+import { ManagementImage, ManagementIcon } from '@/shared/ui/management'
+import { AppDialog } from '@/shared/ui/dialog'
 import { reportLabel, reportValue } from '../model/report'
 const props = defineProps<{ task: Task; items: TaskItem[] }>()
 const preview = ref<{ id: string; kind: 'image' | 'video'; title: string } | null>(null),
@@ -15,6 +17,9 @@ function retryPreview() {
 }
 function text(value: unknown) {
   return typeof value === 'string' ? value : ''
+}
+function keyOf(item: TaskItem, index: number) {
+  return String(item.position ?? index)
 }
 function kind(item: TaskItem): 'image' | 'video' | null {
   if (!text(item.mediaId)) return null
@@ -55,59 +60,65 @@ function location(item: TaskItem) {
   <p v-if="task.status === 'cancelled'" class="mw-muted">
     任务已取消，下方保留取消前的逐项记录，未完成项不会继续执行。
   </p>
-  <ol class="mw-result-list task-result-cards">
-    <li v-for="(item, index) in items" :key="index">
-      <div class="task-result-main">
-        <button
-          v-if="kind(item)"
-          class="task-result-visual"
-          :aria-label="'预览' + title(item, index)"
-          @click="open(item, index)"
-        >
+  <DynamicScroller
+    v-if="items.length"
+    :items="items"
+    :key-field="keyOf"
+    :min-item-size="120"
+    page-mode
+    list-tag="ol"
+    item-tag="li"
+    item-class="task-result-item"
+    list-class="mw-result-list task-result-cards"
+  >
+    <template #default="{ item, index, active }">
+      <DynamicScrollerItem class="task-result-row" :item="item" :active="active" :index="index">
+        <div class="task-result-main">
+          <button
+            v-if="kind(item)"
+            class="task-result-visual"
+            :aria-label="'预览' + title(item, index)"
+            @click="open(item, index)"
+          >
+            <ManagementImage
+              v-if="kind(item) === 'image'"
+              :src="`/api/v1/media/${encodeURIComponent(text(item.mediaId))}/content?quality=auto`"
+              :alt="title(item, index)"
+            />
+            <ManagementIcon v-else name="video" :size="28" />
+          </button>
           <ManagementImage
-            v-if="kind(item) === 'image'"
-            :src="`/api/v1/media/${encodeURIComponent(text(item.mediaId))}/content?quality=auto`"
+            v-else-if="text(item.comicId) && task.type === 'metadata_batch'"
+            class="task-result-visual"
+            :src="comicCoverUrl(text(item.comicId))"
             :alt="title(item, index)"
           />
-          <ManagementIcon v-else name="video" :size="28" />
-        </button>
-        <ManagementImage
-          v-else-if="text(item.comicId) && task.type === 'metadata_batch'"
-          class="task-result-visual"
-          :src="comicCoverUrl(text(item.comicId))"
-          :alt="title(item, index)"
-        />
-        <div class="task-result-description">
-          <strong>{{ title(item, index) }}</strong>
-          <p>
-            {{ outcome(item) }}<template v-if="item.errorCode"> · {{ reportValue(item.errorCode) }}</template>
-          </p>
-          <RouterLink v-if="location(item)" class="mw-button" :to="location(item)!">{{
-            location(item)?.query.chapter ? '打开所在章节' : '打开所属作品'
-          }}</RouterLink>
+          <div class="task-result-description">
+            <strong>{{ title(item, index) }}</strong>
+            <p>
+              {{ outcome(item) }}<template v-if="item.errorCode"> · {{ reportValue(item.errorCode) }}</template>
+            </p>
+            <RouterLink v-if="location(item)" class="mw-button" :to="location(item)!">{{
+              location(item)?.query.chapter ? '打开所在章节' : '打开所属作品'
+            }}</RouterLink>
+          </div>
         </div>
-      </div>
-      <details>
-        <summary>执行依据与标识</summary>
-        <dl class="mw-report-fields">
-          <template v-for="(value, name) in item" :key="name"
-            ><dt>{{ reportLabel(name) }}</dt>
-            <dd>
-              {{ reportValue(value)
-              }}<code v-if="['status', 'errorCode'].includes(name) && value">（{{ value }}）</code>
-            </dd></template
-          >
-        </dl>
-      </details>
-    </li>
-  </ol>
-  <ManagementDialog
-    v-if="preview"
-    :open="true"
-    :title="preview.title"
-    class="task-result-preview"
-    @close="preview = null"
-  >
+        <details>
+          <summary>执行依据与标识</summary>
+          <dl class="mw-report-fields">
+            <template v-for="(value, name) in item" :key="name"
+              ><dt>{{ reportLabel(name) }}</dt>
+              <dd>
+                {{ reportValue(value)
+                }}<code v-if="['status', 'errorCode'].includes(name) && value">（{{ value }}）</code>
+              </dd></template
+            >
+          </dl>
+        </details>
+      </DynamicScrollerItem>
+    </template>
+  </DynamicScroller>
+  <AppDialog v-if="preview" :open="true" :title="preview.title" class="task-result-preview" @close="preview = null">
     <p v-if="failed" class="mw-error" role="alert">
       媒体预览当前不可用。<button class="mw-button" @click="retryPreview">重试预览</button>
     </p>
@@ -126,11 +137,20 @@ function location(item: TaskItem) {
       :alt="preview.title"
       @error="failed = true"
     />
-  </ManagementDialog>
+  </AppDialog>
 </template>
 <style scoped>
-.task-result-cards > li {
+:deep(.task-result-item) {
   display: block;
+  padding: 0;
+  border: 0;
+  font-size: inherit;
+}
+.task-result-row {
+  display: block;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--atlas-line);
+  font-size: 12px;
 }
 .task-result-main {
   display: flex;

@@ -66,7 +66,7 @@ func readRepairRun(ctx context.Context, query rowReader, task string) (run recov
 		return run, recoverydomain.ErrValidation
 	}
 	run.TaskID = task
-	err = query.QueryRowContext(ctx, `SELECT r.comic_id,r.expected_version,r.expected_structure_version,r.marker_created_at,r.marker_task_id,r.completed,r.source_sha,r.completed_at,r.version,r.structure_version,r.preserved_metadata FROM recovery_repairs r JOIN tasks t ON t.id=r.task_id WHERE r.task_id=? AND t.type='recovery_repair'`, task).Scan(&run.ComicID, &run.ExpectedVersion, &run.ExpectedStructureVersion, &run.MarkerCreatedAt, &run.MarkerTaskID, &run.Completed, &run.SourceSHA, &run.CompletedAt, &run.Version, &run.StructureVersion, &run.PreservedMetadata)
+	err = query.QueryRowContext(ctx, `SELECT r.comic_id,r.expected_version,r.expected_structure_version,r.marker_created_at,r.marker_task_id,r.completed,r.completed_at,r.version,r.structure_version,r.preserved_metadata FROM recovery_repairs r JOIN tasks t ON t.id=r.task_id WHERE r.task_id=? AND t.type='recovery_repair'`, task).Scan(&run.ComicID, &run.ExpectedVersion, &run.ExpectedStructureVersion, &run.MarkerCreatedAt, &run.MarkerTaskID, &run.Completed, &run.CompletedAt, &run.Version, &run.StructureVersion, &run.PreservedMetadata)
 	if errors.Is(err, sql.ErrNoRows) {
 		err = recoverydomain.ErrMissing
 	}

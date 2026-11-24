@@ -3,8 +3,6 @@ package domain
 import (
 	jobsdomain "comicatlas.local/backend/internal/modules/jobs/domain"
 	librarydomain "comicatlas.local/backend/internal/modules/library/domain"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"time"
 )
@@ -78,24 +76,19 @@ func SidecarView(state SidecarState) SidecarStatus {
 	return value
 }
 
-func AutomaticSidecarData(task string, snapshot librarydomain.SidecarSnapshot, observed string) ([]byte, string, error) {
+func AutomaticSidecarData(task string, snapshot librarydomain.SidecarSnapshot, observed string) ([]byte, error) {
 	if task == "" || len(task) > 128 || snapshot.ComicID == "" || snapshot.Revision < 1 || len(snapshot.Data) > librarydomain.MaxSnapshotBytes || !json.Valid(snapshot.Data) {
-		return nil, "", ErrValidation
+		return nil, ErrValidation
 	}
 	if _, err := time.Parse(time.RFC3339Nano, observed); err != nil {
-		return nil, "", ErrValidation
+		return nil, ErrValidation
 	}
-	baseline := sha256.Sum256(snapshot.Data)
-	if hex.EncodeToString(baseline[:]) != snapshot.SHA256 {
-		return nil, "", ErrValidation
-	}
-	data, err := json.Marshal(AutomaticMetadataSidecar{Version: 1, TaskID: task, Producer: "automatic", SyncRevision: snapshot.Revision, ObservedAt: observed, BaselineSHA256: snapshot.SHA256, Snapshot: snapshot.Data})
+	data, err := json.Marshal(AutomaticMetadataSidecar{Version: 1, TaskID: task, Producer: "automatic", SyncRevision: snapshot.Revision, ObservedAt: observed, Snapshot: snapshot.Data})
 	if err != nil {
-		return nil, "", err
+		return nil, err
 	}
 	if len(data) > 2*librarydomain.MaxSnapshotBytes {
-		return nil, "", ErrScanLimit
+		return nil, ErrScanLimit
 	}
-	digest := sha256.Sum256(data)
-	return data, hex.EncodeToString(digest[:]), nil
+	return data, nil
 }

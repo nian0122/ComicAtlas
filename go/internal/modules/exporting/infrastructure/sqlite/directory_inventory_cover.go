@@ -18,7 +18,7 @@ func loadDirectoryCover(ctx context.Context, tx *sql.Tx, id string, value *expor
 		value.CoverSelection = &selection
 	}
 	var cover exportdomain.DirectoryCover
-	err = tx.QueryRowContext(ctx, "SELECT media_id,relative_path,size,sha256,source_key,width,height FROM comic_covers WHERE comic_id=?", id).Scan(&cover.MediaID, &cover.File.Path, &cover.File.Size, &cover.File.SHA256, &cover.SourceKey, &cover.Width, &cover.Height)
+	err = tx.QueryRowContext(ctx, "SELECT media_id,relative_path,size,source_key,width,height FROM comic_covers WHERE comic_id=?", id).Scan(&cover.MediaID, &cover.File.Path, &cover.File.Size, &cover.SourceKey, &cover.Width, &cover.Height)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil
 	}

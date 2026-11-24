@@ -2,6 +2,7 @@ package sqlite
 
 import (
 	lifecycledomain "comicatlas.local/backend/internal/modules/lifecycle/domain"
+	mediadomain "comicatlas.local/backend/internal/modules/media/domain"
 	"context"
 	"database/sql"
 	"encoding/json"
@@ -13,10 +14,10 @@ func captureCover(ctx context.Context, tx *sql.Tx, target lifecycledomain.Target
 	if target.Type != "comic" {
 		return nil
 	}
-	coverPath := "thumbs/" + target.ID + "/cover.webp"
-	var mediaID, sha string
+	coverPath := mediadomain.CoverPath(target.ID)
+	var mediaID string
 	var size int64
-	err := tx.QueryRowContext(ctx, "SELECT media_id,sha256,size FROM comic_covers WHERE comic_id=?", target.ID).Scan(&mediaID, &sha, &size)
+	err := tx.QueryRowContext(ctx, "SELECT media_id,size FROM comic_covers WHERE comic_id=?", target.ID).Scan(&mediaID, &size)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil
 	}

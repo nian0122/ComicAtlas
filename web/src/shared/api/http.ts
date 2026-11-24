@@ -70,5 +70,9 @@ export async function request<T>(
   return envelope.data as T
 }
 export function getApiErrorMessage(error: unknown, fallback: string) {
-  return error instanceof Error ? error.message : fallback
+  // 网络失败与超时没有业务文案；直接使用调用方的中文兜底，避免把浏览器英文错误展示给用户。
+  if (error instanceof DOMException) return fallback
+  if (error instanceof TypeError && /failed to fetch|networkerror|load failed|fetch/i.test(error.message))
+    return fallback
+  return error instanceof Error && error.message ? error.message : fallback
 }

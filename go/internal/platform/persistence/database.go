@@ -3,7 +3,6 @@ package persistence
 
 import (
 	"context"
-	"crypto/sha256"
 	"database/sql"
 	"embed"
 	"errors"
@@ -156,7 +155,48 @@ func (database *Database) Close() error {
 	return errors.Join(failures...)
 }
 
-func migrate(ctx context.Context, writer *sql.DB) (result error) {
+func migrate(ctx context.Context, writer *sql.DB) error {
+	return migrateThrough(ctx, writer, "")
+}
+
+func dropMigrationChecksum(ctx context.Context, transaction *sql.Tx) error {
+	rows, err := transaction.QueryContext(ctx, "PRAGMA table_info(schema_migrations)")
+	if err != nil {
+		return err
+	}
+	checksum := false
+	for rows.Next() {
+		var position int
+		var name, kind string
+		var notNull, primaryKey int
+		var defaultValue any
+		if err = rows.Scan(&position, &name, &kind, &notNull, &defaultValue, &primaryKey); err != nil {
+			rows.Close()
+			return err
+		}
+		if name == "checksum" {
+			checksum = true
+		}
+	}
+	err = rows.Err()
+	rows.Close()
+	if err != nil || !checksum {
+		return err
+	}
+	for _, statement := range []string{
+		"CREATE TABLE schema_migrations_new(name TEXT PRIMARY KEY NOT NULL, applied_at TEXT NOT NULL)",
+		"INSERT INTO schema_migrations_new(name, applied_at) SELECT name, applied_at FROM schema_migrations",
+		"DROP TABLE schema_migrations",
+		"ALTER TABLE schema_migrations_new RENAME TO schema_migrations",
+	} {
+		if _, err = transaction.ExecContext(ctx, statement); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func migrateThrough(ctx context.Context, writer *sql.DB, last string) (result error) {
 	// 启动期尚未接入读池或业务请求，在专用连接上按 SQLite 重建表协议执行。
 	connection, err := writer.Conn(ctx)
 	if err != nil {
@@ -185,8 +225,11 @@ func migrate(ctx context.Context, writer *sql.DB) (result error) {
 	}
 	defer transaction.Rollback()
 	if _, err = transaction.ExecContext(ctx, `CREATE TABLE IF NOT EXISTS schema_migrations (
-		name TEXT PRIMARY KEY NOT NULL, checksum TEXT NOT NULL, applied_at TEXT NOT NULL
+		name TEXT PRIMARY KEY NOT NULL, applied_at TEXT NOT NULL
 	)`); err != nil {
+		return err
+	}
+	if err = dropMigrationChecksum(ctx, transaction); err != nil {
 		return err
 	}
 	entries, err := migrations.ReadDir("migrations")
@@ -201,17 +244,16 @@ func migrate(ctx context.Context, writer *sql.DB) (result error) {
 			continue
 		}
 		known[entry.Name()] = true
+		if last != "" && entry.Name() > last {
+			continue
+		}
 		content, readErr := migrations.ReadFile("migrations/" + entry.Name())
 		if readErr != nil {
 			return readErr
 		}
-		checksum := fmt.Sprintf("%x", sha256.Sum256(content))
 		var existing string
-		err = transaction.QueryRowContext(ctx, "SELECT checksum FROM schema_migrations WHERE name=?", entry.Name()).Scan(&existing)
+		err = transaction.QueryRowContext(ctx, "SELECT name FROM schema_migrations WHERE name=?", entry.Name()).Scan(&existing)
 		if err == nil {
-			if existing != checksum {
-				return fmt.Errorf("已执行迁移校验不一致: %s", entry.Name())
-			}
 			continue
 		}
 		if !errors.Is(err, sql.ErrNoRows) {
@@ -221,7 +263,7 @@ func migrate(ctx context.Context, writer *sql.DB) (result error) {
 			return fmt.Errorf("执行迁移 %s: %w", entry.Name(), err)
 		}
 		applied = true
-		if _, err = transaction.ExecContext(ctx, "INSERT INTO schema_migrations VALUES (?, ?, ?)", entry.Name(), checksum, time.Now().UTC().Format(time.RFC3339Nano)); err != nil {
+		if _, err = transaction.ExecContext(ctx, "INSERT INTO schema_migrations(name, applied_at) VALUES (?, ?)", entry.Name(), time.Now().UTC().Format(time.RFC3339Nano)); err != nil {
 			return err
 		}
 	}

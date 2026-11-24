@@ -48,7 +48,7 @@ func (service *Service) Restore(ctx context.Context, request domain.RestoreReque
 	if err := source.CheckExtra(ctx, index); err != nil {
 		return receipt, err
 	}
-	object, err := source.Digest(ctx, domain.CatalogPath)
+	object, err := source.Measure(ctx, domain.CatalogPath)
 	if err != nil {
 		return receipt, err
 	}

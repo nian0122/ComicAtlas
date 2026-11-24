@@ -7,8 +7,6 @@ import (
 	storagedomain "comicatlas.local/backend/internal/modules/storage/domain"
 	"comicatlas.local/backend/internal/platform/natural"
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"io"
 	"os"
@@ -47,7 +45,10 @@ func (files *MetadataFiles) parents(name string) error {
 	}
 	return nil
 }
-func (files *MetadataFiles) digest(ctx context.Context, name string, inspect bool, buffer []byte) (info mediadomain.Inspection, size int64, hash string, err error) {
+func (files *MetadataFiles) measure(ctx context.Context, name string, inspect bool) (info mediadomain.Inspection, size, modified int64, err error) {
+	if err = ctx.Err(); err != nil {
+		return
+	}
 	if err = files.parents(name); err != nil {
 		return
 	}
@@ -57,10 +58,6 @@ func (files *MetadataFiles) digest(ctx context.Context, name string, inspect boo
 	}
 	if !before.Mode().IsRegular() {
 		err = storagedomain.ErrScanRead
-		return
-	}
-	if before.Size() > 20<<30 {
-		err = storagedomain.ErrScanLimit
 		return
 	}
 	input, err := files.scanner.root.Open(filepath.FromSlash(name))
@@ -81,110 +78,66 @@ func (files *MetadataFiles) digest(ctx context.Context, name string, inspect boo
 		if err != nil {
 			return
 		}
-		if _, err = input.Seek(0, io.SeekStart); err != nil {
-			return
-		}
-	}
-	digest := sha256.New()
-	if len(buffer) == 0 {
-		err = storagedomain.ErrScanRead
-		return
-	}
-	for {
-		if err = ctx.Err(); err != nil {
-			return
-		}
-		n, readErr := input.Read(buffer)
-		size += int64(n)
-		if size > 20<<30 {
-			err = storagedomain.ErrScanLimit
-			return
-		}
-		_, _ = digest.Write(buffer[:n])
-		if readErr == io.EOF {
-			break
-		}
-		if readErr != nil {
-			err = readErr
-			return
-		}
 	}
 	after, statErr := input.Stat()
 	current, currentErr := files.scanner.root.Lstat(filepath.FromSlash(name))
-	if statErr != nil || currentErr != nil || !os.SameFile(before, current) || size != before.Size() || after.Size() != size || !after.ModTime().Equal(before.ModTime()) {
+	if statErr != nil || currentErr != nil || !os.SameFile(before, current) || after.Size() != before.Size() || !after.ModTime().Equal(before.ModTime()) {
 		err = storagedomain.ErrScanRead
 		return
 	}
-	hash = hex.EncodeToString(digest.Sum(nil))
+	size, modified = before.Size(), before.ModTime().UnixNano()
 	return
 }
 
-// observeMedia 按媒体类型核对登记原件。图片流式计算整文件摘要；视频只核对
-// 文件身份、大小和 ffprobe 结果，不读取整段内容。视频内容变化后旧摘要失效，
-// 直接清空而不是为了核对重新读取整段视频。
-func (files *MetadataFiles) observeMedia(ctx context.Context, media librarydomain.StoredMedia, buffer []byte) (mediadomain.Inspection, int64, string, error) {
-	if media.MediaType != "video" {
-		return files.digest(ctx, media.StoragePath, true, buffer)
+func (files *MetadataFiles) inspect(ctx context.Context, name, kind string) (mediadomain.Inspection, int64, int64, error) {
+	if kind == "video" {
+		return files.measureVideo(ctx, name)
 	}
-	info, size, err := files.measureVideo(ctx, media.StoragePath)
-	if err != nil {
-		return mediadomain.Inspection{}, size, "", err
-	}
-	if storagedomain.ObservedMediaStatus(media, info, size, media.Hash) == "changed" {
-		return info, size, "", nil
-	}
-	return info, size, media.Hash, nil
+	return files.measure(ctx, name, true)
 }
 
 // measureVideo 只打开并探测视频，不读取整个文件内容。
-func (files *MetadataFiles) measureVideo(ctx context.Context, name string) (mediadomain.Inspection, int64, error) {
+func (files *MetadataFiles) measureVideo(ctx context.Context, name string) (mediadomain.Inspection, int64, int64, error) {
 	var info mediadomain.Inspection
 	if err := files.parents(name); err != nil {
-		return info, 0, err
+		return info, 0, 0, err
 	}
 	before, err := files.scanner.root.Lstat(filepath.FromSlash(name))
 	if err != nil {
-		return info, 0, err
+		return info, 0, 0, err
 	}
 	if !before.Mode().IsRegular() {
-		return info, 0, storagedomain.ErrScanRead
+		return info, 0, 0, storagedomain.ErrScanRead
 	}
 	input, err := files.scanner.root.Open(filepath.FromSlash(name))
 	if err != nil {
-		return info, 0, err
+		return info, 0, 0, err
 	}
 	defer input.Close()
 	opened, err := input.Stat()
 	if err != nil {
-		return info, 0, err
+		return info, 0, 0, err
 	}
 	if !os.SameFile(before, opened) {
-		return info, 0, storagedomain.ErrScanRead
+		return info, 0, 0, storagedomain.ErrScanRead
 	}
 	if files.video == nil {
-		return info, 0, mediadomain.ErrUnavailable
+		return info, 0, 0, mediadomain.ErrUnavailable
 	}
 	video, err := files.video.Inspect(ctx, filepath.Join(files.scanner.root.Name(), filepath.FromSlash(name)))
 	if err != nil {
-		return info, 0, err
+		return info, 0, 0, err
 	}
 	info = mediadomain.Inspection{MediaType: "video", ContentType: mediadomain.ContentType(video.Container), Width: video.Width, Height: video.Height, Video: &video}
 	after, statErr := input.Stat()
 	current, currentErr := files.scanner.root.Lstat(filepath.FromSlash(name))
 	if statErr != nil || currentErr != nil || !os.SameFile(before, current) || before.Size() != after.Size() || !after.ModTime().Equal(before.ModTime()) {
-		return mediadomain.Inspection{}, 0, storagedomain.ErrScanRead
+		return mediadomain.Inspection{}, 0, 0, storagedomain.ErrScanRead
 	}
-	return info, before.Size(), nil
+	return info, before.Size(), before.ModTime().UnixNano(), nil
 }
 func (files *MetadataFiles) ObserveMetadata(ctx context.Context, snapshot librarydomain.Snapshot, progress func(int) error) ([]storagedomain.MediaObservation, error) {
 	items := []storagedomain.MediaObservation{}
-	var digestBuffer []byte
-	getDigestBuffer := func() []byte {
-		if digestBuffer == nil {
-			digestBuffer = make([]byte, 64<<10)
-		}
-		return digestBuffer
-	}
 	known := map[string]bool{}
 	for _, name := range snapshot.SuppressedPaths {
 		known[strings.ToLower(name)] = true
@@ -202,7 +155,7 @@ func (files *MetadataFiles) ObserveMetadata(ctx context.Context, snapshot librar
 		known[strings.ToLower(media.StoragePath)] = true
 		parents[path.Dir(media.StoragePath)] = true
 		if media.HQState != "released" {
-			info, size, hash, err := files.observeMedia(ctx, media, getDigestBuffer())
+			info, size, modified, err := files.inspect(ctx, media.StoragePath, media.MediaType)
 			switch {
 			case ctx.Err() != nil:
 				return nil, ctx.Err()
@@ -215,9 +168,9 @@ func (files *MetadataFiles) ObserveMetadata(ctx context.Context, snapshot librar
 			case err != nil:
 				return nil, err
 			default:
-				item.Status = storagedomain.ObservedMediaStatus(media, info, size, hash)
+				item.Status = storagedomain.ObservedMediaStatus(media, info, size, modified)
 				item.Inspection = &info
-				item.Size, item.SHA256 = size, hash
+				item.Size, item.Modified = size, modified
 			}
 		}
 		if media.LQFile != nil {
@@ -225,19 +178,14 @@ func (files *MetadataFiles) ObserveMetadata(ctx context.Context, snapshot librar
 			if !metadataPath(lq.StoragePath, "lq") {
 				return nil, storagedomain.ErrScanRead
 			}
-			_, size, hash, err := files.digest(ctx, lq.StoragePath, false, getDigestBuffer())
+			_, size, _, err := files.measure(ctx, lq.StoragePath, false)
 			if ctx.Err() != nil {
 				return nil, ctx.Err()
 			}
 			if err != nil && !errors.Is(err, os.ErrNotExist) {
 				return nil, err
 			}
-			originalChanged := item.Inspection != nil && (media.Hash != "" && media.Hash != item.SHA256 ||
-				media.Size > 0 && media.Size != item.Size ||
-				media.Width != nil && *media.Width != item.Inspection.Width ||
-				media.Height != nil && *media.Height != item.Inspection.Height ||
-				media.ContentType != "" && media.ContentType != item.Inspection.ContentType)
-			valid := lq.Valid && err == nil && size == lq.Size && (lq.Hash == "" || hash == lq.Hash) && !originalChanged
+			valid := lq.Valid && err == nil && size == lq.Size && item.Status != "changed"
 			item.LQValid = &valid
 		}
 		item.Position = len(items) + 1
@@ -246,7 +194,7 @@ func (files *MetadataFiles) ObserveMetadata(ctx context.Context, snapshot librar
 			return nil, err
 		}
 	}
-	discovered, err := files.discover(ctx, snapshot, known, parents, getDigestBuffer, func(count int) error { return progress(len(items) + count) })
+	discovered, err := files.discover(ctx, snapshot, known, parents, func(count int) error { return progress(len(items) + count) })
 	if err != nil {
 		return nil, err
 	}
@@ -256,7 +204,7 @@ func (files *MetadataFiles) ObserveMetadata(ctx context.Context, snapshot librar
 	}
 	return items, nil
 }
-func (files *MetadataFiles) discover(ctx context.Context, snapshot librarydomain.Snapshot, known, parents map[string]bool, digestBuffer func() []byte, progress func(int) error) ([]storagedomain.MediaObservation, error) {
+func (files *MetadataFiles) discover(ctx context.Context, snapshot librarydomain.Snapshot, known, parents map[string]bool, progress func(int) error) ([]storagedomain.MediaObservation, error) {
 	root := "hq/" + snapshot.Detail.ID
 	if !metadataPath(root, "hq") {
 		return nil, storagedomain.ErrScanRead
@@ -347,22 +295,9 @@ func (files *MetadataFiles) discover(ctx context.Context, snapshot librarydomain
 						item.Status = "ignored"
 						code := "METADATA_NAME_CONFLICT"
 						item.ErrorCode = &code
-					} else if kind := mediadomain.UploadMediaKind(child.Name()); kind == "video" {
-						// 视频登记只探测头部和核对文件身份，不读取整段内容；摘要保持未知。
-						inspection, size, inspectErr := files.measureVideo(ctx, target)
-						if errors.Is(inspectErr, mediadomain.ErrInvalidVideo) {
-							item.Status = "ignored"
-							code := "METADATA_MEDIA_INVALID"
-							item.ErrorCode = &code
-						} else if inspectErr != nil {
-							return inspectErr
-						} else {
-							id := storagedomain.DiscoveredVideoID(snapshot.Detail.ID, chapter, target)
-							item.MediaID, item.ChapterID = &id, &chapter
-							item.Inspection, item.Size = &inspection, size
-						}
 					} else {
-						inspection, size, hash, inspectErr := files.digest(ctx, target, true, digestBuffer())
+						kind := mediadomain.UploadMediaKind(child.Name())
+						inspection, size, modified, inspectErr := files.inspect(ctx, target, kind)
 						if errors.Is(inspectErr, mediadomain.ErrImageInvalid) || errors.Is(inspectErr, mediadomain.ErrInvalidVideo) {
 							item.Status = "ignored"
 							code := "METADATA_MEDIA_INVALID"
@@ -370,9 +305,9 @@ func (files *MetadataFiles) discover(ctx context.Context, snapshot librarydomain
 						} else if inspectErr != nil {
 							return inspectErr
 						} else {
-							id := storagedomain.DiscoveredImageID(snapshot.Detail.ID, chapter, target, hash)
+							id := storagedomain.DiscoveredMediaID(snapshot.Detail.ID, chapter, target)
 							item.MediaID, item.ChapterID = &id, &chapter
-							item.Inspection, item.SHA256, item.Size = &inspection, hash, size
+							item.Inspection, item.Size, item.Modified = &inspection, size, modified
 						}
 					}
 				}

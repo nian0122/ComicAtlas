@@ -2,7 +2,6 @@ package domain
 
 import (
 	librarydomain "comicatlas.local/backend/internal/modules/library/domain"
-	"encoding/hex"
 	"path"
 	"strings"
 )
@@ -13,13 +12,13 @@ func SourceFrom(choice SourceChoice) (SourceImage, error) {
 		return value, ErrSource
 	}
 	quality := "hq/"
-	if choice.HQState == "available" && choice.HQSHA256 != "" {
-		value.Path, value.SHA256 = choice.HQPath, choice.HQSHA256
+	if choice.HQState == "available" {
+		value.Path = choice.HQPath
 	} else {
 		if !choice.LQValid {
 			return value, ErrSource
 		}
-		value.Path, value.SHA256 = choice.LQPath, choice.LQSHA256
+		value.Path = choice.LQPath
 		quality = "lq/"
 	}
 	if ValidateSource(value) != nil || !strings.HasPrefix(value.Path, quality) {
@@ -29,8 +28,7 @@ func SourceFrom(choice SourceChoice) (SourceImage, error) {
 }
 
 func ValidateSource(value SourceImage) error {
-	data, err := hex.DecodeString(value.SHA256)
-	if !identifier(value.MediaID) || value.Ordinal < 1 || value.Ordinal > librarydomain.MaxSnapshotMedia || err != nil || len(data) != 32 || strings.ToLower(value.SHA256) != value.SHA256 || value.Path == "" || len(value.Path) > 2048 || path.Clean(value.Path) != value.Path || strings.ContainsAny(value.Path, "\\:\x00") || !strings.HasPrefix(value.Path, "hq/") && !strings.HasPrefix(value.Path, "lq/") {
+	if !identifier(value.MediaID) || value.Ordinal < 1 || value.Ordinal > librarydomain.MaxSnapshotMedia || value.Path == "" || len(value.Path) > 2048 || path.Clean(value.Path) != value.Path || strings.ContainsAny(value.Path, "\\:\x00") || !strings.HasPrefix(value.Path, "hq/") && !strings.HasPrefix(value.Path, "lq/") {
 		return ErrSource
 	}
 	return nil

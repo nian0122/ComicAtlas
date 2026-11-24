@@ -5,7 +5,16 @@ func ValidateDirectoryRetry(id string, state DirectoryRetryState) error {
 	if !TaskID(id) {
 		return ErrValidation
 	}
-	if state.TaskID != id || state.Type != "directory_move" || state.Status != "failed" || state.ComicID != "" || state.TargetType != "directory_preview" || state.Payload != "{}" || !TaskID(state.PreviewID) || state.TargetID != state.PreviewID || state.OwnerTaskID != id || !digest(state.PlanSHA256) || state.Completed || state.Members < 1 || state.Members > MaxDirectoryBooks || state.DetachedMembers != 0 {
+	if state.TaskID != id || state.Type != "directory_move" || state.Status != "failed" || state.ComicID != "" || state.TargetType != "directory_preview" || state.Payload != "{}" || !TaskID(state.TargetID) {
+		return ErrConflict
+	}
+	if !state.HasPlan {
+		if state.Completed || state.Members != 0 || state.DetachedMembers != 0 {
+			return ErrConflict
+		}
+		return nil
+	}
+	if state.PlanID != state.TargetID || state.Completed || state.Members < 1 || state.Members > MaxDirectoryBooks || state.DetachedMembers != 0 {
 		return ErrConflict
 	}
 	return nil

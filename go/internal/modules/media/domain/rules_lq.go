@@ -29,8 +29,8 @@ func ValidateLQResult(status string, hasRecord bool, code string) error {
 }
 func CanRecordLQ(status string) bool { return status == "running" || status == "cancelling" }
 
-func OriginalStorageState(sourceSHA, observed string, record *LQRecord) string {
-	if observed == "unknown" && sourceSHA == "" && record != nil && record.Provenance != nil && record.Provenance.OriginalState != "" {
+func OriginalStorageState(observed string, record *LQRecord) string {
+	if observed == "unknown" && record != nil && record.Provenance != nil && record.Provenance.OriginalState != "" {
 		if record.Provenance.OriginalState == "released" {
 			return "released"
 		}

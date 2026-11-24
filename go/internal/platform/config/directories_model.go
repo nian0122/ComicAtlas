@@ -4,4 +4,5 @@ type Directories struct {
 	Data   string
 	Import string
 	Media  string
+	Export string
 }

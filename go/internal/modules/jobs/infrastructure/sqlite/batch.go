@@ -12,7 +12,7 @@ import (
 	jobsdomain "comicatlas.local/backend/internal/modules/jobs/domain"
 )
 
-func (store *sqliteRepository) CreateImportBatch(ctx context.Context, inputs []jobsdomain.PreparedImport, key, hash string, admission jobsports.BatchAdmission) (jobsdomain.TaskBatch, error) {
+func (store *sqliteRepository) CreateImportBatch(ctx context.Context, inputs []jobsdomain.PreparedImport, key, requestKey string, admission jobsports.BatchAdmission) (jobsdomain.TaskBatch, error) {
 	result := jobsdomain.TaskBatch{Items: []jobsdomain.BatchTask{}}
 	tx, err := store.database.Writer.BeginTx(ctx, nil)
 	if err != nil {
@@ -21,9 +21,9 @@ func (store *sqliteRepository) CreateImportBatch(ctx context.Context, inputs []j
 	defer tx.Rollback()
 	if key != "" {
 		var existing string
-		err = tx.QueryRowContext(ctx, "SELECT id,request_hash FROM task_batches WHERE idempotency_key=?", key).Scan(&result.ID, &existing)
+		err = tx.QueryRowContext(ctx, "SELECT id,request_key FROM task_batches WHERE idempotency_key=?", key).Scan(&result.ID, &existing)
 		if err == nil {
-			if existing != hash {
+			if existing != requestKey {
 				return result, jobsdomain.ErrConflict
 			}
 			if err = loadImportBatch(ctx, tx, &result); err != nil {
@@ -53,11 +53,11 @@ func (store *sqliteRepository) CreateImportBatch(ctx context.Context, inputs []j
 	if key != "" {
 		idempotency = key
 	}
-	parent, err := store.createInTx(ctx, tx, jobsdomain.ResourceTask{Type: "import_batch", TargetType: "import_batch", TargetID: result.ID, Title: "批量导入", Payload: "{}"}, key, hash, false, nil)
+	parent, err := store.createInTx(ctx, tx, jobsdomain.ResourceTask{Type: "import_batch", TargetType: "import_batch", TargetID: result.ID, Title: "批量导入", Payload: "{}"}, key, requestKey, false, nil)
 	if err != nil {
 		return result, err
 	}
-	if _, err = tx.ExecContext(ctx, "INSERT INTO task_batches(id,idempotency_key,request_hash,parent_task_id) VALUES(?,?,?,?)", result.ID, idempotency, hash, parent); err != nil {
+	if _, err = tx.ExecContext(ctx, "INSERT INTO task_batches(id,idempotency_key,request_key,parent_task_id) VALUES(?,?,?,?)", result.ID, idempotency, requestKey, parent); err != nil {
 		return result, err
 	}
 	ids := make([]string, 0, len(inputs))

@@ -1,6 +1,5 @@
 """接收端独立校验 Go 协议，不信任模型或上传声明。"""
 
-import re
 import unicodedata
 
 from . import jsoncodec
@@ -61,17 +60,15 @@ def manifest(data: bytes) -> Analysis:
         raise InvalidInput()
     samples, ids, previous = [], set(), 0
     for index, item in enumerate(array(value["samples"], MAX_SAMPLES)):
-        exact(item, {"mediaId", "ordinal", "sha256", "size", "width", "height",
+        exact(item, {"mediaId", "ordinal", "size", "width", "height",
                      "contentType", "field"})
         identity = text(item["mediaId"], 128)
         ordinal = integer(item["ordinal"], 1, 100000)
-        digest = text(item["sha256"], 64)
         if (identity in ids or ordinal <= previous or
-                re.fullmatch(r"[0-9a-f]{64}", digest) is None or
                 item["field"] != f"image_{index + 1:02d}" or
                 item["contentType"] not in ("image/png", "image/jpeg", "image/webp")):
             raise InvalidInput()
-        samples.append(Sample(identity, ordinal, digest,
+        samples.append(Sample(identity, ordinal,
                               integer(item["size"], 1, MAX_PAGE_BYTES),
                               integer(item["width"], 1, 1600),
                               integer(item["height"], 1, 1600),

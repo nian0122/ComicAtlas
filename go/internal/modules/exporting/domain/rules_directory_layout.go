@@ -2,16 +2,14 @@ package domain
 
 import (
 	mediadomain "comicatlas.local/backend/internal/modules/media/domain"
-	"crypto/sha256"
-	"encoding/hex"
+	"comicatlas.local/backend/internal/platform/stableid"
 	"path"
 	"sort"
 	"strings"
 )
 
 func directoryKey(id string) string {
-	sum := sha256.Sum256([]byte(id))
-	return hex.EncodeToString(sum[:6])
+	return stableid.Hex(id)[:12]
 }
 
 func directoryExtension(source, role string) string {

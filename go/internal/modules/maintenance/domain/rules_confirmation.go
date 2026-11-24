@@ -3,7 +3,6 @@ package domain
 import (
 	jobsdomain "comicatlas.local/backend/internal/modules/jobs/domain"
 	librarydomain "comicatlas.local/backend/internal/modules/library/domain"
-	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/hex"
 )
@@ -11,13 +10,12 @@ import (
 func RequiresConfirmation(operation string) bool {
 	return operation == "hq_release" || TrashTargetType(operation) != "" || UsesTrashSelection(operation)
 }
-func ConfirmationHash(token string) (string, error) {
+func ConfirmationToken(token string) (string, error) {
 	data, err := hex.DecodeString(token)
 	if err != nil || len(data) != 32 || hex.EncodeToString(data) != token {
 		return "", librarydomain.ErrValidation
 	}
-	digest := sha256.Sum256([]byte(token))
-	return hex.EncodeToString(digest[:]), nil
+	return token, nil
 }
 func ValidateDangerousConfirmation(operation, expected, supplied string) error {
 	if !RequiresConfirmation(operation) {

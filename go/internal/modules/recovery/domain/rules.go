@@ -2,7 +2,6 @@ package domain
 
 import (
 	librarydomain "comicatlas.local/backend/internal/modules/library/domain"
-	"encoding/hex"
 	"path"
 	"strings"
 	"time"
@@ -20,14 +19,6 @@ func Key(value string) bool {
 	return true
 }
 
-func validHash(value string) bool {
-	if len(value) != 64 || strings.ToLower(value) != value {
-		return false
-	}
-	_, err := hex.DecodeString(value)
-	return err == nil
-}
-
 func sourcePath(value, prefix string) bool {
 	if len(value) > 2048 || !strings.HasPrefix(value, prefix+"/") || path.Clean(value) != value || strings.ContainsAny(value, "\\:") {
 		return false
@@ -41,7 +32,7 @@ func sourcePath(value, prefix string) bool {
 }
 
 func ValidateSidecar(comic string, value Sidecar) error {
-	if !Key(comic) || value.Version != 1 || !Key(value.TaskID) || !validHash(value.BaselineSHA256) || len(value.ObservedAt) > 40 {
+	if !Key(comic) || value.Version != 1 || !Key(value.TaskID) || len(value.ObservedAt) > 40 {
 		return ErrMetadata
 	}
 	if _, err := time.Parse(time.RFC3339Nano, value.ObservedAt); err != nil {
@@ -62,13 +53,8 @@ func ValidateSidecar(comic string, value Sidecar) error {
 	if err := validateSnapshot(comic, value.Snapshot); err != nil {
 		return err
 	}
-	_, stamp, err := librarydomain.SnapshotData(value.Snapshot)
-	if err != nil {
+	if _, err := librarydomain.SnapshotData(value.Snapshot); err != nil {
 		return ErrLimit
-	}
-	// 手动刷新的 baseline 是刷新前的快照，不能拿它与下一份 snapshot 比较。
-	if value.Producer == "automatic" && stamp != value.BaselineSHA256 {
-		return ErrMetadata
 	}
 	return nil
 }

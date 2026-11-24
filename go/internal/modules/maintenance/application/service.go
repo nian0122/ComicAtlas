@@ -51,19 +51,19 @@ func (service *Service) Preview(ctx context.Context, request maintenancedomain.R
 	if err != nil {
 		return maintenancedomain.Preview{}, err
 	}
-	confirmation, hash := "", ""
+	confirmation, stored := "", ""
 	if maintenancedomain.RequiresConfirmation(request.Operation) {
 		var value [32]byte
 		if _, err = rand.Read(value[:]); err != nil {
 			return maintenancedomain.Preview{}, err
 		}
 		confirmation = hex.EncodeToString(value[:])
-		hash, err = maintenancedomain.ConfirmationHash(confirmation)
+		stored, err = maintenancedomain.ConfirmationToken(confirmation)
 		if err != nil {
 			return maintenancedomain.Preview{}, err
 		}
 	}
-	preview, err := service.repository.CreatePreview(ctx, "preview_"+hex.EncodeToString(token[:]), string(data), hash, targets, time.Now().UTC())
+	preview, err := service.repository.CreatePreview(ctx, "preview_"+hex.EncodeToString(token[:]), string(data), stored, targets, time.Now().UTC())
 	preview.ConfirmationToken = confirmation
 	return preview, err
 }
@@ -124,17 +124,17 @@ func (service *Service) Confirm(ctx context.Context, id, key string, confirmatio
 	if err != nil {
 		return jobsdomain.Task{}, err
 	}
-	hash := ""
+	stored := ""
 	if confirmation.Token != "" {
-		hash, err = maintenancedomain.ConfirmationHash(confirmation.Token)
+		stored, err = maintenancedomain.ConfirmationToken(confirmation.Token)
 		if err != nil {
 			return jobsdomain.Task{}, err
 		}
 	}
-	if err = maintenancedomain.ValidateDangerousConfirmation(record.Preview.Operation, record.ConfirmationHash, hash); err != nil {
+	if err = maintenancedomain.ValidateDangerousConfirmation(record.Preview.Operation, record.Confirmation, stored); err != nil {
 		return jobsdomain.Task{}, err
 	}
-	task, err := service.jobs.CreateResource(ctx, maintenancedomain.BatchResource(record.Preview.Operation, id), key, service.repository.Admission(id, hash))
+	task, err := service.jobs.CreateResource(ctx, maintenancedomain.BatchResource(record.Preview.Operation, id), key, service.repository.Admission(id, stored))
 	if err == nil {
 		service.WakeCommands()
 	}

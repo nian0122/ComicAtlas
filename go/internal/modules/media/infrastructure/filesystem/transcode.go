@@ -2,8 +2,6 @@ package filesystem
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"os"
 	"path"
@@ -12,6 +10,7 @@ import (
 
 	mediaports "comicatlas.local/backend/internal/modules/media/application/ports"
 	mediadomain "comicatlas.local/backend/internal/modules/media/domain"
+	"comicatlas.local/backend/internal/platform/prune"
 )
 
 type VideoStorage struct {
@@ -30,29 +29,23 @@ func videoParent(id string, item mediadomain.TranscodeItem) (string, error) {
 	if !safeKey(id) || item.MediaID == "" || !mediadomain.ValidHQPath(item.SourcePath) || !filepath.IsLocal(item.SourcePath) {
 		return "", mediadomain.ErrTranscodeInvalid
 	}
-	hash := sha256.Sum256([]byte(item.MediaID))
-	return "staging/transcode/" + id + "/" + hex.EncodeToString(hash[:]), nil
+	return "staging/transcode/" + id + "/" + item.MediaID, nil
 }
 
-// videoTarget 优先用源摘要命名；历史媒体没有源摘要时退回产物摘要。
-func videoTarget(item mediadomain.TranscodeItem, record mediadomain.TranscodeRecord) (string, error) {
-	revision := item.SourceSHA256
-	if revision == "" {
-		revision = record.SHA256
-	}
-	target := mediadomain.DerivedPath("hq", item.SourcePath, item.MediaID, revision, "mp4")
+func videoTarget(id string, item mediadomain.TranscodeItem) (string, error) {
+	target := mediadomain.TranscodedPath(item.SourcePath, item.MediaID, id)
 	if target == "" {
 		return "", mediadomain.ErrTranscodeInvalid
 	}
 	return target, nil
 }
 
-func (storage *VideoStorage) verifySourceSize(item mediadomain.TranscodeItem) error {
+func (storage *VideoStorage) verifySourceAttributes(item mediadomain.TranscodeItem) error {
 	if err := storage.files.existingParents(item.SourcePath); err != nil {
 		return err
 	}
 	info, err := storage.files.root.Lstat(filepath.FromSlash(item.SourcePath))
-	if err != nil || !info.Mode().IsRegular() || info.Size() != item.SourceSize {
+	if err != nil || !info.Mode().IsRegular() || info.Size() != item.SourceSize || item.SourceModified != 0 && info.ModTime().UnixNano() != item.SourceModified {
 		return mediadomain.ErrTranscodeChanged
 	}
 	return nil
@@ -65,7 +58,7 @@ func (storage *VideoStorage) EncodeVideo(ctx context.Context, id string, item me
 	if err != nil {
 		return nil, err
 	}
-	if err = storage.verifySourceSize(item); err != nil {
+	if err = storage.verifySourceAttributes(item); err != nil {
 		if ctx.Err() != nil {
 			return nil, ctx.Err()
 		}
@@ -102,18 +95,21 @@ func (storage *VideoStorage) EncodeVideo(ctx context.Context, id string, item me
 	if err != nil {
 		return nil, err
 	}
+	if err = storage.verifySourceAttributes(item); err != nil {
+		return nil, err
+	}
 	relative, err := filepath.Rel(storage.files.root.Name(), artifact.Path)
 	if err != nil || !filepath.IsLocal(relative) {
 		return nil, mediadomain.ErrTranscodeOutput
 	}
-	record := mediadomain.TranscodeRecord{StagePath: filepath.ToSlash(relative), Size: artifact.Size, SHA256: artifact.SHA256, Video: artifact.Video}
-	if record.Path, err = videoTarget(item, record); err != nil {
+	record := mediadomain.TranscodeRecord{StagePath: filepath.ToSlash(relative), Size: artifact.Size, Modified: artifact.Modified, Video: artifact.Video}
+	if record.Path, err = videoTarget(id, item); err != nil {
 		return nil, err
 	}
 	if err = storage.validateRecord(id, item, record); err != nil {
 		return nil, err
 	}
-	if err = storage.files.syncParents(record.StagePath); err != nil {
+	if err = storage.files.syncDirectory(path.Dir(record.StagePath)); err != nil {
 		return nil, err
 	}
 	return &record, nil
@@ -123,7 +119,7 @@ func (storage *VideoStorage) validateRecord(id string, item mediadomain.Transcod
 	if err != nil {
 		return err
 	}
-	target, err := videoTarget(item, record)
+	target, err := videoTarget(id, item)
 	if err != nil {
 		return err
 	}
@@ -138,7 +134,7 @@ func (storage *VideoStorage) validateRecord(id string, item mediadomain.Transcod
 }
 func (storage *VideoStorage) verifyOutputSize(name string, record mediadomain.TranscodeRecord) error {
 	info, err := storage.files.root.Lstat(filepath.FromSlash(name))
-	if err != nil || !info.Mode().IsRegular() || info.Size() != record.Size {
+	if err != nil || !info.Mode().IsRegular() || (info.Size() != record.Size || info.ModTime().UnixNano() != record.Modified) {
 		return mediadomain.ErrTranscodeOutput
 	}
 	return nil
@@ -186,7 +182,7 @@ func (storage *VideoStorage) CollectVideo(ctx context.Context, id string, item m
 		return err
 	}
 	if info, err := storage.files.root.Lstat(filepath.FromSlash(item.SourcePath)); err == nil {
-		if !info.Mode().IsRegular() || info.Size() != item.SourceSize {
+		if !info.Mode().IsRegular() || info.Size() != item.SourceSize || item.SourceModified != 0 && info.ModTime().UnixNano() != item.SourceModified {
 			return mediadomain.ErrTranscodeChanged
 		}
 		if err = storage.files.root.Remove(filepath.FromSlash(item.SourcePath)); err != nil {
@@ -211,5 +207,6 @@ func (storage *VideoStorage) CollectVideo(ctx context.Context, id string, item m
 	if err = storage.files.syncDirectory(path.Dir(parent)); err != nil {
 		return err
 	}
+	prune.EmptyDirectories(storage.files.root, path.Dir(parent))
 	return nil
 }

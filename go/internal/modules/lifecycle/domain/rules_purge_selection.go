@@ -36,7 +36,7 @@ func purgeScopeExcludes(scope PurgeScope, excluded map[string]bool) bool {
 	return false
 }
 func ValidatePurgeSnapshot(expected string, preview PurgePreview) error {
-	if !validDigest(expected) || !preview.Allowed || expected != preview.Stamp {
+	if !validStamp(expected) || !preview.Allowed || expected != preview.Stamp {
 		return ErrScopeChanged
 	}
 	return nil

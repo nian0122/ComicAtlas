@@ -7,7 +7,7 @@ type PreparedImport struct {
 	ReferenceID string
 	Resource    ResourceTask
 	Explicit    bool
-	RequestHash string
+	RequestKey  string
 }
 type BatchTask struct {
 	ReferenceID string  `json:"referenceId"`

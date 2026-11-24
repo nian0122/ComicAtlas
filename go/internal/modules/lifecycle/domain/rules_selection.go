@@ -1,8 +1,7 @@
 package domain
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
+	"comicatlas.local/backend/internal/platform/stableid"
 	"encoding/json"
 	"sort"
 	"strings"
@@ -54,15 +53,13 @@ func normalizeSelectionIDs(ids []string, maximum int) ([]string, error) {
 
 // EntryStamp 只覆盖本条回收记录及目标自身状态；祖先恢复造成的顺序变化不更换此条归属。
 func EntryStamp(entry Entry, plan, targetState string) string {
-	planHash := sha256.Sum256([]byte(plan))
 	data, _ := json.Marshal(struct {
 		ID, Kind, Target, Comic, Chapter, State, Updated, Task, TargetState string
-		PlanHash                                                            [32]byte
+		Plan                                                                string
 	}{
-		entry.ID, entry.Target.Type, entry.Target.ID, entry.Target.ComicID, entry.Target.ChapterID, entry.State, entry.UpdatedAt, entry.TaskID, targetState, planHash,
+		entry.ID, entry.Target.Type, entry.Target.ID, entry.Target.ComicID, entry.Target.ChapterID, entry.State, entry.UpdatedAt, entry.TaskID, targetState, plan,
 	})
-	digest := sha256.Sum256(data)
-	return hex.EncodeToString(digest[:])
+	return stableid.Hex(string(data))
 }
 func SelectRestoreEntry(entry Entry, plan, own, comic, chapter, comicEntry, chapterEntry string) SelectedEntry {
 	value := SelectedEntry{Entry: entry, Stamp: EntryStamp(entry, plan, own)}
@@ -112,8 +109,7 @@ func ValidateRestoreStamp(expected, actual string, ancestors bool) error {
 	return nil
 }
 func ValidRestoreStamp(stamp string) bool {
-	data, err := hex.DecodeString(stamp)
-	return err == nil && len(data) == 32 && hex.EncodeToString(data) == stamp
+	return validStamp(stamp)
 }
 func ValidateRestoreIdentity(expected, current Target) error {
 	if expected.Type != current.Type || expected.ID != current.ID || expected.ComicID != current.ComicID || expected.ChapterID != current.ChapterID {

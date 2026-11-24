@@ -10,7 +10,7 @@ type CoverSource struct {
 }
 
 type Cover struct {
-	SHA256      string
+	ETag        string
 	ContentType string
 	Data        []byte
 }

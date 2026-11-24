@@ -2,7 +2,7 @@ package domain
 
 import librarydomain "comicatlas.local/backend/internal/modules/library/domain"
 
-// Preparation 在移动来源前保存；Files 使用相对路径，业务 ID 在规范化完成后生成。
+// Preparation 在搬移来源前保存；Layout 与 Target 一次固定，恢复时不再扫描或重算。
 type Preparation struct {
 	Version    int                            `json:"version"`
 	TaskID     string                         `json:"taskId"`
@@ -16,10 +16,9 @@ type Preparation struct {
 }
 
 type PreparedFile struct {
-	Source     string `json:"source"`
-	Normalized string `json:"normalized"`
-	Size       int64  `json:"size"`
-	Modified   int64  `json:"modified"`
-	Identity   string `json:"identity"`
-	Hash       string `json:"hash"`
+	Source   string `json:"source"`
+	Target   string `json:"target"`
+	Size     int64  `json:"size"`
+	Modified int64  `json:"modified"`
+	Identity string `json:"identity"`
 }

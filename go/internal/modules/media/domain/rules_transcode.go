@@ -1,14 +1,11 @@
 package domain
 
-import (
-	"encoding/hex"
-	"time"
-)
+import "time"
 
 const (
 	MinTranscodeTimeout = 2 * time.Hour
 	MaxTranscodeTimeout = 10 * time.Hour
-	// MaxTranscodeTaskTimeout 为任务外层摘要校验、发布和清理预留余量。
+	// MaxTranscodeTaskTimeout 为任务外层发布和清理预留余量。
 	MaxTranscodeTaskTimeout = MaxTranscodeTimeout + 2*time.Hour
 )
 
@@ -28,19 +25,6 @@ func TranscodeTimeout(durationMS *int64) time.Duration {
 		return MaxTranscodeTimeout
 	}
 	return estimate
-}
-
-func ValidateVideoEncodeRequest(request VideoEncodeRequest) error {
-	digest, err := hex.DecodeString(request.SourceSHA256)
-	if err != nil || len(digest) != 32 || request.SourceSize < 1 || request.SourceSize > MaxTranscodeBytes {
-		return ErrTranscodeInvalid
-	}
-	for _, character := range request.SourceSHA256 {
-		if character >= 'A' && character <= 'F' {
-			return ErrTranscodeInvalid
-		}
-	}
-	return nil
 }
 
 func ValidateTranscodeSource(video Video) error {

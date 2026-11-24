@@ -1,21 +1,21 @@
 package domain
 
 type ImageSource struct {
-	MediaID, Path, SHA256, OriginalSHA256 string
-	Size                                  int64
+	MediaID, Path string
+	Modified      int64
+	Size          int64
 }
 
 type ImageCandidate struct {
-	MetadataOnly     bool
-	Source           ImageSource
-	HQState          string
-	LQPath, LQSHA256 *string
-	LQSize           *int64
-	LQValid          *bool
+	Source  ImageSource
+	HQState string
+	LQPath  *string
+	LQSize  *int64
+	LQValid *bool
 }
 
 type CoverRecord struct {
-	MediaID, SourceKey, Path, SHA256 string
-	Size                             int64
-	Width, Height                    int
+	MediaID, SourceKey, Path string
+	Size                     int64
+	Width, Height            int
 }

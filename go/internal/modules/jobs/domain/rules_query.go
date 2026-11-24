@@ -6,7 +6,7 @@ var taskTypes = [...]string{
 	"directory_import", "archive_import", "image_lq", "storage_refresh", "hq_release",
 	"directory_scan", "archive_export", "video_transcode", "media_upload", "metadata_refresh",
 	"lifecycle", "lifecycle_audit", "metadata_sync", "metadata_batch", "command_batch",
-	"directory_move", "directory_preflight", "disk_recovery", "recovery_repair", "ai_analysis", "import_batch",
+	"directory_move", "disk_recovery", "recovery_repair", "ai_analysis", "import_batch",
 }
 
 func TaskTypes() []string { return slices.Clone(taskTypes[:]) }

@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, nextTick, reactive, ref, watch } from 'vue'
 import type { Task } from '@/entities/task'
-import { ManagementDialog, ManagementImage, taskStatusLabels, taskStageLabel, formatDate } from '@/shared/ui/management'
+import { ManagementImage, taskStatusLabels, taskStageLabel, formatDate } from '@/shared/ui/management'
+import { AppDialog } from '@/shared/ui/dialog'
 import { useAnalysis } from '../model/use-analysis'
 const props = defineProps<{ comicId: string; taskId: string; writable: boolean }>()
 const emit = defineEmits<{ close: [changed: boolean]; accepted: [task: Task]; task: [id: string] }>()
@@ -55,14 +56,7 @@ watch(
 )
 </script>
 <template>
-  <ManagementDialog
-    :open="true"
-    title="AI 候选审阅"
-    :busy="w.busy"
-    placement="right"
-    size="form"
-    @close="leave('close')"
-  >
+  <AppDialog :open="true" title="AI 候选审阅" :busy="w.busy" placement="right" size="form" @close="leave('close')">
     <section v-if="pending" ref="discardPanel" class="analysis-discard" role="alert" tabindex="-1">
       <p>仍有未保存的候选勾选，离开后这些选择会丢失，漫画资料不会修改。</p>
       <button class="mw-button" @click="finishLeave(pending as 'close' | 'task')">放弃勾选并离开</button>
@@ -212,7 +206,7 @@ watch(
       <p class="mw-muted">资料 v{{ w.comic.version }} · 结构 v{{ w.comic.structureVersion }}</p>
     </details>
     <button v-if="w.error && !w.comic" class="mw-button" :disabled="w.busy" @click="w.refresh">重新读取</button>
-  </ManagementDialog>
+  </AppDialog>
 </template>
 <style scoped>
 .analysis-source {

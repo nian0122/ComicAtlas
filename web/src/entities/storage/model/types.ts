@@ -22,7 +22,6 @@ export interface Inventory {
   availableImages?: number
   availableBytes?: number
   missingLq?: number
-  missingSourceSha256Images: number
   releasedImages?: number
   releasingImages?: number
 }
@@ -62,7 +61,6 @@ export interface Statistics {
       lq: Usage
       covers: Usage
       metadata?: Usage
-      temp: Usage
       trash: Usage
       exports: Usage
       retired: Usage
@@ -95,7 +93,7 @@ export interface StorageQuery {
   tagMode?: 'any' | 'all' | 'not' | 'none'
   hqStatus?: string
   lqStatus?: string
-  attention?: 'missing_lq' | 'can_release' | 'missing_source_sha256'
+  attention?: 'missing_lq' | 'can_release'
   sort?: 'title' | 'createdAt' | 'pages' | 'totalBytes' | 'hqBytes' | 'lqBytes'
   order?: 'asc' | 'desc'
 }

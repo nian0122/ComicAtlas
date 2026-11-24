@@ -7,6 +7,7 @@ import (
 	"path"
 	"path/filepath"
 	"sort"
+	"strings"
 
 	lifecycledomain "comicatlas.local/backend/internal/modules/lifecycle/domain"
 	"comicatlas.local/backend/internal/platform/relocate"
@@ -55,15 +56,20 @@ func (files *Files) moveUnit(ctx context.Context, id, operation string, unit lif
 		if err != nil {
 			return err
 		}
-		if unit.Directory {
-			if err := files.verifyMove(ctx, target, id, unit, observed); err != nil {
-				return err
-			}
-		} else if observed.Size() != unit.Size {
-			return lifecycledomain.ErrChanged
+		if err := files.verifyMove(ctx, target, id, unit, observed); err != nil {
+			return err
 		}
 	}
 	return errors.Join(files.syncDirectory(path.Dir(target)), files.syncDirectory(path.Dir(source)))
+}
+
+func (files *Files) verifyMissing(id string, item lifecycledomain.FileCandidate) error {
+	for _, name := range []string{item.Path, lifecycledomain.RetainedPath(id, item.Path)} {
+		if _, err := files.moveInfo(name, item.Directory); !errors.Is(err, os.ErrNotExist) {
+			return errors.Join(lifecycledomain.ErrConflict, err)
+		}
+	}
+	return nil
 }
 
 func (files *Files) applyMoves(ctx context.Context, value lifecycledomain.FileJournal, operation, phase string, visit func(lifecycledomain.FileResult) error) error {
@@ -72,30 +78,28 @@ func (files *Files) applyMoves(ctx context.Context, value lifecycledomain.FileJo
 		units[unit.Path] = unit
 	}
 	moved := map[string]bool{}
+	var pages pageDirectory
+	defer pages.close()
 	for index, item := range value.Files {
 		if err := ctx.Err(); err != nil {
 			return err
 		}
 		var err error
 		if item.Missing {
-			for _, name := range []string{item.Source.Path, lifecycledomain.RetainedPath(value.ID, item.Source.Path)} {
-				if _, statErr := files.stat(name); !errors.Is(statErr, os.ErrNotExist) {
-					err = errors.Join(lifecycledomain.ErrConflict, statErr)
-					break
-				}
-			}
+			err = files.verifyMissing(value.ID, item.Source)
 		} else {
 			unit, _ := lifecycledomain.MoveForPath(units, item.Source.Path)
 			if !moved[unit.Path] {
+				pages.close()
 				err = files.moveUnit(ctx, value.ID, operation, unit, phase == "verifying")
 				moved[unit.Path] = err == nil
 			}
-			if err == nil && unit.Directory {
+			if err == nil && unit.Directory && !item.Source.Directory {
 				name := item.Source.Path
 				if operation == "trash" {
 					name = lifecycledomain.RetainedPath(value.ID, name)
 				}
-				info, statErr := files.stat(name)
+				info, statErr := pages.stat(files, name)
 				err = statErr
 				if err == nil && info.Size() != item.Size {
 					err = lifecycledomain.ErrChanged
@@ -106,6 +110,7 @@ func (files *Files) applyMoves(ctx context.Context, value lifecycledomain.FileJo
 			return err
 		}
 	}
+	pages.close()
 	for _, unit := range value.Moves {
 		if !moved[unit.Path] {
 			if err := files.moveUnit(ctx, value.ID, operation, unit, phase == "verifying"); err != nil {
@@ -124,7 +129,11 @@ func (files *Files) Trash(ctx context.Context, id string, visit func(lifecycledo
 		return err
 	}
 	if value.Phase == "trashed" {
-		return files.applyMoves(ctx, value, "trash", "verifying", visit)
+		if err = files.applyMoves(ctx, value, "trash", "verifying", visit); err != nil {
+			return err
+		}
+		files.removeEmptyCoverDirectories(ctx, value)
+		return nil
 	}
 	if value.Phase != "prepared" {
 		return lifecycledomain.ErrConflict
@@ -133,7 +142,25 @@ func (files *Files) Trash(ctx context.Context, id string, visit func(lifecycledo
 		return err
 	}
 	value.Phase = "trashed"
-	return files.save(ctx, value, false)
+	if err = files.save(ctx, value, false); err != nil {
+		return err
+	}
+	// 封面文件移走后，thumbs/{comic} 只会剩空目录；只删空目录，未知文件保留。
+	files.removeEmptyCoverDirectories(ctx, value)
+	return nil
+}
+
+func (files *Files) removeEmptyCoverDirectories(ctx context.Context, value lifecycledomain.FileJournal) {
+	for _, item := range value.Files {
+		if item.Source.Directory {
+			continue
+		}
+		parent := path.Dir(item.Source.Path)
+		if strings.Count(parent, "/") != 1 || !strings.HasPrefix(parent, "thumbs/") {
+			continue
+		}
+		_ = files.removeEmptyDirectory(ctx, parent)
+	}
 }
 
 func (files *Files) Restore(ctx context.Context, id string, visit func(lifecycledomain.FileResult) error) error {

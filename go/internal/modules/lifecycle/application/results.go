@@ -23,7 +23,7 @@ func (recorder *resultRecorder) record(item lifecycledomain.FileResult) error {
 	}
 	item.Position += recorder.offset
 	recorder.batch = append(recorder.batch, item)
-	if len(recorder.batch) >= lifecycledomain.MaxFileResultBatch {
+	if item.Directory || len(recorder.batch) >= lifecycledomain.MaxFileResultBatch {
 		return recorder.flush()
 	}
 	return nil

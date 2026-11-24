@@ -68,7 +68,7 @@ func (service *Service) Create(ctx context.Context, request domain.CreateRequest
 	if err != nil {
 		return manifest, err
 	}
-	object, err := work.Digest(ctx, domain.CatalogPath)
+	object, err := work.Measure(ctx, domain.CatalogPath)
 	if err != nil {
 		return manifest, err
 	}

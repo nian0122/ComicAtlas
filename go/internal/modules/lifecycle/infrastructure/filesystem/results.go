@@ -12,7 +12,7 @@ func reportFile(visit func(lifecycledomain.FileResult) error, id, operation, pha
 	if visit == nil || errors.Is(operationErr, context.Canceled) || errors.Is(operationErr, context.DeadlineExceeded) {
 		return operationErr
 	}
-	result := lifecycledomain.FileResult{EntryID: id, Operation: operation, Phase: phase, Position: position, State: "applied", ObservedAt: time.Now().UTC().Format(time.RFC3339Nano)}
+	result := lifecycledomain.FileResult{Directory: item.Source.Directory, EntryID: id, Operation: operation, Phase: phase, Position: position, State: "applied", ObservedAt: time.Now().UTC().Format(time.RFC3339Nano)}
 	result.Role, result.FileName = lifecycledomain.FileLabel(item.Source.Path)
 	if item.Missing {
 		result.State = "initially_missing"

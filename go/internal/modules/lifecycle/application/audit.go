@@ -79,7 +79,8 @@ func (service *Service) runAudit(ctx context.Context, task string) (jobsports.Co
 				summary.IssueFiles++
 				summary.Consistent = false
 			}
-			if !item.Resumable {
+			// 页异常进入完整性报告；整目录重试由目录凭证与两端位置决定。
+			if !item.Resumable && !item.DirectoryMember {
 				resumable = false
 			}
 			batch = append(batch, item)

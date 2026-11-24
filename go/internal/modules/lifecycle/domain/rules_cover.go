@@ -1,8 +1,7 @@
 package domain
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
+	"comicatlas.local/backend/internal/platform/stableid"
 	"encoding/json"
 	"strings"
 )
@@ -50,7 +49,7 @@ func ValidateCoverSource(source CoverSource) error {
 	}
 	for _, item := range source.Candidates {
 		role, _, _ := strings.Cut(item.Path, "/")
-		if (role != "hq" && role != "lq" && role != "thumbs") || item.Size < 0 || !validDigest(item.SHA256) {
+		if (role != "hq" && role != "lq" && role != "thumbs") || item.Size < 0 {
 			return ErrValidation
 		}
 	}
@@ -66,6 +65,5 @@ func CoverSourceKey(source CoverSource) (string, error) {
 		return "", err
 	}
 	data, _ := json.Marshal(source)
-	digest := sha256.Sum256(append([]byte("trash-cover-v1\x00"), data...))
-	return hex.EncodeToString(digest[:]), nil
+	return stableid.Hex("trash-cover\x00" + string(data)), nil
 }

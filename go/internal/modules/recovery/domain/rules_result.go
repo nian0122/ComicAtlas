@@ -14,16 +14,20 @@ func ValidateOutcome(value Outcome, hasWrite bool) error {
 	if _, err := time.Parse(time.RFC3339Nano, value.UpdatedAt); err != nil {
 		return ErrValidation
 	}
-	if value.SourceSHA256 != nil && !validHash(*value.SourceSHA256) {
-		return ErrValidation
+	if err := ValidateOutcomeWrite(value, hasWrite); err != nil {
+		return err
 	}
+	return nil
+}
+
+func ValidateOutcomeWrite(value Outcome, hasWrite bool) error {
 	switch value.Status {
 	case ResultRestored:
-		if !hasWrite || value.SourceSHA256 == nil || value.ErrorCode != nil {
+		if !hasWrite || value.ErrorCode != nil {
 			return ErrValidation
 		}
 	case ResultPlaceholder:
-		if !hasWrite || value.SourceSHA256 != nil || value.ErrorCode != nil {
+		if !hasWrite || value.ErrorCode != nil {
 			return ErrValidation
 		}
 	case ResultSkipped, ResultEmpty:

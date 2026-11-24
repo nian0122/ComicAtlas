@@ -1,8 +1,6 @@
 package domain
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"path"
 	"path/filepath"
 	"slices"
@@ -33,14 +31,33 @@ func ValidSourcePath(name string) bool {
 	return root == "hq" || root == "lq" || root == "thumbs" || root == "metadata" || root == "retired"
 }
 
-func validDigest(value string) bool {
-	decoded, err := hex.DecodeString(value)
-	return err == nil && len(decoded) == sha256.Size && strings.ToLower(value) == value
+func validProof(value string) bool {
+	if len(value) != 64 || strings.ToLower(value) != value {
+		return false
+	}
+	for _, c := range value {
+		if !(c >= '0' && c <= '9' || c >= 'a' && c <= 'f') {
+			return false
+		}
+	}
+	return true
 }
 
-func CandidateForFile(name string, size int64, hash string, sourceAbsent bool) FileCandidate {
-	value := FileCandidate{Path: name, Size: size, SHA256: hash}
-	if sourceAbsent && hash == "" {
+func validStamp(value string) bool {
+	if len(value) != 32 || strings.ToLower(value) != value {
+		return false
+	}
+	for _, c := range value {
+		if !(c >= '0' && c <= '9' || c >= 'a' && c <= 'f') {
+			return false
+		}
+	}
+	return true
+}
+
+func CandidateForFile(name string, size int64, sourceAbsent bool) FileCandidate {
+	value := FileCandidate{Path: name, Size: size}
+	if sourceAbsent {
 		value.Size = 0
 		value.SourceAbsent = true
 	}
@@ -53,10 +70,13 @@ func ValidateCandidates(items []FileCandidate) error {
 	}
 	seen := map[string]bool{}
 	for _, item := range items {
-		if !ValidSourcePath(item.Path) || seen[item.Path] || item.Size < -1 || item.SHA256 != "" && !validDigest(item.SHA256) {
+		if !ValidSourcePath(item.Path) || seen[item.Path] || item.Size < -1 {
 			return ErrValidation
 		}
-		if item.SourceAbsent && (item.Size != 0 || item.SHA256 != "" || !strings.HasPrefix(item.Path, "hq/")) {
+		if item.Directory && (item.Size != -1 || item.SourceAbsent || !validComicRoot(item.Path)) {
+			return ErrValidation
+		}
+		if item.SourceAbsent && (item.Size != 0 || !strings.HasPrefix(item.Path, "hq/")) {
 			return ErrValidation
 		}
 		seen[item.Path] = true
@@ -75,10 +95,13 @@ func ValidateJournal(value FileJournal) error {
 	}
 	moves := make(map[string]MoveUnit, len(value.Moves))
 	for _, unit := range value.Moves {
-		if !ValidSourcePath(unit.Path) || moves[unit.Path].Path != "" || !validDigest(unit.Proof) || unit.Size < 0 {
+		if !ValidSourcePath(unit.Path) || moves[unit.Path].Path != "" || unit.Size < 0 {
 			return ErrJournal
 		}
-		if unit.Directory && (!(strings.HasPrefix(unit.Path, "hq/") || strings.HasPrefix(unit.Path, "lq/")) || strings.Count(unit.Path, "/") > 2) {
+		if unit.Directory && (!validProof(unit.Proof) || unit.Modified != 0 || !(strings.HasPrefix(unit.Path, "hq/") || strings.HasPrefix(unit.Path, "lq/")) || strings.Count(unit.Path, "/") > 2) {
+			return ErrJournal
+		}
+		if !unit.Directory && (unit.Proof != "" || unit.Modified == 0) {
 			return ErrJournal
 		}
 		moves[unit.Path] = unit
@@ -90,24 +113,31 @@ func ValidateJournal(value FileJournal) error {
 			}
 		}
 	}
+	directoryCount := 0
 	items := make([]FileCandidate, 0, len(value.Files))
 	covered := map[string]bool{}
 	for _, file := range value.Files {
 		if !ValidSourcePath(file.Source.Path) {
 			return ErrJournal
 		}
+		if file.Source.Directory {
+			directoryCount++
+			if directoryCount > 2 || file.Size != 0 {
+				return ErrJournal
+			}
+		}
 		items = append(items, file.Source)
 		if file.Missing {
-			if file.Size != 0 || file.SHA256 != "" {
+			if _, hasMove := moves[file.Source.Path]; file.Size != 0 || hasMove {
 				return ErrJournal
 			}
 			continue
 		}
-		if file.Source.SourceAbsent || file.Size < 0 || file.Source.Size >= 0 && file.Size != file.Source.Size || file.SHA256 != file.Source.SHA256 {
+		if file.Source.SourceAbsent || file.Size < 0 || file.Source.Size >= 0 && file.Size != file.Source.Size {
 			return ErrJournal
 		}
 		unit, ok := MoveForPath(moves, file.Source.Path)
-		if !ok || !unit.Directory && (unit.Size != file.Size || file.SHA256 != "" && unit.Proof != file.SHA256) {
+		if !ok || (unit.Path == file.Source.Path && unit.Directory) != file.Source.Directory || !unit.Directory && unit.Size != file.Size {
 			return ErrJournal
 		}
 		covered[unit.Path] = true
@@ -133,7 +163,7 @@ func MoveMarkerPath(directory, id string) string {
 
 func MoveForPath(moves map[string]MoveUnit, name string) (MoveUnit, bool) {
 	if unit, exists := moves[name]; exists {
-		return unit, !unit.Directory
+		return unit, true
 	}
 	for parent := path.Dir(name); parent != "." && parent != "/"; parent = path.Dir(parent) {
 		if unit, exists := moves[parent]; exists {
@@ -169,6 +199,11 @@ func MatchTrashDirectories(journal FileJournal, target Target) error {
 	if err != nil {
 		return err
 	}
+	for _, file := range journal.Files {
+		if file.Source.Directory && (target.Type != "comic" || !slices.Contains(roots, file.Source.Path)) {
+			return ErrJournal
+		}
+	}
 	for _, unit := range journal.Moves {
 		if unit.Directory && !slices.Contains(roots, unit.Path) {
 			return ErrJournal
@@ -180,8 +215,47 @@ func MatchTrashDirectories(journal FileJournal, target Target) error {
 	return nil
 }
 
+func validComicRoot(name string) bool {
+	role, id, ok := strings.Cut(name, "/")
+	return ok && (role == "hq" || role == "lq") && ValidJournalID(id)
+}
+
+func DirectoryPlan(files []FileCandidate, roots []string) []FileCandidate {
+	if len(roots) == 0 {
+		return files
+	}
+	plan := make([]FileCandidate, 0, len(roots)+2)
+	for _, root := range roots {
+		plan = append(plan, FileCandidate{Path: root, Size: -1, Directory: true})
+	}
+	for _, file := range files {
+		covered := false
+		for _, root := range roots {
+			if strings.HasPrefix(file.Path, root+"/") {
+				covered = true
+				break
+			}
+		}
+		if !covered {
+			plan = append(plan, file)
+		}
+	}
+	return plan
+}
+
 func MatchJournalCandidates(value FileJournal, candidates []FileCandidate) error {
-	if ValidateJournal(value) != nil || ValidateCandidates(candidates) != nil || len(value.Files) != len(candidates) {
+	if ValidateJournal(value) != nil || ValidateCandidates(candidates) != nil {
+		return ErrJournal
+	}
+	// 目录条目覆盖其下的登记页。库内登记清单另供完整性核对和清理预估使用。
+	var roots []string
+	for _, file := range value.Files {
+		if file.Source.Directory {
+			roots = append(roots, file.Source.Path)
+		}
+	}
+	candidates = DirectoryPlan(candidates, roots)
+	if len(value.Files) != len(candidates) {
 		return ErrJournal
 	}
 	items := append([]FileCandidate{}, candidates...)

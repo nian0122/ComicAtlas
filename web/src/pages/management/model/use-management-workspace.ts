@@ -27,14 +27,18 @@ import {
   type BatchPreview,
   type BatchItem,
   type BatchRequest,
+  type StructureNodeResult,
   type TrashOperation,
 } from '@/features/manage-items'
+import { nodeNameError } from './node-name'
+import { readLibraryFilters, writeLibraryFilters, type LibraryFilters } from './library-filters'
 import { useSelection } from '@/shared/lib/selection'
 import type { FileRow } from '@/widgets/management-files'
-import type { RecycleRequest } from '@/widgets/management-reactions'
+import type { RecycleGroup, RecycleRequest } from '@/widgets/management-reactions'
 import { ApiError, getApiErrorMessage } from '@/shared/api/http'
 
 const NODE_PAGE_SIZE = 50
+const LIBRARY_PAGE_SIZE = 20
 const resultTypes = new Set([
   'metadata_sync',
   'metadata_batch',
@@ -70,7 +74,9 @@ export function useManagementWorkspace() {
     statistics = ref<Statistics | null>(null)
   const detail = ref<ComicDetailVO | null>(null),
     chapter = ref<ChapterResponse | null>(null)
-  const resourceStorage = ref<StorageObject | null>(null)
+  const resourceStorage = ref<StorageObject | null>(null),
+    resourceStorageLoading = ref(false),
+    resourceStorageError = ref('')
   const pendingResource = ref<{
     kind: 'comics' | 'chapters' | 'media'
     id: string
@@ -102,20 +108,35 @@ export function useManagementWorkspace() {
     orderVersion = ref(0)
   const orderMode = computed(() => orderDraft.value !== null)
   watch(inspector, (value) => localStorage.setItem('comicatlas.management.inspector', value ? 'open' : 'closed'))
+  const savedFilters = readLibraryFilters()
   const page = ref(1),
     libraryBasePage = ref(1),
     total = ref<number | null>(null),
-    keyword = ref(''),
-    category = ref(''),
-    uncategorized = ref(false),
-    tagIds = ref<string[]>([]),
-    tagMode = ref<'any' | 'all' | 'not'>('any'),
-    untagged = ref(false),
-    hq = ref<'' | 'has_hq' | 'no_hq'>(''),
-    lq = ref<'' | 'needs_lq' | 'ready'>(''),
-    attention = ref<NonNullable<StorageQuery['attention']> | ''>(''),
-    sort = ref<'title' | 'createdAt' | 'pages' | 'totalBytes' | 'hqBytes' | 'lqBytes'>('title'),
-    sortOrder = ref<'asc' | 'desc'>('asc')
+    keyword = ref(savedFilters.keyword),
+    category = ref(savedFilters.category),
+    uncategorized = ref(savedFilters.uncategorized),
+    tagIds = ref<string[]>([...savedFilters.tagIds]),
+    tagMode = ref<'any' | 'all' | 'not'>(savedFilters.tagMode),
+    untagged = ref(savedFilters.untagged),
+    hq = ref<'' | 'has_hq' | 'no_hq'>(savedFilters.hq),
+    lq = ref<'' | 'needs_lq' | 'ready'>(savedFilters.lq),
+    attention = ref<NonNullable<StorageQuery['attention']> | ''>(savedFilters.attention),
+    sort = ref<'title' | 'createdAt' | 'pages' | 'totalBytes' | 'hqBytes' | 'lqBytes'>(savedFilters.sort),
+    sortOrder = ref<'asc' | 'desc'>(savedFilters.sortOrder)
+  const libraryFilters = computed<LibraryFilters>(() => ({
+    keyword: keyword.value,
+    category: category.value,
+    uncategorized: uncategorized.value,
+    tagIds: tagIds.value,
+    tagMode: tagMode.value,
+    untagged: untagged.value,
+    hq: hq.value,
+    lq: lq.value,
+    attention: attention.value,
+    sort: sort.value,
+    sortOrder: sortOrder.value,
+  }))
+  watch(libraryFilters, (value) => writeLibraryFilters(value))
   const categories = ref<Term[]>([]),
     tags = ref<Term[]>([])
   const tasks = ref<Task[]>([]),
@@ -192,13 +213,19 @@ export function useManagementWorkspace() {
   async function focusTaskResult(trigger: string, state: ReturnType<typeof taskSnapshot>) {
     await nextTick()
     if (selectedTask.value?.id !== state.task.id) return
-    const target = document.querySelector<HTMLButtonElement>(`[data-task-relation="${CSS.escape(trigger)}"]`)
+    const pane = document.querySelector<HTMLElement>('.mw-task-detail')
+    if (pane) pane.scrollTop = state.detailScroll
+    let target: HTMLButtonElement | null = null
+    for (let attempt = 0; attempt < 8; attempt++) {
+      target = document.querySelector<HTMLButtonElement>(`[data-task-relation="${CSS.escape(trigger)}"]`)
+      if (target) break
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+    }
     if (!target) {
       pendingTaskRestore = { trigger, state }
       return
     }
     pendingTaskRestore = null
-    const pane = document.querySelector('.mw-task-detail')
     if (pane) pane.scrollTop = state.detailScroll
     target.focus({ preventScroll: true })
     window.scrollTo({ left: state.scrollX, top: state.scrollY, behavior: 'instant' })
@@ -349,7 +376,7 @@ export function useManagementWorkspace() {
     tagIds: [] as string[],
     version: 0,
   })
-  const removingCatalog = ref<{ id: string; title: string; version: number } | null>(null),
+  const deletingCatalogs = ref<{ id: string; title: string; depth: number }[]>([]),
     reparentTo = ref('')
   function catalogDescendants(ids: string[]) {
     const blocked = new Set(ids)
@@ -366,7 +393,7 @@ export function useManagementWorkspace() {
     return blocked
   }
   const catalogDeleteTargets = computed(() => {
-    const blocked = catalogDescendants(removingCatalog.value ? [removingCatalog.value.id] : [])
+    const blocked = catalogDescendants(deletingCatalogs.value.map((entry) => entry.id))
     return (detail.value?.catalogs ?? []).filter((entry) => !blocked.has(entry.id))
   })
   function catalogPath(id: string) {
@@ -381,23 +408,61 @@ export function useManagementWorkspace() {
     }
     return parts.join(' / ')
   }
+  function clearNodeError() {
+    nodeError.value = ''
+  }
+  function catalogDepth(id: string) {
+    let depth = 0,
+      current = detail.value?.catalogs.find((entry) => entry.id === id)?.parentId ?? ''
+    const seen = new Set<string>()
+    while (current && !seen.has(current)) {
+      seen.add(current)
+      depth++
+      current = detail.value?.catalogs.find((entry) => entry.id === current)?.parentId ?? ''
+    }
+    return depth
+  }
+  function openCatalogDelete(rows: FileRow[]) {
+    if (!writable.value || !detail.value) return
+    const chosen = rows.filter((row) => row.kind === 'catalog')
+    if (!chosen.length) return
+    const blocked = catalogDescendants(chosen.map((row) => row.id))
+    deletingCatalogs.value = chosen
+      .map((row) => ({ id: row.id, title: row.title, depth: catalogDepth(row.id) }))
+      .sort((a, b) => b.depth - a.depth)
+    const parents = new Set(
+      chosen.map((row) => detail.value?.catalogs.find((entry) => entry.id === row.id)?.parentId ?? ''),
+    )
+    const candidate = parents.size === 1 ? [...parents][0] : ''
+    reparentTo.value = candidate && !blocked.has(candidate) ? candidate : ''
+    showDialog('deleteCatalog', chosen.length > 1 ? '删除所选目录并保留内容' : '删除目录并保留内容')
+  }
   function showDeleteCatalog(row: FileRow) {
-    if (!writable.value || !detail.value || row.kind !== 'catalog') return
-    const entry = detail.value.catalogs.find((c) => c.id === row.id)
-    if (!entry) return
-    removingCatalog.value = { id: row.id, title: row.title, version: detail.value.structureVersion }
-    reparentTo.value = entry.parentId ?? ''
-    showDialog('deleteCatalog', '删除目录并保留内容')
+    openCatalogDelete([row])
+  }
+  function showBatchDeleteCatalogs() {
+    if (!canBatchDeleteCatalogs.value) return
+    openCatalogDelete(sourceRows.value.filter((row) => selected.value.includes(row.id)))
+  }
+  function pruneLibraryFilters() {
+    const categoryIds = new Set(categories.value.map((term) => term.id)),
+      knownTagIds = new Set(tags.value.map((term) => term.id))
+    if (category.value && !categoryIds.has(category.value)) category.value = ''
+    const validTags = tagIds.value.filter((id) => knownTagIds.has(id))
+    if (validTags.length !== tagIds.value.length) tagIds.value = validTags
+    if (!tagIds.value.length) tagMode.value = 'any'
   }
   async function refreshTerms() {
     await run(async () => {
       const [c, t] = await Promise.all([comicApi.categories(), comicApi.tags()])
       categories.value = c.items
       tags.value = t.items
+      pruneLibraryFilters()
       await loadScope()
     })
   }
   const node = ref({ id: '', kind: 'catalogs' as 'catalogs' | 'chapters', title: '', parentId: '', version: 0 })
+  const nodeError = ref('')
   const nodeParents = computed(() => {
     const blocked = catalogDescendants(node.value.kind === 'catalogs' && node.value.id ? [node.value.id] : [])
     return (detail.value?.catalogs ?? []).filter((entry) => !blocked.has(entry.id))
@@ -416,8 +481,17 @@ export function useManagementWorkspace() {
   const purgeAcknowledged = ref(false),
     previewTotal = ref(0),
     previewPage = ref(1)
+  interface MultiRecycleGroup {
+    targetType: RecycleGroup['targetType']
+    preview: BatchPreview
+    items: BatchItem[]
+    key: string
+    task: Task | null
+  }
+  const multiPreview = ref<{ groups: MultiRecycleGroup[] } | null>(null)
   let scopeGeneration = 0,
     focusGeneration = 0,
+    storageGeneration = 0,
     taskGeneration = 0,
     disposed = false,
     polling = false
@@ -461,7 +535,8 @@ export function useManagementWorkspace() {
         title: m.fileName,
         kind: m.mediaType,
         subtitle: `第 ${m.pageNumber} 项`,
-        cover: m.previewUrl,
+        cover: m.mediaType === 'video' ? null : m.previewUrl,
+        videoSource: m.mediaType === 'video' ? m.contentUrl : undefined,
         previewImages: [],
         bytes: m.size,
         count: null,
@@ -528,6 +603,15 @@ export function useManagementWorkspace() {
         .filter((row) => selected.value.includes(row.id))
         .every((row) => ['chapter', 'image', 'video'].includes(row.kind)),
   )
+  const canBatchDeleteCatalogs = computed(
+    () =>
+      !root.value &&
+      !orderMode.value &&
+      !!detail.value &&
+      selected.value.length > 0 &&
+      sourceRows.value.filter((row) => selected.value.includes(row.id)).length === selected.value.length &&
+      sourceRows.value.filter((row) => selected.value.includes(row.id)).every((row) => row.kind === 'catalog'),
+  )
   const focusedRow = computed(() => rows.value.find((r) => r.id === focused.value) ?? null)
   const selectedMedia = computed(() => chapter.value?.items.find((m) => m.id === focused.value) ?? null)
   const breadcrumbs = computed(() => {
@@ -590,31 +674,52 @@ export function useManagementWorkspace() {
       query: { ...(comic ? { comic } : {}), ...(catalog ? { catalog } : {}), ...(chapter ? { chapter } : {}) },
     })
   }
+  async function loadResourceStorage(row: FileRow) {
+    clearResourceStorage()
+    if (row.kind !== 'comic' && row.kind !== 'chapter') return
+    const generation = ++storageGeneration
+    resourceStorageLoading.value = true
+    try {
+      const usage = row.kind === 'comic' ? await storageApi.comic(row.id) : await storageApi.chapter(row.id)
+      if (!disposed && generation === storageGeneration && focused.value === row.id) resourceStorage.value = usage
+    } catch (e) {
+      if (!disposed && generation === storageGeneration && focused.value === row.id)
+        resourceStorageError.value = getApiErrorMessage(e, '存储状态暂时无法读取')
+    } finally {
+      if (generation === storageGeneration) resourceStorageLoading.value = false
+    }
+  }
+  function clearResourceStorage() {
+    ++storageGeneration
+    resourceStorage.value = null
+    resourceStorageError.value = ''
+    resourceStorageLoading.value = false
+  }
+  function retryResourceStorage() {
+    const row = focusedRow.value
+    if (row) void loadResourceStorage(row)
+  }
   async function focus(row: FileRow) {
     focused.value = row.id
     const generation = ++focusGeneration
-    resourceStorage.value = null
+    if (inspector.value) void loadResourceStorage(row)
+    else clearResourceStorage()
     if (row.kind === 'comic') {
       detail.value = null
       try {
-        const [d, usage] = await Promise.all([comicApi.detail(row.id), storageApi.comic(row.id)])
-        if (!disposed && generation === focusGeneration && root.value && focused.value === row.id) {
-          detail.value = d
-          resourceStorage.value = usage
-        }
-      } catch (e) {
-        if (generation === focusGeneration) error.value = message(e)
-      }
-    } else if (row.kind === 'chapter') {
-      try {
-        const usage = await storageApi.chapter(row.id)
-        if (!disposed && generation === focusGeneration && focused.value === row.id) resourceStorage.value = usage
+        const d = await comicApi.detail(row.id)
+        if (!disposed && generation === focusGeneration && root.value && focused.value === row.id) detail.value = d
       } catch (e) {
         if (generation === focusGeneration) error.value = message(e)
       }
     }
   }
   let detailsTrigger = ''
+  watch(inspector, (open) => {
+    const row = focusedRow.value
+    if (!open || !row || resourceStorage.value || resourceStorageLoading.value) return
+    if (row.kind === 'comic' || row.kind === 'chapter') void loadResourceStorage(row)
+  })
   function showDetails(row: FileRow) {
     if (busy.value) return
     detailsTrigger = row.id
@@ -664,7 +769,7 @@ export function useManagementWorkspace() {
       if (!disposed && generation === trashPendingGeneration) trashPending.value = null
     }
   }
-  async function loadScope(preserveContext = false) {
+  async function loadScope(preserveContext = false, groupPage?: { status: string; page: number }) {
     if (orderMode.value) {
       notice.value = '请先保存或取消当前顺序调整'
       return
@@ -688,7 +793,7 @@ export function useManagementWorkspace() {
     }
     chapter.value = null
     detail.value = null
-    resourceStorage.value = null
+    clearResourceStorage()
     try {
       if (section.value === 'library' && root.value) {
         const requestedPage = page.value
@@ -723,12 +828,12 @@ export function useManagementWorkspace() {
         }
         const target = (keepLibraryContext && rows.value.find((row) => row.id === previousFocus)) || rows.value[0]
         if (target) {
-          if (keepLibraryContext) await focus(target)
+          if (keepLibraryContext || inspector.value) await focus(target)
           else focused.value = target.id
         } else focused.value = ''
       } else if (section.value === 'reactions') reactionRefresh.value++
       else if (section.value === 'tasks') {
-        await loadTasks()
+        await loadTasks(groupPage)
         try {
           await refreshSelectedTask()
         } catch (e) {
@@ -757,7 +862,7 @@ export function useManagementWorkspace() {
   function libraryQuery(target: number) {
     return {
       page: target,
-      pageSize: 20,
+      pageSize: LIBRARY_PAGE_SIZE,
       keyword: keyword.value,
       categoryId: category.value,
       uncategorized: uncategorized.value || undefined,
@@ -772,7 +877,8 @@ export function useManagementWorkspace() {
   }
   async function loadMoreLibrary() {
     if (section.value !== 'library' || !root.value || loading.value || loadingMore.value || orderMode.value) return
-    if (total.value === null || records.value.length >= total.value || page.value * 20 >= total.value) return
+    if (total.value === null || records.value.length >= total.value || page.value * LIBRARY_PAGE_SIZE >= total.value)
+      return
     const generation = scopeGeneration,
       next = page.value + 1
     loadingMore.value = true
@@ -851,12 +957,92 @@ export function useManagementWorkspace() {
   async function refreshCurrentScope() {
     const context = refreshContextKey()
     const expectedGeneration = scopeGeneration + 1
-    const position = { left: window.scrollX, top: window.scrollY }
+    const top = window.scrollY
     await loadScope(true)
     await nextTick()
     if (disposed || scopeGeneration !== expectedGeneration || context !== refreshContextKey()) return false
-    window.scrollTo(position)
+    // 定位交给共享页块组件，和返回主库使用同一套落点规则。
+    if (section.value === 'library') libraryRestore.value = { top, token: ++restoreToken }
     return !scopeFailed.value && !error.value
+  }
+  /*
+   * 主库浏览上下文：进入作品内容或切换管理分区时记下已加载页、分页与滚动位置，
+   * 返回 /manage 时恢复列表；滚动落点交给共享的 ManagementPagedFeed 处理。
+   */
+  type LibraryBrowse = {
+    records: StorageObject[]
+    total: number | null
+    page: number
+    basePage: number
+    focused: string
+    scrollY: number
+  }
+  let libraryBrowse: LibraryBrowse | null = null,
+    restoreToken = 0
+  const libraryRestore = ref<{ top: number; token: number } | null>(null)
+  function isLibraryRoot(fullPath: string) {
+    const resolved = router.resolve(fullPath)
+    return resolved.name === 'management' && !resolved.params.section && !resolved.query.comic
+  }
+  function captureLibraryBrowse() {
+    // 路由更新后 comicId 已指向新范围，这里只按调用方确认的“离开主库”条件取当前列表。
+    if (!ready.value || !records.value.length) return
+    libraryBrowse = {
+      records: [...records.value],
+      total: total.value,
+      page: page.value,
+      basePage: libraryBasePage.value,
+      focused: focused.value,
+      scrollY: window.scrollY,
+    }
+  }
+  async function restoreLibraryBrowse(context: LibraryBrowse) {
+    libraryBrowse = null
+    const generation = ++scopeGeneration
+    ++focusGeneration
+    previewId.value = ''
+    nodePreviews.value = new Map()
+    loading.value = false
+    loadingMore.value = false
+    loadMoreError.value = ''
+    scopeFailed.value = false
+    error.value = ''
+    selection.clear()
+    focused.value = ''
+    chapter.value = null
+    detail.value = null
+    clearResourceStorage()
+    let nextRecords = context.records,
+      nextTotal = context.total
+    const focusedIndex = context.records.findIndex((row) => row.id === context.focused)
+    const focusedPage = focusedIndex < 0 ? 0 : context.basePage + Math.floor(focusedIndex / LIBRARY_PAGE_SIZE)
+    // 只重读焦点行所在页，并且先取回再渲染，避免定位完成后换数据把页面撑动。
+    if (focusedPage >= context.basePage && focusedPage <= context.page) {
+      try {
+        const result = await storageApi.comics(libraryQuery(focusedPage))
+        if (disposed || generation !== scopeGeneration) return
+        nextRecords = [...context.records]
+        nextRecords.splice((focusedPage - context.basePage) * LIBRARY_PAGE_SIZE, LIBRARY_PAGE_SIZE, ...result.items)
+        nextTotal = result.total
+      } catch {
+        // 重新读取失败时保留快照，刷新入口仍可用。
+      }
+    }
+    records.value = nextRecords
+    total.value = nextTotal
+    page.value = context.page
+    libraryBasePage.value = context.basePage
+    await nextTick()
+    if (disposed || generation !== scopeGeneration) return
+    const target = rows.value.find((row) => row.id === context.focused) ?? rows.value[0]
+    if (target) {
+      if (inspector.value) void focus(target)
+      else focused.value = target.id
+    } else focused.value = ''
+    libraryRestore.value = { top: context.scrollY, token: ++restoreToken }
+  }
+  function libraryRestored(token: number) {
+    if (libraryRestore.value?.token === token) libraryRestore.value = null
   }
   async function loadNodePreviews(generation: number) {
     if (root.value || chapterId.value || !comicId.value) return
@@ -907,7 +1093,7 @@ export function useManagementWorkspace() {
     void loadScope()
   }
   let tasksGeneration = 0
-  async function loadTasks() {
+  async function loadTasks(groupPage?: { status: string; page: number }) {
     const generation = ++tasksGeneration
     taskListFailed.value = false
     try {
@@ -925,7 +1111,7 @@ export function useManagementWorkspace() {
       const states = taskStatus.value ? taskStates.filter((status) => status === taskStatus.value) : taskStates
       const pages = await Promise.all(
         states.map(async (status) => {
-          const requested = taskGroupPages.value[status] ?? 1
+          const requested = groupPage?.status === status ? groupPage.page : (taskGroupPages.value[status] ?? 1)
           const query = {
             ...filters,
             oldest: taskOldest.value,
@@ -956,9 +1142,10 @@ export function useManagementWorkspace() {
   }
   async function taskGroupPage(status: string, page: number) {
     const previous = taskGroupPages.value[status] ?? 1
-    taskGroupPages.value[status] = page
     const expectedGeneration = scopeGeneration + 1
-    await loadScope()
+    // 页码和该页数据在同一轮加载里提交；先改页码会短暂把上一页数据套到新页码，
+    // 让页块组件在同一个 key 上重建视图并重复渲染任务行。
+    await loadScope(false, { status, page })
     if (scopeGeneration === expectedGeneration && taskListFailed.value) taskGroupPages.value[status] = previous
   }
   async function loadMoreTaskGroup(status: string) {
@@ -1151,6 +1338,9 @@ export function useManagementWorkspace() {
     transcodeAcknowledged.value = false
     key.value = crypto.randomUUID()
   }
+  watch(dialog, (value) => {
+    if (value !== 'batch') multiPreview.value = null
+  })
   function showImport() {
     sourcePath.value = ''
     importTitle.value = ''
@@ -1219,7 +1409,7 @@ export function useManagementWorkspace() {
     showDialog('edit', '编辑漫画资料')
   }
   function showNode(kind: 'catalogs' | 'chapters', row?: FileRow) {
-    if (!detail.value) return
+    if (!detail.value || !writable.value || orderMode.value) return
     const current = row
       ? kind === 'catalogs'
         ? detail.value.catalogs.find((c) => c.id === row.id)
@@ -1233,6 +1423,7 @@ export function useManagementWorkspace() {
       parentId: parent ?? '',
       version: detail.value.structureVersion,
     }
+    nodeError.value = ''
     showDialog('node', row ? '重命名或移动' : kind === 'catalogs' ? '新建目录' : '新建章节')
   }
   async function previewOperation(request: BatchRequest, title: string) {
@@ -1240,6 +1431,7 @@ export function useManagementWorkspace() {
       resumeBatch()
       return false
     }
+    multiPreview.value = null
     const trigger = document.activeElement instanceof HTMLElement ? document.activeElement : null
     let success = false
     await run(async () => {
@@ -1301,33 +1493,137 @@ export function useManagementWorkspace() {
   }
   const recyclePreviews = ref<Record<string, string | null>>({})
   const recycledReactions = ref(0)
+  function recycleTitle(targetType: RecycleGroup['targetType']) {
+    return targetType === 'comic'
+      ? '确认回收不喜欢的漫画'
+      : targetType === 'chapter'
+        ? '确认回收不喜欢的章节'
+        : '确认回收不喜欢的媒体'
+  }
+  function recycleBatchRequest(group: RecycleGroup): BatchRequest {
+    if (group.scope === 'filter') {
+      return group.targetType === 'chapter'
+        ? { operation: 'chapter_trash', targetSelection: { mode: 'filter', filter: dislikedTrashFilter('chapter') } }
+        : {
+            operation: 'media_trash',
+            targetSelection: { mode: 'filter', filter: dislikedTrashFilter('media', group.mediaType) },
+          }
+    }
+    return group.targetType === 'comic'
+      ? { operation: 'comic_trash', selection: { mode: 'ids', ids: [...group.ids] } }
+      : {
+          operation: group.targetType === 'chapter' ? 'chapter_trash' : 'media_trash',
+          targetSelection: { mode: 'ids', ids: [...group.ids] },
+        }
+  }
+  async function previewRecycleGroups(groups: RecycleGroup[]) {
+    const trigger = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    let success = false
+    await run(async () => {
+      const contents: MultiRecycleGroup[] = []
+      for (const group of groups) {
+        const request = recycleBatchRequest(group)
+        const content = await createBatchPreview(request, {
+          preview: (value) => {
+            if (value.operation !== request.operation || !value.confirmationToken)
+              throw new Error('操作预览契约不完整，请重新核对')
+            if (batchPreviewExpired(value)) throw new Error('操作预览已过期，请重新选择')
+          },
+        })
+        contents.push({
+          targetType: group.targetType,
+          preview: content.preview,
+          items: content.items,
+          key: crypto.randomUUID(),
+          task: null,
+        })
+      }
+      const eligible = contents
+      const sum = (key: 'selectedCount' | 'eligibleCount' | 'blockedCount' | 'pendingCount') =>
+        eligible.reduce((total, group) => total + group.preview[key], 0)
+      const labels: Record<string, string> = { comic: '漫画', chapter: '章节', media: '媒体' }
+      multiPreview.value = { groups: eligible }
+      preview.value = {
+        id: `multi-${crypto.randomUUID()}`,
+        operation: 'media_trash',
+        selectedCount: sum('selectedCount'),
+        eligibleCount: sum('eligibleCount'),
+        blockedCount: sum('blockedCount'),
+        pendingCount: sum('pendingCount'),
+        succeededCount: 0,
+        failedCount: 0,
+        expiresAt: eligible.map((group) => group.preview.expiresAt).sort()[0] ?? new Date().toISOString(),
+        taskId: null,
+        activeCount: 0,
+        cancelledCount: 0,
+        createdAt: new Date().toISOString(),
+        taskStatus: null,
+        completedAt: null,
+      }
+      previewItems.value = eligible.flatMap((group) =>
+        group.items.map((item) => ({ ...item, title: `${labels[group.targetType] ?? ''} · ${item.title}` })),
+      )
+      previewTotal.value = previewItems.value.length
+      previewPage.value = 1
+      success = true
+    }, dialog.value === 'batch')
+    if (success) {
+      await nextTick()
+      if (trigger?.isConnected && !trigger.matches(':disabled')) trigger.focus({ preventScroll: true })
+      showDialog('batch', '确认回收所选内容')
+    }
+  }
   async function recycleDislikedMedia(payload: RecycleRequest) {
     if (!writable.value) return
-    if (payload.scope === 'ids' && !payload.ids.length) return
-    if (payload.scope === 'filter' && payload.targetType === 'comic') return
-    recyclePreviews.value = Object.fromEntries(payload.previews.map((item) => [item.id, item.url]))
-    const request: BatchRequest =
-      payload.scope === 'filter'
-        ? payload.targetType === 'chapter'
-          ? { operation: 'chapter_trash', targetSelection: { mode: 'filter', filter: dislikedTrashFilter('chapter') } }
-          : {
-              operation: 'media_trash',
-              targetSelection: { mode: 'filter', filter: dislikedTrashFilter('media', payload.mediaType) },
-            }
-        : payload.targetType === 'comic'
-          ? { operation: 'comic_trash', selection: { mode: 'ids', ids: [...payload.ids] } }
-          : {
-              operation: payload.targetType === 'chapter' ? 'chapter_trash' : 'media_trash',
-              targetSelection: { mode: 'ids', ids: [...payload.ids] },
-            }
-    await previewOperation(
-      request,
-      payload.targetType === 'comic'
-        ? '确认回收不喜欢的漫画'
-        : payload.targetType === 'chapter'
-          ? '确认回收不喜欢的章节'
-          : '确认回收不喜欢的媒体',
+    const groups = payload.groups.filter((group) =>
+      group.scope === 'filter' ? group.targetType !== 'comic' : group.ids.length > 0,
     )
+    if (!groups.length) return
+    recyclePreviews.value = Object.fromEntries(
+      groups.flatMap((group) => group.previews).map((item) => [item.id, item.url]),
+    )
+    if (groups.length === 1) {
+      multiPreview.value = null
+      const group = groups[0]!
+      await previewOperation(recycleBatchRequest(group), recycleTitle(group.targetType))
+      return
+    }
+    await previewRecycleGroups(groups)
+  }
+  async function submitMultiTrash() {
+    const multi = multiPreview.value
+    if (!multi) return
+    const pending = multi.groups.filter((group) => !group.task && group.preview.eligibleCount > 0)
+    if (pending.some((group) => batchPreviewExpired(group.preview)))
+      throw new Error('部分预览已过期，请关闭后重新选择剩余类型')
+    let failure: unknown = null
+    for (const group of pending) {
+      try {
+        group.task = await confirmBatchPreview(group.preview, group.key)
+      } catch (e) {
+        failure = e
+        break
+      }
+    }
+    const tasks = multi.groups.map((group) => group.task).filter((task): task is Task => Boolean(task))
+    if (failure) {
+      if (tasks.length) notice.value = `已提交 ${tasks.length} 个回收任务，剩余类型未提交；请在任务中心查看已受理结果。`
+      throw new Error(
+        `已提交 ${tasks.length} 个类型，剩余类型提交失败：${getApiErrorMessage(failure, '请重试剩余类型')}`,
+      )
+    }
+    multiPreview.value = null
+    preview.value = null
+    previewItems.value = []
+    previewTotal.value = 0
+    previewPage.value = 1
+    submittedTask.value = tasks[0] ?? null
+    submittedBatch.value = null
+    recycledReactions.value++
+    notice.value = '已提交回收任务，请在任务中心查看。'
+    dialog.value = ''
+    await loadTasks()
+    await refreshCurrentScope()
   }
   async function morePreviewItems() {
     if (!preview.value || previewItems.value.length >= previewTotal.value) return
@@ -1357,7 +1653,7 @@ export function useManagementWorkspace() {
   async function accepted(task: Task, batch: BatchPreview | null = null) {
     submittedTask.value = task
     submittedBatch.value = batch
-    if (batch?.operation === 'media_trash') recycledReactions.value++
+    if (batch && ['comic_trash', 'chapter_trash', 'media_trash'].includes(batch.operation)) recycledReactions.value++
     notice.value = `已提交任务：${task.title || task.type}。执行结果请在任务中心查看。`
     dialog.value = ''
     await loadTasks()
@@ -1389,28 +1685,70 @@ export function useManagementWorkspace() {
         dialog.value = ''
         notice.value = '漫画资料已保存'
         await loadScope()
-      } else if (dialog.value === 'deleteCatalog' && detail.value && removingCatalog.value) {
+      } else if (dialog.value === 'deleteCatalog' && detail.value && deletingCatalogs.value.length) {
         if (reparentTo.value && !catalogDeleteTargets.value.some((c) => c.id === reparentTo.value))
           throw new Error('请选择有效的接收位置')
-        await commands.deleteCatalog(
-          detail.value.id,
-          removingCatalog.value.id,
-          removingCatalog.value.version,
-          reparentTo.value || null,
-        )
+        let version = detail.value.structureVersion,
+          deleted = 0
+        try {
+          for (const entry of deletingCatalogs.value) {
+            const result = await commands.deleteCatalog(detail.value.id, entry.id, version, reparentTo.value || null)
+            version = result.version
+            deleted++
+          }
+        } catch (e) {
+          if (!deleted) throw e
+          dialog.value = ''
+          focused.value = ''
+          await loadScope()
+          error.value = `已删除 ${deleted} 个目录，后续删除失败：${message(e)}。已刷新结构，请重新选择剩余目录后重试。`
+          return
+        }
         dialog.value = ''
         focused.value = ''
-        notice.value = '目录已删除，子内容已移动到接收位置'
+        notice.value =
+          deleted > 1 ? `已删除 ${deleted} 个目录，子内容已移动到接收位置` : '目录已删除，子内容已移动到接收位置'
         await loadScope()
       } else if (dialog.value === 'node' && detail.value) {
-        await commands.node(detail.value.id, node.value.kind, node.value.id || null, {
-          version: node.value.version,
-          title: node.value.title.trim(),
-          parentId: node.value.parentId || null,
-        })
+        nodeError.value = nodeNameError(node.value.title)
+        if (nodeError.value) return
+        if (node.value.parentId && !detail.value.catalogs.some((catalog) => catalog.id === node.value.parentId)) {
+          dialogError.value = '所选位置已不存在，请重新选择。'
+          return
+        }
+        const creating = !node.value.id
+        let result: StructureNodeResult
+        try {
+          result = await commands.node(detail.value.id, node.value.kind, node.value.id || null, {
+            version: node.value.version,
+            title: node.value.title.trim(),
+            parentId: node.value.parentId || null,
+          })
+        } catch (e) {
+          if (!(e instanceof ApiError) || e.status !== 409) throw e
+          const latest = await comicApi.detail(detail.value.id)
+          detail.value = latest
+          node.value.version = latest.structureVersion
+          if (node.value.parentId && !latest.catalogs.some((catalog) => catalog.id === node.value.parentId))
+            node.value.parentId = latest.catalogs.some((catalog) => catalog.id === catalogId.value)
+              ? catalogId.value
+              : ''
+          dialogError.value = '目录结构已被其他操作更新，已载入最新版本；请确认名称和位置后再次提交。'
+          return
+        }
         dialog.value = ''
-        notice.value = '目录结构已保存'
+        nodeError.value = ''
+        const label = node.value.kind === 'catalogs' ? '目录' : '章节'
+        notice.value = `${creating ? '已创建' : '已更新'}${label}「${result.node.title}」`
         await loadScope()
+        const revealed = rows.value.find((row) => row.id === result.node.id)
+        if (revealed) {
+          focused.value = revealed.id
+          await nextTick()
+          document
+            .querySelector<HTMLElement>(`[data-file-id="${CSS.escape(revealed.id)}"]`)
+            ?.scrollIntoView({ block: 'nearest' })
+        }
       } else if (dialog.value === 'move' && detail.value) {
         if (moveTarget.value === catalogId.value) throw new Error('请选择其他目录')
         await commands.move(
@@ -1422,6 +1760,8 @@ export function useManagementWorkspace() {
         dialog.value = ''
         notice.value = '所选内容已移动，原有相对顺序已保留'
         await loadScope()
+      } else if (dialog.value === 'batch' && multiPreview.value) {
+        await submitMultiTrash()
       } else if (dialog.value === 'batch' && preview.value) {
         if (preview.value.operation === 'trash_purge' && !purgeAcknowledged.value)
           throw new Error('请先核对永久清理范围并确认无法恢复')
@@ -1465,6 +1805,10 @@ export function useManagementWorkspace() {
         await accepted(await commands.exportComic(form.id, { format: form.format, partBytes }, key.value))
       }
     }, true)
+    if (dialog.value === 'node' && nodeError.value) {
+      await nextTick()
+      document.getElementById('mw-node-title')?.focus()
+    }
   }
   function beginOrder() {
     if (!writable.value || !canOrder.value || !detail.value) return
@@ -1546,10 +1890,17 @@ export function useManagementWorkspace() {
   })
   watch(
     () => route.fullPath,
-    () => {
-      page.value = 1
+    (to, from) => {
+      const enteringLibrary = isLibraryRoot(to)
+      if (isLibraryRoot(from) && !enteringLibrary) captureLibraryBrowse()
       nodePage.value = 1
       nodeLoadedPage.value = 1
+      if (enteringLibrary && libraryBrowse) {
+        void restoreLibraryBrowse(libraryBrowse)
+        return
+      }
+      libraryRestore.value = null
+      page.value = 1
       void loadScope()
     },
   )
@@ -1560,6 +1911,7 @@ export function useManagementWorkspace() {
       const [c, t] = await Promise.all([comicApi.categories(), comicApi.tags(), loadTasks()])
       categories.value = c.items
       tags.value = t.items
+      pruneLibraryFilters()
       await loadScope()
     } catch (e) {
       error.value =
@@ -1617,6 +1969,7 @@ export function useManagementWorkspace() {
     disposed = true
     ++scopeGeneration
     ++focusGeneration
+    ++storageGeneration
     ++taskGeneration
     window.clearInterval(timer)
   })
@@ -1651,7 +2004,9 @@ export function useManagementWorkspace() {
     acceptExternalTask: (task: Task, batch: BatchPreview | null = null) => run(() => accepted(task, batch)),
     openTask,
     refreshTerms,
-    removingCatalog,
+    deletingCatalogs,
+    canBatchDeleteCatalogs,
+    showBatchDeleteCatalogs,
     reparentTo,
     catalogDeleteTargets,
     showDeleteCatalog,
@@ -1667,6 +2022,9 @@ export function useManagementWorkspace() {
     recyclePreviews,
     recycledReactions,
     resourceStorage,
+    resourceStorageLoading,
+    resourceStorageError,
+    retryResourceStorage,
     pendingResource,
     showRefresh,
     showDetails,
@@ -1780,10 +2138,12 @@ export function useManagementWorkspace() {
     importTitle,
     edit,
     node,
+    nodeError,
     nodeParents,
     catalogPath,
     preview,
     previewItems,
+    multiPreview,
     heading,
     rows,
     breadcrumbs,
@@ -1796,6 +2156,8 @@ export function useManagementWorkspace() {
     selectAll,
     loadScope: () => (ready.value ? loadScope() : boot()),
     loadMoreLibrary,
+    libraryRestore,
+    libraryRestored,
     refreshCurrentScope,
     filters,
     loadTasks,
@@ -1803,6 +2165,7 @@ export function useManagementWorkspace() {
     showImport,
     showEdit,
     showNode,
+    clearNodeError,
     batch,
     showTrash,
     submit,

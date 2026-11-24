@@ -5,14 +5,13 @@ type SourceImage struct {
 	MediaID string
 	Ordinal int
 	Path    string `json:"-"`
-	SHA256  string `json:"-"`
 }
 
 type SourceChoice struct {
-	MediaID, HQState, HQPath, HQSHA256 string
-	Ordinal                            int
-	LQPath, LQSHA256                   string
-	LQValid                            bool
+	MediaID, HQState, HQPath string
+	Ordinal                  int
+	LQPath                   string
+	LQValid                  bool
 }
 
 type Snapshot struct {

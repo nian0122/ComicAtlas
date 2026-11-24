@@ -14,7 +14,7 @@ func ValidateRequest(value Request) error {
 	if value.Operation == "restore" && ValidJournalID(value.EntryID) && value.Confirmation == "" {
 		return nil
 	}
-	if value.Operation == "purge" && ValidJournalID(value.EntryID) && validDigest(value.Confirmation) {
+	if value.Operation == "purge" && ValidJournalID(value.EntryID) && (validProof(value.Confirmation) || validStamp(value.Confirmation)) {
 		return nil
 	}
 	return ErrValidation

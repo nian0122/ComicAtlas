@@ -20,7 +20,7 @@ func New(database *persistence.Database) *repository { return &repository{databa
 var _ storageports.Repository = (*repository)(nil)
 
 // metricsColumns 与 comic_storage_metrics 的列顺序一致，供合并读取与批量写入复用。
-const metricsColumns = "comic_id,chapters,images,videos,hq_files,hq_bytes,lq_files,lq_bytes,current_lq,available_images,released_images,releasing_images,missing_source_sha256_images,missing_lq,available_bytes,cover_files,cover_bytes"
+const metricsColumns = "comic_id,chapters,images,videos,hq_files,hq_bytes,lq_files,lq_bytes,current_lq,available_images,released_images,releasing_images,missing_lq,available_bytes,cover_files,cover_bytes"
 
 // metricsAggregate 对一段漫画范围聚合占用；只用于脏漫画或批量重算，读路径不再全库聚合。
 func metricsAggregate(where string) string {
@@ -31,7 +31,6 @@ func metricsAggregate(where string) string {
 	 COALESCE(SUM(m.media_type='image' AND m.hq_state='available'),0) AS available_images,
 	 COALESCE(SUM(m.media_type='image' AND m.hq_state='released'),0) AS released_images,
 	 COALESCE(SUM(m.media_type='image' AND m.hq_state='releasing'),0) AS releasing_images,
-	 COALESCE(SUM(m.media_type='image' AND m.hq_state='available' AND m.sha256=''),0) AS missing_source_sha256_images,
 	 COALESCE(SUM(m.media_type='image' AND m.hq_state='available' AND (l.media_id IS NULL OR l.valid<>1)),0) AS missing_lq,
 	 COALESCE(SUM(CASE WHEN m.media_type='image' AND m.hq_state='available' THEN m.size ELSE 0 END),0) AS available_bytes,
 	 (SELECT COUNT(*) FROM comic_covers cv WHERE cv.comic_id=c.id) AS cover_files,
@@ -75,17 +74,17 @@ func (repo *repository) globalInventory(ctx context.Context) (storagedomain.Inve
 	}
 	defer tx.Rollback()
 	var chapters, images, videos, hqFiles, hqBytes, lqFiles, lqBytes, currentLQ, coverFiles, coverBytes int64
-	var availableImages, availableBytes, missingLQ, missingSourceSha256Images, releasedImages, releasingImages int64
+	var availableImages, availableBytes, missingLQ, releasedImages, releasingImages int64
 	if err = tx.QueryRowContext(ctx, `WITH `+metricsCombined()+`
 	 SELECT (SELECT COUNT(*) FROM active_comics),
 	 COALESCE(SUM(m.chapters),0),COALESCE(SUM(m.images),0),COALESCE(SUM(m.videos),0),
 	 COALESCE(SUM(m.hq_files),0),COALESCE(SUM(m.hq_bytes),0),COALESCE(SUM(m.lq_files),0),COALESCE(SUM(m.lq_bytes),0),
 	 COALESCE(SUM(m.current_lq),0),COALESCE(SUM(m.available_images),0),COALESCE(SUM(m.available_bytes),0),
-	 COALESCE(SUM(m.missing_lq),0),COALESCE(SUM(m.missing_source_sha256_images),0),COALESCE(SUM(m.released_images),0),COALESCE(SUM(m.releasing_images),0),
+	 COALESCE(SUM(m.missing_lq),0),COALESCE(SUM(m.released_images),0),COALESCE(SUM(m.releasing_images),0),
 	 COALESCE(SUM(m.cover_files),0),COALESCE(SUM(m.cover_bytes),0)
 	 FROM active_comics c LEFT JOIN combined m ON m.comic_id=c.id`).Scan(
 		&result.Comics, &chapters, &images, &videos, &hqFiles, &hqBytes, &lqFiles, &lqBytes, &currentLQ,
-		&availableImages, &availableBytes, &missingLQ, &missingSourceSha256Images, &releasedImages, &releasingImages,
+		&availableImages, &availableBytes, &missingLQ, &releasedImages, &releasingImages,
 		&coverFiles, &coverBytes); err != nil {
 		return result, err
 	}
@@ -93,7 +92,7 @@ func (repo *repository) globalInventory(ctx context.Context) (storagedomain.Inve
 	result.HQ, result.LQ = storagedomain.Usage{Files: hqFiles, Bytes: hqBytes}, storagedomain.Usage{Files: lqFiles, Bytes: lqBytes}
 	result.CurrentLQImages, result.Covers = currentLQ, storagedomain.Usage{Files: coverFiles, Bytes: coverBytes}
 	result.AvailableImages, result.AvailableBytes = availableImages, availableBytes
-	result.MissingLQ, result.MissingSourceSHA256Images = missingLQ, missingSourceSha256Images
+	result.MissingLQ = missingLQ
 	result.ReleasedImages, result.ReleasingImages = releasedImages, releasingImages
 	return result, tx.Commit()
 }
@@ -107,10 +106,10 @@ func (repo *repository) comicInventory(ctx context.Context, id string) (storaged
 	defer tx.Rollback()
 	if err = tx.QueryRowContext(ctx, `WITH `+metricsCombined()+`
 	 SELECT m.chapters,m.images,m.videos,m.hq_files,m.hq_bytes,m.lq_files,m.lq_bytes,m.current_lq,
-	 m.available_images,m.available_bytes,m.missing_lq,m.missing_source_sha256_images,m.released_images,m.releasing_images,m.cover_files,m.cover_bytes
+	 m.available_images,m.available_bytes,m.missing_lq,m.released_images,m.releasing_images,m.cover_files,m.cover_bytes
 	 FROM active_comics c JOIN combined m ON m.comic_id=c.id WHERE c.id=?`, id).Scan(
 		&result.Chapters, &result.Images, &result.Videos, &result.HQ.Files, &result.HQ.Bytes, &result.LQ.Files, &result.LQ.Bytes, &result.CurrentLQImages,
-		&result.AvailableImages, &result.AvailableBytes, &result.MissingLQ, &result.MissingSourceSHA256Images, &result.ReleasedImages, &result.ReleasingImages,
+		&result.AvailableImages, &result.AvailableBytes, &result.MissingLQ, &result.ReleasedImages, &result.ReleasingImages,
 		&result.Covers.Files, &result.Covers.Bytes); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return storagedomain.Inventory{}, storagedomain.ErrNotFound
@@ -140,12 +139,11 @@ func (repo *repository) chapterInventory(ctx context.Context, id string) (storag
 	 COALESCE(SUM(m.media_type='image' AND m.hq_state='available'),0),
 	 COALESCE(SUM(CASE WHEN m.media_type='image' AND m.hq_state='available' THEN m.size ELSE 0 END),0),
 	 COALESCE(SUM(m.media_type='image' AND m.hq_state='available' AND (l.media_id IS NULL OR l.valid<>1)),0),
-	 COALESCE(SUM(m.media_type='image' AND m.hq_state='available' AND m.sha256=''),0),
 	 COALESCE(SUM(m.media_type='image' AND m.hq_state='released'),0),
 	 COALESCE(SUM(m.media_type='image' AND m.hq_state='releasing'),0)
 	 FROM active_media m JOIN active_chapters ch ON ch.id=m.chapter_id LEFT JOIN image_lq l ON l.media_id=m.id WHERE ch.id=?`, id).Scan(
 		&result.HQ.Files, &result.HQ.Bytes, &result.Images, &result.Videos, &result.LQ.Files, &result.LQ.Bytes, &result.CurrentLQImages,
-		&result.AvailableImages, &result.AvailableBytes, &result.MissingLQ, &result.MissingSourceSHA256Images, &result.ReleasedImages, &result.ReleasingImages); err != nil {
+		&result.AvailableImages, &result.AvailableBytes, &result.MissingLQ, &result.ReleasedImages, &result.ReleasingImages); err != nil {
 		return result, err
 	}
 	return result, tx.Commit()
@@ -215,7 +213,9 @@ func (repo *repository) GlobalDetails(ctx context.Context) (*storagedomain.Obser
 	value := storagedomain.Observation{}
 	err = tx.QueryRowContext(ctx, "SELECT task_id,started_at,finished_at,result_json FROM storage_observations WHERE singleton=1").Scan(&value.TaskID, &value.StartedAt, &value.FinishedAt, &data)
 	if err == nil {
-		if err = json.Unmarshal([]byte(data), &value.Usage); err != nil {
+		decoder := json.NewDecoder(strings.NewReader(data))
+		decoder.DisallowUnknownFields()
+		if err = decoder.Decode(&value.Usage); err != nil {
 			return nil, nil, err
 		}
 		observation = &value

@@ -4,13 +4,8 @@ import { comicCoverUrl } from '@/entities/comic'
 import type { Task } from '@/entities/task'
 import { operationBlockers } from '@/entities/storage'
 import type { BatchPreview } from '@/features/manage-items'
-import {
-  BatchPreviewList,
-  BatchPreviewSummary,
-  ManagementDialog,
-  ManagementImage,
-  formatBytes,
-} from '@/shared/ui/management'
+import { BatchPreviewList, BatchPreviewSummary, ManagementImage, formatBytes } from '@/shared/ui/management'
+import { AppDialog } from '@/shared/ui/dialog'
 import { useHqRelease, type HqTarget } from '../model/use-hq-release'
 const props = defineProps<{ open: boolean; target: HqTarget | null; ids: string[]; workspaceBusy: boolean }>()
 const emit = defineEmits<{ close: []; accepted: [task: Task, batch: BatchPreview | null] }>()
@@ -36,7 +31,7 @@ const batchRows = computed(() =>
 )
 </script>
 <template>
-  <ManagementDialog :open="open" title="释放图片原件" :busy="w.busy" @close="emit('close')">
+  <AppDialog :open="open" title="释放图片原件" :busy="w.busy" @close="emit('close')">
     <div class="mw-error">
       <strong>永久删除当前受管图片原件，保留已验证的轻量副本。</strong>
       <p>
@@ -106,7 +101,7 @@ const batchRows = computed(() =>
         {{ w.attempted ? '重试确认同次提交' : '永久释放图片原件' }}
       </button>
     </footer>
-  </ManagementDialog>
+  </AppDialog>
 </template>
 <style scoped>
 .hq-target {

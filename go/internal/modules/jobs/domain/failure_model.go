@@ -16,8 +16,8 @@ const (
 )
 
 const (
-	FailureDirectoryPreflight      = "DIRECTORY_PREFLIGHT_FAILED"
 	FailureDirectoryMove           = "DIRECTORY_MOVE_FAILED"
+	FailureDirectoryMoveStorage    = "DIRECTORY_MOVE_STORAGE_FAILED"
 	FailureDirectoryMoveSource     = "DIRECTORY_MOVE_SOURCE_CHANGED"
 	FailureDirectoryMoveConflict   = "DIRECTORY_MOVE_CONFLICT"
 	FailureDirectoryMoveTimeout    = "DIRECTORY_MOVE_TIMEOUT"
@@ -34,7 +34,7 @@ const (
 	FailureMetadataRefreshLimit    = "METADATA_REFRESH_LIMIT"
 	FailureUpload                  = "UPLOAD_PUBLISH_FAILED"
 	FailureUploadTimeout           = "UPLOAD_PUBLISH_TIMEOUT"
-	FailureUploadChecksum          = "UPLOAD_FILE_CHECKSUM_MISMATCH"
+	FailureUploadContentMismatch   = "UPLOAD_FILE_CONTENT_MISMATCH"
 	FailureUploadMedia             = "UPLOAD_MEDIA_INVALID"
 	FailureUploadConflict          = "UPLOAD_TARGET_CHANGED"
 	FailureUploadRetire            = "UPLOAD_RETIRE_FAILED"

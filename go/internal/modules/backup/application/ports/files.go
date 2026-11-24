@@ -10,7 +10,7 @@ type Workspace interface {
 	Root() string
 	Directory(context.Context, string) (domain.Entry, error)
 	File(context.Context, string) (domain.Entry, error)
-	Digest(context.Context, string) (domain.Object, error)
+	Measure(context.Context, string) (domain.Object, error)
 	ImportMedia(context.Context, string, func(domain.Entry) error) error
 	ImportEntry(context.Context, string, domain.Entry) error
 	WriteManifest(context.Context, domain.Manifest) error
@@ -22,7 +22,7 @@ type Workspace interface {
 type Bundle interface {
 	Root() string
 	Manifest(context.Context) (domain.Manifest, error)
-	Digest(context.Context, string) (domain.Object, error)
+	Measure(context.Context, string) (domain.Object, error)
 	Check(context.Context, domain.Entry) error
 	CheckExtra(context.Context, CatalogReader) error
 	Close() error

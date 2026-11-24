@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { AppSearch } from '@/shared/ui/search'
 import { ManagementPagedFeed } from '@/shared/ui/pagination'
-import { reactive, ref, computed, watch, nextTick, onBeforeUnmount } from 'vue'
+import { reactive, ref, computed, watch, nextTick, onBeforeUnmount, onMounted } from 'vue'
 import { ManagementMetadata, type MetadataTarget } from '@/widgets/management-metadata'
 import { ManagementSidecar } from '@/widgets/management-sidecar'
 import { ManagementSystem } from '@/widgets/management-system'
@@ -14,7 +14,13 @@ import { ManagementReactions, ManagementReactionConfirm } from '@/widgets/manage
 import type { ReactionTarget, SavedReaction } from '@/entities/managed-reaction'
 import { RouterLink } from 'vue-router'
 import { comicCoverUrl } from '@/entities/comic'
-import { operationBlockers, type StorageObject } from '@/entities/storage'
+import {
+  operationBlockers,
+  StorageUsageSummary,
+  describeMediaState,
+  describeObservedState,
+  type StorageObject,
+} from '@/entities/storage'
 import type { BatchItem } from '@/features/manage-items'
 import type { TrashEntry } from '@/entities/trash'
 import { ManagementHqRelease, type HqTarget } from '@/widgets/management-hq-release'
@@ -24,6 +30,7 @@ import { ManagementCover } from '@/widgets/management-cover'
 import { ManagementImportScan } from '@/widgets/management-imports'
 import { ManagementTerms } from '@/widgets/management-terms'
 import { ManagementShell } from '@/widgets/management-shell'
+import { ManagementTree } from '@/widgets/management-tree'
 import { ManagementFiles } from '@/widgets/management-files'
 import { ManagementOrder } from '@/widgets/management-order'
 import { ManagementTrash } from '@/widgets/management-trash'
@@ -32,15 +39,14 @@ import { ManagementPreview } from '@/widgets/management-preview'
 import { ManagementTasks } from '@/widgets/management-tasks'
 import {
   ManagementIcon,
-  ManagementDialog,
   ManagementImage,
   ManagementActionMenu,
   BatchPreviewSummary,
   BatchPreviewList,
-  registrationLabel,
   formatBytes,
   formatDate,
 } from '@/shared/ui/management'
+import { AppDialog } from '@/shared/ui/dialog'
 import { useManagementWorkspace } from '../model/use-management-workspace'
 type LibraryFilterKey = 'category' | 'tag' | 'hq' | 'lq' | 'attention'
 const systemPanel = ref<InstanceType<typeof ManagementSystem>>()
@@ -51,6 +57,8 @@ let metadataTrigger: HTMLElement | null = null
 let disposed = false
 onBeforeUnmount(() => {
   disposed = true
+  window.removeEventListener('scroll', onHeadScroll)
+  if (headScrollFrame) cancelAnimationFrame(headScrollFrame)
 })
 function showMetadata(selected = false, previewId = '') {
   metadataTrigger = document.activeElement instanceof HTMLElement ? document.activeElement : null
@@ -138,7 +146,7 @@ function openRecoveredComic(id: string) {
   void w.openRecovered(id)
 }
 const directoryOpen = ref(false),
-  directoryPreview = ref(''),
+  directoryTask = ref(''),
   directoryTargets = ref<DirectoryTarget[]>([])
 const canMoveDirectory = computed(
   () =>
@@ -151,18 +159,18 @@ const canMoveDirectory = computed(
 function showDirectoryMove() {
   if (!canMoveDirectory.value) return
   directoryTargets.value = selectedRatingRows.value.map((row) => ({ id: row.id, title: row.title, cover: row.cover }))
-  directoryPreview.value = ''
+  directoryTask.value = ''
   directoryOpen.value = true
 }
 function showDirectorySingle() {
   if (!w.detail) return
   directoryTargets.value = [{ id: w.detail.id, title: w.detail.title, cover: w.detail.coverUrl }]
-  directoryPreview.value = ''
+  directoryTask.value = ''
   directoryOpen.value = true
 }
 function resumeDirectory(id: string) {
   directoryTargets.value = []
-  directoryPreview.value = id
+  directoryTask.value = id
   directoryOpen.value = true
 }
 function closeDirectory(changed: boolean) {
@@ -347,9 +355,62 @@ const inspectedKindLabel = computed(() =>
     ? { comic: '漫画', catalog: '目录', chapter: '章节', image: '图片', video: '视频' }[w.focusedRow.kind]
     : '',
 )
-const hasInspectionMaintenance = computed(
-  () => !!w.focusedRow && ['comic', 'chapter', 'catalog', 'video'].includes(w.focusedRow.kind),
+const inspectorMeta = computed(() => {
+  if (!w.focusedRow) return ''
+  if (inspectingComic.value && w.detail) return [w.detail.author, w.detail.category?.name].filter(Boolean).join(' · ')
+  if (w.focusedRow.kind === 'chapter') return w.detail?.title ?? ''
+  if (w.selectedMedia) return [w.detail?.title, w.chapter?.chapter.title].filter(Boolean).join(' · ')
+  if (w.focusedRow.kind === 'catalog') return w.detail?.title ?? ''
+  return ''
+})
+const selectedNote = computed(() => (w.selected.length > 1 ? `已选 ${w.selected.length} 项 · 详情仅对应当前对象` : ''))
+const hasInspectionMaintenance = computed(() => !!w.focusedRow && ['comic', 'catalog'].includes(w.focusedRow.kind))
+const canRenameInspection = computed(() => !!w.focusedRow && ['catalog', 'chapter'].includes(w.focusedRow.kind))
+const canTrashInspection = computed(
+  () => !!w.focusedRow && ['comic', 'chapter', 'image', 'video'].includes(w.focusedRow.kind),
 )
+const mediaHq = computed(() => (w.selectedMedia ? describeMediaState('hq', w.selectedMedia.hqState) : null))
+const mediaLq = computed(() =>
+  w.selectedMedia?.mediaType === 'image' ? describeMediaState('lq', w.selectedMedia.lq?.state ?? 'none') : null,
+)
+const mediaObserved = computed(() => (w.selectedMedia ? describeObservedState(w.selectedMedia.storageState) : null))
+const storageHints = computed(() => {
+  const storage = w.resourceStorage
+  if (!storage) return []
+  const hints: { name: string; text: string }[] = []
+  const taskCodes = new Set([
+    'LQ_TASK_ACTIVE',
+    'HQ_TASK_ACTIVE',
+    'MEDIA_TASK_ACTIVE',
+    'EXPORT_TASK_ACTIVE',
+    'METADATA_REFRESH_ACTIVE',
+    'TRANSCODE_TASK_ACTIVE',
+    'UPLOAD_TASK_ACTIVE',
+  ])
+  const add = (name: string, blockers: string[]) => {
+    // 已有任务行时不再重复一条“任务正在执行”的原因。
+    if (storage.activeTasks.length && blockers.length && blockers.every((code) => taskCodes.has(code))) return
+    hints.push({ name, text: operationBlockers(blockers) })
+  }
+  if (!storage.operations.generateLq.canSubmit) add('生成轻量副本', storage.operations.generateLq.blockers)
+  if (!storage.operations.releaseHq.canSubmit) add('释放图片原件', storage.operations.releaseHq.blockers)
+  if (storage.inventory.videos > 0 && !storage.operations.transcode.canSubmit)
+    add('视频转码', storage.operations.transcode.blockers)
+  if (inspectingComic.value && !storage.operations.refreshMetadata.canSubmit)
+    add('核对媒体', storage.operations.refreshMetadata.blockers)
+  return hints
+})
+const storageScopeMismatch = computed(() => {
+  const scope = w.resourceStorage?.inventory
+  if (!scope || !w.focusedRow || (scope.scopeType !== 'comic' && scope.scopeType !== 'chapter')) return false
+  if (inspectingComic.value) return scope.scopeType !== 'comic' || scope.scopeId !== w.focusedRow.id
+  return scope.scopeType !== 'chapter' || scope.scopeId !== w.focusedRow.id
+})
+const storageScopeNote = computed(() => {
+  if (storageScopeMismatch.value)
+    return w.resourceStorage?.inventory.scopeType === 'comic' ? '作品汇总 · 范围不一致' : '范围未确认'
+  return inspectingComic.value ? '按作品登记 · 非磁盘实测' : '按章节登记 · 非磁盘实测'
+})
 watch(
   () => [w.comicId, w.chapterId, w.selectedMedia?.id],
   () => {
@@ -413,9 +474,12 @@ function toggleSortOrder() {
 const submitLabel = computed(() => {
   if (w.dialog === 'node') return w.node.id ? '保存名称与位置' : w.node.kind === 'catalogs' ? '创建目录' : '创建章节'
   if (w.dialog === 'edit') return '保存资料'
+  if (w.dialog === 'deleteCatalog')
+    return w.deletingCatalogs.length > 1 ? `删除 ${w.deletingCatalogs.length} 个目录` : '删除目录并保留内容'
   if (w.dialog === 'resource')
     return { transcode: '开始视频转码', refresh: '开始核对媒体' }[w.pendingResource?.operation ?? 'refresh']
-  if (w.dialog === 'batch')
+  if (w.dialog === 'batch') {
+    if (w.multiPreview) return '确认回收'
     return (
       (
         {
@@ -429,17 +493,18 @@ const submitLabel = computed(() => {
         } as Record<string, string>
       )[w.preview?.operation ?? ''] ?? '提交任务'
     )
+  }
   return (
     (
       {
         import: '开始导入',
         export: '生成归档',
         move: '移动所选内容',
-        deleteCatalog: '删除目录并保留内容',
       } as Record<string, string>
     )[w.dialog] ?? '提交任务'
   )
 })
+const submitBusyLabel = computed(() => (w.dialog === 'node' ? (w.node.id ? '正在保存…' : '正在创建…') : '正在提交…'))
 function previewItemLabel(item: BatchItem) {
   if (item.coveredBy) return `由第 ${item.coveredBy} 项一并处理`
   if (item.errorCode) {
@@ -488,7 +553,7 @@ const batchPreviewRows = computed(() =>
     if (w.preview?.operation === 'metadata_refresh')
       meta.push(`登记图片 ${item.imageCount ?? 0} 张 · 视频 ${item.videoCount ?? 0} 个`)
     return {
-      key: item.position,
+      key: `${item.targetType}-${item.targetId}-${item.position}`,
       title: item.title,
       cover: previewCover(item),
       meta: meta.join(' · ') || undefined,
@@ -575,16 +640,37 @@ const appliedLibraryFilters = computed(() => {
   if (w.attention)
     filters.push({
       key: 'attention',
-      label: { missing_lq: '缺少副本', can_release: '可释放原件', missing_source_sha256: '缺少原件 SHA-256' }[
-        w.attention
-      ],
+      label: { missing_lq: '缺少副本', can_release: '可释放原件' }[w.attention],
     })
   return filters
 })
 const scopeCountLabel = computed(() => {
   if (w.loading) return '读取中…'
   if (w.scopeFailed) return w.root && w.total !== null ? `${w.total} 部作品（上次结果）` : '数量暂不可用'
-  return w.root ? (w.total === null ? '数量暂不可用' : `${w.total} 部作品`) : `${w.scopeTotal} 项内容`
+  if (w.root) return w.total === null ? '数量暂不可用' : `${w.total} 部作品`
+  return w.chapterId ? `${w.scopeTotal} 个媒体` : `${w.scopeTotal} 项内容`
+})
+const worksHead = computed(() => w.section === 'library' && !w.root && !!w.detail)
+const rootHead = computed(() => w.section === 'library' && w.root)
+const headCompact = ref(false)
+let headScrollFrame = 0
+function syncHeadCompact() {
+  // 收放有 40px 的回滞区，避免用户在阈值附近滚动时头部反复收放。
+  const y = window.scrollY
+  if (headCompact.value) {
+    if (y < 24) headCompact.value = false
+  } else if (y > 64) headCompact.value = true
+}
+function onHeadScroll() {
+  if (headScrollFrame) return
+  headScrollFrame = requestAnimationFrame(() => {
+    headScrollFrame = 0
+    syncHeadCompact()
+  })
+}
+onMounted(() => {
+  window.addEventListener('scroll', onHeadScroll, { passive: true })
+  syncHeadCompact()
 })
 const emptyState = computed(() => {
   if (w.scopeFailed) return { title: '暂时无法读取内容', message: '请使用上方“刷新”重新读取。' }
@@ -647,33 +733,63 @@ async function removeLibraryFilter(key: LibraryFilterKey) {
     @section="w.navigate"
   >
     <template #tree>
-      <template v-if="w.detail && w.comicId && w.section === 'library'">
-        <button
-          class="mw-tree-item"
-          :class="{ active: w.comicId && !w.catalogId && !w.chapterId }"
-          @click="w.scope(w.detail.id)"
-        >
-          <ManagementIcon name="book" :size="15" /><span class="mw-tree-name">{{ w.detail.title }}</span>
-        </button>
-        <button
-          v-for="entry in w.tree"
-          :key="entry.id"
-          class="mw-tree-item"
-          :class="{ active: entry.id === w.catalogId || entry.id === w.chapterId }"
-          :style="{ paddingLeft: `${23 + Math.min(entry.depth, 6) * 13}px` }"
-          @click="entry.kind === 'catalog' ? w.scope(w.detail.id, entry.id) : w.scope(w.detail.id, '', entry.id)"
-        >
-          <ManagementIcon :name="entry.kind === 'catalog' ? 'folder' : 'image'" :size="14" /><span
-            class="mw-tree-name"
-            >{{ entry.title }}</span
-          >
-        </button>
-      </template>
+      <ManagementTree
+        v-if="w.detail && w.comicId && w.section === 'library'"
+        :root-id="w.detail.id"
+        :root-title="w.detail.title"
+        :entries="w.tree"
+        :catalog-id="w.catalogId"
+        :chapter-id="w.chapterId"
+        @root="w.scope(w.detail.id)"
+        @catalog="w.scope(w.detail.id, $event)"
+        @chapter="w.scope(w.detail.id, '', $event)"
+      />
     </template>
 
     <div class="mw-content">
-      <div class="mw-page-heading" :class="{ 'mw-library-heading': w.section === 'library' }">
-        <div>
+      <div
+        class="mw-page-heading"
+        :class="{
+          'mw-library-heading': w.section === 'library',
+          'mw-works-head': worksHead,
+          'mw-works-head-compact': worksHead && headCompact,
+          'mw-root-head': rootHead,
+          'mw-root-head-compact': rootHead && headCompact,
+        }"
+        :role="worksHead ? 'region' : undefined"
+        :aria-label="worksHead ? '当前漫画' : undefined"
+      >
+        <ManagementImage
+          v-if="worksHead"
+          class="mw-works-poster"
+          :src="w.detail?.coverUrl ?? null"
+          :alt="w.detail?.title ?? ''"
+        />
+        <div v-if="worksHead" class="mw-works-copy">
+          <nav class="mw-works-path" aria-label="资料位置">
+            <button type="button" @click="w.scope()"><ManagementIcon name="back" :size="12" />全部漫画</button>
+            <template v-if="w.catalogId || w.chapterId">
+              <span aria-hidden="true">/</span>
+              <button type="button" @click="w.scope(w.comicId)">{{ w.detail?.title }}</button>
+              <template v-for="entry in w.breadcrumbs" :key="entry.id">
+                <span aria-hidden="true">/</span>
+                <button type="button" @click="w.scope(w.comicId, entry.id)">{{ entry.title }}</button>
+              </template>
+            </template>
+          </nav>
+          <div class="mw-title-line">
+            <h1 :title="w.heading">{{ w.heading }}</h1>
+            <span class="mw-muted" aria-live="polite">{{ scopeCountLabel }}</span>
+          </div>
+          <p class="mw-works-meta">
+            <span v-if="w.detail?.author">{{ w.detail.author }} · </span>{{ w.detail?.chapters.length }} 个章节<template
+              v-if="w.detail?.category"
+            >
+              · {{ w.detail.category.name }}</template
+            >
+          </p>
+        </div>
+        <div v-else>
           <div class="mw-title-line">
             <h1 :title="w.heading">
               {{ w.section === 'library' && !w.root && !w.catalogId && !w.chapterId ? '作品内容' : w.heading }}
@@ -695,6 +811,12 @@ async function removeLibraryFilter(key: LibraryFilterKey) {
           </p>
         </div>
         <div class="mw-inline-actions">
+          <RouterLink
+            v-if="worksHead"
+            :to="`/comic/${w.detail?.id}`"
+            class="app-button app-button--secondary mw-works-read mw-works-secondary"
+            ><ManagementIcon name="book" :size="15" />阅读详情</RouterLink
+          >
           <span v-if="w.section !== 'library'" class="mw-connection"
             ><ManagementIcon :name="w.ready ? 'check' : 'loading'" :size="14" />{{
               w.ready ? '本机工作空间' : '正在连接'
@@ -702,7 +824,7 @@ async function removeLibraryFilter(key: LibraryFilterKey) {
           >
           <button
             v-if="w.section === 'library' && w.root"
-            class="mw-button"
+            class="mw-button mw-root-secondary"
             :disabled="!w.writable"
             @click="termsOpen = true"
           >
@@ -710,7 +832,7 @@ async function removeLibraryFilter(key: LibraryFilterKey) {
           </button>
           <button
             v-if="w.section === 'library' && w.root && !w.selected.length"
-            class="mw-button"
+            class="mw-button mw-root-secondary"
             :disabled="!w.writable"
             @click="showMetadata()"
           >
@@ -718,7 +840,7 @@ async function removeLibraryFilter(key: LibraryFilterKey) {
           </button>
           <button
             v-if="w.section === 'library' && w.root"
-            class="mw-button mw-button-primary"
+            class="mw-button mw-button-primary mw-root-primary"
             :disabled="!w.writable"
             @click="w.showImport"
           >
@@ -726,7 +848,7 @@ async function removeLibraryFilter(key: LibraryFilterKey) {
           </button>
           <button
             v-if="w.section === 'library' && !w.root && !w.chapterId"
-            class="mw-button"
+            class="mw-button mw-works-secondary"
             :disabled="!w.writable || w.orderMode"
             @click="w.showNode('catalogs')"
           >
@@ -734,7 +856,7 @@ async function removeLibraryFilter(key: LibraryFilterKey) {
           </button>
           <button
             v-if="w.section === 'library' && !w.root"
-            class="mw-button mw-button-primary"
+            class="mw-button mw-button-primary mw-works-primary"
             :disabled="!w.writable || w.orderMode"
             @click="w.chapterId ? showUpload() : w.showNode('chapters')"
           >
@@ -742,6 +864,7 @@ async function removeLibraryFilter(key: LibraryFilterKey) {
           </button>
           <button
             class="mw-icon-button"
+            :class="{ 'mw-works-refresh': worksHead, 'mw-root-refresh': rootHead }"
             aria-label="刷新当前页面"
             :disabled="w.loading || w.busy"
             @click="w.section === 'system' ? systemPanel?.refresh() : w.loadScope()"
@@ -750,6 +873,7 @@ async function removeLibraryFilter(key: LibraryFilterKey) {
           ><button
             v-if="w.section === 'library'"
             class="mw-icon-button"
+            :class="{ 'mw-works-panel': worksHead, 'mw-root-panel': rootHead }"
             aria-label="切换详情面板"
             :aria-pressed="w.inspector"
             @click="w.inspector = !w.inspector"
@@ -774,57 +898,15 @@ async function removeLibraryFilter(key: LibraryFilterKey) {
       </p>
 
       <template v-if="w.section === 'library' && w.ready">
-        <nav v-if="!w.root" class="mw-breadcrumb" aria-label="资料位置">
-          <button @click="w.scope()"><ManagementIcon name="library" :size="13" />全部漫画</button>
-          <template v-if="w.detail"
-            ><ManagementIcon name="right" :size="12" /><button @click="w.scope(w.comicId)">{{ w.detail.title }}</button>
-            <template v-for="entry in w.breadcrumbs" :key="entry.id"
-              ><ManagementIcon name="right" :size="12" /><button @click="w.scope(w.comicId, entry.id)">
-                {{ entry.title }}
-              </button></template
-            >
-            <template v-if="w.chapter"
-              ><ManagementIcon name="right" :size="12" /><span :title="w.chapter.chapter.title">{{
-                w.chapter.chapter.title
-              }}</span></template
-            >
-          </template>
-        </nav>
-        <section
-          v-if="!w.root && w.detail"
-          class="mw-comic-context"
-          :class="{ 'mw-comic-context-compact': !!w.chapterId || !!w.catalogId }"
-          aria-label="当前漫画"
+        <div
+          class="mw-library-workbench"
+          :class="{
+            'mw-workbench-under-head': worksHead,
+            'mw-workbench-under-head-compact': worksHead && headCompact,
+            'mw-workbench-under-root': rootHead,
+            'mw-workbench-under-root-compact': rootHead && headCompact,
+          }"
         >
-          <ManagementImage
-            v-if="w.detail.coverUrl && !w.chapterId && !w.catalogId"
-            class="mw-context-backdrop"
-            :src="w.detail.coverUrl"
-            alt=""
-            aria-hidden="true"
-          />
-          <ManagementImage class="mw-context-poster" :src="w.detail.coverUrl" :alt="w.detail.title" />
-          <div class="mw-context-copy">
-            <h2 :title="w.detail.title">{{ w.detail.title }}</h2>
-            <p>
-              <span v-if="w.detail.author">{{ w.detail.author }} · </span>{{ w.detail.chapters.length }} 个章节<span
-                v-if="w.detail.category"
-              >
-                · {{ w.detail.category.name }}</span
-              >
-            </p>
-            <p v-if="w.detail.description && !w.chapterId && !w.catalogId" class="mw-context-description">
-              {{ w.detail.description }}
-            </p>
-          </div>
-          <RouterLink
-            :to="`/comic/${w.detail.id}`"
-            class="app-button app-button--secondary mw-context-reading"
-            :class="{ 'is-small': !!w.chapterId || !!w.catalogId }"
-            ><ManagementIcon name="book" :size="15" />阅读详情</RouterLink
-          >
-        </section>
-        <div class="mw-library-workbench">
           <div v-if="w.root" ref="librarySearchRegion" class="mw-library-search" role="search" aria-label="搜索漫画库">
             <label class="mw-workbench-field mw-workbench-query">
               <span>查找漫画</span>
@@ -1007,15 +1089,6 @@ async function removeLibraryFilter(key: LibraryFilterKey) {
                         @change="w.filters"
                       />可释放原件</label
                     >
-                    <label class="mw-filter-option"
-                      ><input
-                        v-model="w.attention"
-                        type="radio"
-                        name="library-attention"
-                        value="missing_source_sha256"
-                        @change="w.filters"
-                      />缺少原件 SHA-256</label
-                    >
                   </div>
                 </fieldset>
                 <button v-if="activeLibraryFilters" type="button" class="mw-filter-reset" @click="clearLibraryFilters">
@@ -1166,7 +1239,14 @@ async function removeLibraryFilter(key: LibraryFilterKey) {
                   ><button v-if="!w.chapterId" class="mw-button" :disabled="!w.writable" @click="w.showMove">
                     移动到</button
                   ><button class="mw-button" :disabled="!w.writable || !w.canOrder" @click="w.beginOrder">
-                    调整顺序
+                    调整顺序</button
+                  ><button
+                    v-if="w.canBatchDeleteCatalogs"
+                    class="mw-button mw-selection-danger"
+                    :disabled="!w.writable"
+                    @click="w.showBatchDeleteCatalogs"
+                  >
+                    删除目录
                   </button></template
                 >
                 <button
@@ -1234,9 +1314,11 @@ async function removeLibraryFilter(key: LibraryFilterKey) {
             :append-error="w.root ? w.loadMoreError : ''"
             :disabled="w.loading || w.busy"
             :label="w.root ? '漫画库分页' : '内容分页'"
+            :restore="w.libraryRestore"
             @page-change="changeLibraryPage"
             @load-more="loadMoreLibraryPage"
             @retry="retryLibraryPage"
+            @restored="w.libraryRestored"
           >
             <template #default="{ items }">
               <ManagementFiles
@@ -1390,8 +1472,8 @@ async function removeLibraryFilter(key: LibraryFilterKey) {
         </button>
       </div>
       <div class="mw-inspector-body">
-        <template v-if="w.detail && w.focusedRow"
-          ><div class="mw-preview">
+        <template v-if="w.detail && w.focusedRow">
+          <div class="mw-preview">
             <ManagementImage
               :src="
                 w.selectedMedia
@@ -1401,42 +1483,15 @@ async function removeLibraryFilter(key: LibraryFilterKey) {
               :alt="w.focusedRow?.title || w.detail.title"
             /><span>{{ inspectedKindLabel }}</span>
           </div>
-          <h2>{{ w.focusedRow.title }}</h2>
-          <p class="mw-muted">
-            当前查看：{{ w.focusedRow.title
-            }}<template v-if="w.selected.length > 1"> · 已选 {{ w.selected.length }} 项，此处为单项详情</template>
-          </p>
+          <header class="mw-inspector-intro">
+            <h2>{{ w.focusedRow.title }}</h2>
+            <p v-if="inspectorMeta" class="mw-inspector-meta">{{ inspectorMeta }}</p>
+            <p v-if="selectedNote" class="mw-inspector-selection">{{ selectedNote }}</p>
+          </header>
           <div class="mw-inspector-primary">
-            <button
-              v-if="w.selectedMedia?.mediaType === 'image'"
-              class="mw-button"
-              :disabled="!w.writable"
-              @click="coverOpen = true"
-            >
-              <ManagementIcon name="image" :size="14" />设为漫画封面
-            </button>
-            <button v-if="w.selectedMedia" class="mw-button" :disabled="!w.writable" @click="showUpload(true)">
-              替换此媒体文件</button
-            ><button
-              v-if="w.focusedRow && ['catalog', 'chapter'].includes(w.focusedRow.kind)"
-              class="mw-button"
-              :disabled="!w.writable"
-              @click="w.showNode(w.focusedRow.kind === 'catalog' ? 'catalogs' : 'chapters', w.focusedRow)"
-            >
-              重命名 / 移动</button
-            ><button
-              v-if="w.focusedRow && ['comic', 'chapter', 'image', 'video'].includes(w.focusedRow.kind)"
-              class="mw-button mw-button-danger"
-              :disabled="!w.writable"
-              @click="w.showTrash(w.focusedRow)"
-            >
-              <ManagementIcon name="trash" :size="14" />移入回收站
-            </button>
-            <button v-if="inspectingComic" class="mw-button" :disabled="!w.writable" @click="w.showEdit">
-              <ManagementIcon name="edit" :size="14" />编辑漫画资料</button
-            ><RouterLink
+            <RouterLink
               v-if="w.focusedRow.kind !== 'catalog'"
-              class="mw-button mw-button-secondary"
+              class="mw-button mw-button-primary mw-inspector-read"
               :to="
                 w.focusedRow.kind === 'chapter' || w.chapterId
                   ? {
@@ -1445,71 +1500,163 @@ async function removeLibraryFilter(key: LibraryFilterKey) {
                     }
                   : `/comic/${w.detail.id}`
               "
-              ><ManagementIcon name="book" :size="14" />{{
+              ><ManagementIcon name="book" :size="15" />{{
                 inspectingComic ? '打开阅读详情' : '从这里阅读'
               }}</RouterLink
             >
+            <div v-if="inspectingComic || canRenameInspection || w.selectedMedia" class="mw-inspector-secondary">
+              <button v-if="inspectingComic" class="mw-button" :disabled="!w.writable" @click="w.showEdit">
+                <ManagementIcon name="edit" :size="14" />编辑漫画资料</button
+              ><button
+                v-if="canRenameInspection"
+                class="mw-button"
+                :disabled="!w.writable"
+                @click="w.showNode(w.focusedRow.kind === 'catalog' ? 'catalogs' : 'chapters', w.focusedRow)"
+              >
+                重命名 / 移动</button
+              ><button
+                v-if="w.selectedMedia?.mediaType === 'image'"
+                class="mw-button"
+                :disabled="!w.writable"
+                @click="coverOpen = true"
+              >
+                <ManagementIcon name="image" :size="14" />设为漫画封面</button
+              ><button v-if="w.selectedMedia" class="mw-button" :disabled="!w.writable" @click="showUpload(true)">
+                替换此媒体文件
+              </button>
+            </div>
           </div>
-          <details v-if="hasInspectionMaintenance" class="mw-inspector-maintenance">
-            <summary>维护与文件操作</summary>
-            <p class="mw-muted">仅处理当前{{ inspectedKindLabel }}：{{ w.focusedRow.title }}。</p>
-            <div class="mw-inspector-actions">
-              <template v-if="w.resourceStorage">
-                <button
-                  v-if="w.focusedRow && ['comic', 'chapter'].includes(w.focusedRow.kind)"
-                  class="mw-button mw-button-danger"
-                  :disabled="!w.writable"
-                  @click="showHqResource"
-                >
-                  释放图片原件
-                </button>
-                <p v-if="!w.resourceStorage.operations.releaseHq.canSubmit" class="mw-muted">
-                  {{ operationBlockers(w.resourceStorage.operations.releaseHq.blockers) }}
-                </p>
-                <template v-if="w.resourceStorage.inventory.videos > 0"
-                  ><button
-                    class="mw-button"
-                    :disabled="!w.writable || !w.resourceStorage.operations.transcode.canSubmit"
-                    @click="w.showTranscode"
-                  >
-                    <ManagementIcon name="video" :size="14" />视频转码
-                  </button>
-                  <p v-if="!w.resourceStorage.operations.transcode.canSubmit" class="mw-muted">
-                    {{ operationBlockers(w.resourceStorage.operations.transcode.blockers) }}
-                  </p></template
-                >
+          <section
+            v-if="inspectingComic || w.focusedRow.kind === 'chapter'"
+            class="mw-inspector-section mw-inspector-storage"
+            aria-labelledby="mw-inspector-storage-title"
+          >
+            <div class="mw-inspector-section-head">
+              <h3 id="mw-inspector-storage-title">存储状态</h3>
+              <span class="mw-inspector-section-note" title="登记状态来自资料库，不代表磁盘文件实际存在">{{
+                storageScopeNote
+              }}</span>
+              <button
+                class="mw-icon-button"
+                :aria-label="w.resourceStorageLoading ? '正在重新读取登记' : '重新读取登记'"
+                title="重新读取登记"
+                :disabled="w.resourceStorageLoading"
+                @click="w.retryResourceStorage()"
+              >
+                <ManagementIcon name="refresh" :size="14" :class="{ 'mw-spin': w.resourceStorageLoading }" />
+              </button>
+            </div>
+            <p v-if="storageScopeMismatch" class="mw-inspector-hint is-attention">
+              存储明细范围与当前对象不一致，已隐藏明细与操作；请重新读取登记。
+            </p>
+            <StorageUsageSummary
+              v-else-if="w.resourceStorage"
+              :object="w.resourceStorage"
+              :hide-covers="w.focusedRow.kind === 'chapter'"
+            />
+            <p v-else-if="w.resourceStorageLoading" class="mw-inspector-pending" role="status">
+              <ManagementIcon name="loading" :size="14" class="mw-spin" />正在读取存储状态…
+            </p>
+            <div v-else-if="w.resourceStorageError" class="mw-inspector-storage-error" role="alert">
+              <p>{{ w.resourceStorageError }}</p>
+              <button class="mw-button" @click="w.retryResourceStorage()">重新读取</button>
+            </div>
+            <p v-else class="mw-inspector-pending">
+              <ManagementIcon name="info" :size="14" />尚未读取存储状态<button
+                class="mw-button"
+                @click="w.retryResourceStorage()"
+              >
+                读取
+              </button>
+            </p>
+            <template v-if="w.resourceStorage && !storageScopeMismatch">
+              <div class="mw-inspector-storage-actions">
                 <button
                   class="mw-button"
                   :disabled="!w.writable || !w.resourceStorage.operations.generateLq.canSubmit"
                   @click="showLqSingle"
                 >
-                  <ManagementIcon name="image" :size="14" />生成轻量副本
-                </button>
-                <p v-if="!w.resourceStorage.operations.generateLq.canSubmit" class="mw-muted">
-                  {{ operationBlockers(w.resourceStorage.operations.generateLq.blockers) }}
-                </p>
-                <template v-if="w.focusedRow?.kind === 'comic'"
-                  ><button
-                    class="mw-button"
-                    :disabled="!w.writable || !w.resourceStorage.operations.refreshMetadata.canSubmit"
-                    @click="w.showRefresh"
-                  >
-                    <ManagementIcon name="scan" :size="14" />核对媒体
-                  </button>
-                  <p v-if="!w.resourceStorage.operations.refreshMetadata.canSubmit" class="mw-muted">
-                    {{ operationBlockers(w.resourceStorage.operations.refreshMetadata.blockers) }}
-                  </p></template
+                  生成轻量副本</button
+                ><button
+                  class="mw-button is-caution"
+                  title="仅释放已有轻量副本的图片；缺副本的图片不参与释放"
+                  :disabled="!w.writable || !w.resourceStorage.operations.releaseHq.canSubmit"
+                  @click="showHqResource"
                 >
-              </template>
-              <button
-                v-if="w.selectedMedia?.mediaType === 'video'"
-                class="mw-button"
-                :disabled="!w.writable"
-                @click="w.showTranscode"
+                  释放图片原件</button
+                ><button
+                  v-if="w.resourceStorage.inventory.videos > 0"
+                  class="mw-button"
+                  :disabled="!w.writable || !w.resourceStorage.operations.transcode.canSubmit"
+                  @click="w.showTranscode"
+                >
+                  视频转码</button
+                ><button
+                  v-if="inspectingComic"
+                  class="mw-button"
+                  :disabled="!w.writable || !w.resourceStorage.operations.refreshMetadata.canSubmit"
+                  @click="w.showRefresh"
+                >
+                  核对媒体
+                </button>
+              </div>
+              <p v-for="hint in storageHints" :key="hint.name" class="mw-inspector-hint">
+                <span>{{ hint.name }}</span
+                >{{ hint.text }}
+              </p>
+            </template>
+          </section>
+          <section
+            v-if="w.selectedMedia && mediaHq"
+            class="mw-inspector-section mw-inspector-storage"
+            aria-labelledby="mw-inspector-file-storage-title"
+          >
+            <div class="mw-inspector-section-head">
+              <h3 id="mw-inspector-file-storage-title">存储状态</h3>
+              <span class="mw-inspector-section-note" title="登记状态来自资料库，不代表磁盘文件实际存在"
+                >按文件登记 · 非磁盘实测</span
               >
-                <ManagementIcon name="video" :size="14" />视频转码
-              </button>
-
+            </div>
+            <dl class="mw-inspector-file-facts">
+              <div>
+                <dt>登记大小</dt>
+                <dd>{{ formatBytes(w.selectedMedia.size) }}</dd>
+              </div>
+              <div>
+                <dt>原件</dt>
+                <dd :class="`is-${mediaHq.tone}`">{{ mediaHq.label }}</dd>
+              </div>
+              <div v-if="mediaObserved">
+                <dt>上次核对</dt>
+                <dd :class="`is-${mediaObserved.tone}`" :title="mediaObserved.detail">{{ mediaObserved.label }}</dd>
+              </div>
+              <div v-if="mediaLq">
+                <dt>轻量副本</dt>
+                <dd :class="`is-${mediaLq.tone}`">{{ mediaLq.label }}</dd>
+              </div>
+              <div v-else>
+                <dt>轻量副本</dt>
+                <dd class="is-muted">视频不适用</dd>
+              </div>
+            </dl>
+            <button
+              v-if="w.selectedMedia.mediaType === 'video'"
+              class="mw-button"
+              :disabled="!w.writable"
+              @click="w.showTranscode"
+            >
+              视频转码
+            </button>
+          </section>
+          <div v-if="canTrashInspection" class="mw-inspector-danger-zone">
+            <button class="mw-inspector-danger" :disabled="!w.writable" @click="w.showTrash(w.focusedRow)">
+              <ManagementIcon name="trash" :size="14" />移入回收站
+            </button>
+          </div>
+          <details v-if="hasInspectionMaintenance" class="mw-inspector-maintenance">
+            <summary>维护与文件操作</summary>
+            <p class="mw-muted">仅处理当前{{ inspectedKindLabel }}：{{ w.focusedRow.title }}。</p>
+            <div class="mw-inspector-actions">
               <template v-if="inspectingComic">
                 <button class="mw-button" :disabled="!w.writable" @click="showAnalysis(w.detail.id)">AI 候选分析</button
                 ><button class="mw-button" @click="showSidecar(w.detail.id)">侧车同步状态</button
@@ -1519,7 +1666,7 @@ async function removeLibraryFilter(key: LibraryFilterKey) {
                 </button>
               </template>
               <button
-                v-if="w.focusedRow?.kind === 'catalog'"
+                v-if="w.focusedRow.kind === 'catalog'"
                 class="mw-button mw-button-danger"
                 :disabled="!w.writable"
                 @click="w.showDeleteCatalog(w.focusedRow)"
@@ -1535,16 +1682,14 @@ async function removeLibraryFilter(key: LibraryFilterKey) {
           <section class="mw-info-section">
             <h3>基本信息</h3>
             <dl class="mw-properties">
-              <dt>所属作品</dt>
-              <dd>{{ w.detail.title }}</dd>
-              <template v-if="w.focusedRow?.kind === 'chapter' && w.focusedRow.count != null"
-                ><dt>媒体数量</dt>
-                <dd>{{ w.focusedRow.count }}</dd></template
-              >
-              <template v-if="w.focusedRow.kind === 'catalog'"
-                ><dt>直接子项</dt>
-                <dd>{{ w.focusedRow.count }}</dd></template
-              >
+              <template v-if="w.focusedRow.kind === 'chapter' && w.focusedRow.count != null">
+                <dt>媒体数量</dt>
+                <dd>{{ w.focusedRow.count }}</dd>
+              </template>
+              <template v-if="w.focusedRow.kind === 'catalog'">
+                <dt>直接子项</dt>
+                <dd>{{ w.focusedRow.count }}</dd>
+              </template>
               <template v-if="inspectingComic">
                 <dt>作者</dt>
                 <dd>{{ w.detail.author || '未填写' }}</dd>
@@ -1555,30 +1700,14 @@ async function removeLibraryFilter(key: LibraryFilterKey) {
                 <dt>添加时间</dt>
                 <dd>{{ formatDate(w.detail.createdAt) }}</dd>
               </template>
-              <template v-if="w.selectedMedia"
-                ><dt>文件大小</dt>
-                <dd>{{ formatBytes(w.selectedMedia.size) }}</dd>
-                <dt>原件登记</dt>
-                <dd>{{ registrationLabel(w.selectedMedia.hqState) }}</dd>
+              <template v-if="w.selectedMedia">
                 <dt>媒体顺序</dt>
-                <dd>{{ w.selectedMedia.pageNumber }}</dd></template
-              >
-              <template v-if="!w.selectedMedia && w.focusedRow?.bytes != null"
-                ><dt>登记大小</dt>
-                <dd>{{ formatBytes(w.focusedRow.bytes) }}</dd></template
-              >
-              <template v-if="!w.selectedMedia && w.focusedRow?.hq"
-                ><dt>原件登记</dt>
-                <dd>{{ registrationLabel(w.focusedRow.hq) }}</dd></template
-              >
-              <template v-if="w.focusedRow?.lq"
-                ><dt>轻量副本登记</dt>
-                <dd>{{ registrationLabel(w.focusedRow.lq) }}</dd></template
-              >
-              <template v-if="w.selectedMedia?.width && w.selectedMedia?.height"
-                ><dt>画面尺寸</dt>
-                <dd>{{ w.selectedMedia.width }} × {{ w.selectedMedia.height }}</dd></template
-              >
+                <dd>{{ w.selectedMedia.pageNumber }}</dd>
+                <template v-if="w.selectedMedia.width && w.selectedMedia.height">
+                  <dt>画面尺寸</dt>
+                  <dd>{{ w.selectedMedia.width }} × {{ w.selectedMedia.height }}</dd>
+                </template>
+              </template>
             </dl>
           </section>
           <section v-if="inspectingComic" class="mw-info-section">
@@ -1656,7 +1785,7 @@ async function removeLibraryFilter(key: LibraryFilterKey) {
       <ManagementDirectoryMove
         v-if="directoryOpen"
         :targets="directoryTargets"
-        :preview-id="directoryPreview"
+        :task-id="directoryTask"
         :writable="w.writable"
         @close="closeDirectory"
         @accepted="w.acceptExternalTask"
@@ -1724,7 +1853,7 @@ async function removeLibraryFilter(key: LibraryFilterKey) {
         @inspect="inspectImportTask"
       />
       <ManagementTerms :open="termsOpen" @close="termsOpen = false" @changed="w.refreshTerms" />
-      <ManagementDialog
+      <AppDialog
         :placement="w.dialog === 'import' ? 'right' : 'center'"
         :open="!!w.dialog"
         :title="w.dialogTitle"
@@ -1838,22 +1967,53 @@ async function removeLibraryFilter(key: LibraryFilterKey) {
               <p v-if="!w.tags.length" class="mw-muted">暂无可选标签</p>
             </fieldset></template
           >
-          <template v-else-if="w.dialog === 'node'"
-            ><label class="mw-field">名称<input v-model="w.node.title" required /></label
-            ><label class="mw-field"
-              >所在目录<select v-model="w.node.parentId">
+          <template v-else-if="w.dialog === 'node'">
+            <label class="mw-field">
+              {{ w.node.kind === 'catalogs' ? '目录名称' : '章节名称' }}
+              <input
+                id="mw-node-title"
+                v-model="w.node.title"
+                autofocus
+                autocomplete="off"
+                :aria-label="w.node.kind === 'catalogs' ? '目录名称' : '章节名称'"
+                :aria-invalid="w.nodeError ? true : undefined"
+                :aria-describedby="w.nodeError ? 'mw-node-title-error' : undefined"
+                :placeholder="w.node.kind === 'catalogs' ? '例如：第一卷' : '例如：第 1 话'"
+                :disabled="w.busy"
+                @input="w.clearNodeError()"
+              />
+              <small v-if="w.nodeError" id="mw-node-title-error" class="mw-field-error">{{ w.nodeError }}</small>
+            </label>
+            <label class="mw-field">
+              {{ w.node.id ? '所在目录' : '创建位置' }}
+              <select v-model="w.node.parentId" :aria-label="w.node.id ? '所在目录' : '创建位置'" :disabled="w.busy">
                 <option value="">漫画根目录</option>
                 <option v-for="entry in w.nodeParents" :key="entry.id" :value="entry.id">
                   {{ w.catalogPath(entry.id) }}
                 </option>
-              </select></label
-            >
-            <p class="mw-muted">仅调整当前漫画内的名称和位置，不移动磁盘文件；目录不能放入自身或其子目录。</p></template
-          >
-          <template v-else-if="w.dialog === 'deleteCatalog' && w.removingCatalog">
-            <p>删除目录「{{ w.removingCatalog.title }}」</p>
+              </select>
+            </label>
+            <p v-if="w.node.id" class="mw-muted">
+              仅调整当前漫画内的名称和位置，不移动磁盘文件；目录不能放入自身或其子目录。
+            </p>
+            <p v-else class="mw-muted">
+              新的{{
+                w.node.kind === 'catalogs' ? '目录' : '章节'
+              }}会追加到所选位置末尾，只调整当前漫画的结构，不移动磁盘文件。
+            </p>
+          </template>
+          <template v-else-if="w.dialog === 'deleteCatalog' && w.deletingCatalogs.length">
+            <p v-if="w.deletingCatalogs.length === 1">删除目录「{{ w.deletingCatalogs[0].title }}」</p>
+            <p v-else>
+              删除选中的 {{ w.deletingCatalogs.length }} 个目录：{{
+                w.deletingCatalogs.map((entry) => entry.title).join('、')
+              }}
+            </p>
             <p class="mw-muted">
-              仅移除目录层级；其中的直接子目录和章节会追加到接收位置，内部层级、媒体文件与阅读记录保留。此操作不进入回收站。
+              仅移除目录层级；其中的直接子目录和章节会追加到接收位置，内部层级、媒体文件与阅读记录保留。<template
+                v-if="w.deletingCatalogs.length > 1"
+                >多个目录会依次删除。</template
+              >此操作不进入回收站。
             </p>
             <label class="mw-field"
               >子内容接收位置<select v-model="w.reparentTo" :disabled="w.busy">
@@ -1899,22 +2059,22 @@ async function removeLibraryFilter(key: LibraryFilterKey) {
               :unit="batchPreviewUnit"
             />
             <p class="mw-muted">以下是本次操作的预览。确认后提交后台任务，请在任务中心检查逐项结果。</p>
-            <p v-if="w.preview.operation === 'metadata_refresh'" class="mw-muted">
+            <p v-if="!w.multiPreview && w.preview.operation === 'metadata_refresh'" class="mw-muted">
               按作品核对已登记媒体，记录缺失或变更；没有可核对媒体的作品会跳过。此操作不是磁盘占用扫描，逐项结果在任务中心查看。
             </p>
-            <p v-if="w.preview.operation === 'trash_restore'" class="mw-muted">
+            <p v-if="!w.multiPreview && w.preview.operation === 'trash_restore'" class="mw-muted">
               恢复后追加到原位置末尾，不保证回收前的序号：章节回到原目录末尾，媒体回到原章节末尾；阅读进度跟随媒体身份。祖先仍被回收时，需要先恢复祖先。
             </p>
-            <p v-if="w.preview.operation === 'media_trash'" class="mw-muted">
+            <p v-if="!w.multiPreview && w.preview.operation === 'media_trash'" class="mw-muted">
               媒体回收只处理活动内容：已回收或所属章节、作品已回收的媒体不在范围内。回收会移入回收站并可在回收站恢复，喜欢／不喜欢标记保留。
             </p>
-            <p v-if="w.preview.operation === 'chapter_trash'" class="mw-muted">
+            <p v-if="!w.multiPreview && w.preview.operation === 'chapter_trash'" class="mw-muted">
               章节回收会连同其下媒体一起移入回收站；恢复时按原顺序追加到原位置末尾，喜欢／不喜欢标记保留。
             </p>
-            <p v-if="w.preview.operation === 'comic_trash'" class="mw-muted">
+            <p v-if="!w.multiPreview && w.preview.operation === 'comic_trash'" class="mw-muted">
               漫画回收会连同目录、章节和媒体一起移入回收站；可在回收站恢复，喜欢／不喜欢标记保留。
             </p>
-            <template v-if="w.preview.operation === 'video_transcode'">
+            <template v-if="!w.multiPreview && w.preview.operation === 'video_transcode'">
               <p class="mw-muted">
                 按作品冻结登记视频范围；没有视频的作品不会执行。转码为
                 H.264/AAC，可能替换旧视频文件；已经兼容的视频由后端核对后跳过。已受理子任务不可取消，取消批次只停止未分派项并等待其余任务结束。
@@ -1927,7 +2087,7 @@ async function removeLibraryFilter(key: LibraryFilterKey) {
                 />我理解批量视频转码会更新旧文件，已受理的视频任务不可取消。</label
               >
             </template>
-            <div v-if="w.preview.operation === 'trash_purge' && w.preview.purge" class="mw-error">
+            <div v-if="!w.multiPreview && w.preview.operation === 'trash_purge' && w.preview.purge" class="mw-error">
               <strong>永久清理后无法恢复</strong>
               <p>
                 实际范围 {{ w.preview.purge.entryCount }} 个回收条目 · {{ w.preview.purge.fileCount }} 个登记文件 ·
@@ -1949,7 +2109,7 @@ async function removeLibraryFilter(key: LibraryFilterKey) {
               @more="w.morePreviewItems"
             />
             <p class="mw-muted">预览有效至 {{ formatDate(w.preview.expiresAt) }}</p>
-            <label v-if="w.preview.operation === 'trash_purge'" class="mw-select-page"
+            <label v-if="!w.multiPreview && w.preview.operation === 'trash_purge'" class="mw-select-page"
               ><input
                 v-model="w.purgeAcknowledged"
                 type="checkbox"
@@ -1970,11 +2130,11 @@ async function removeLibraryFilter(key: LibraryFilterKey) {
               "
             >
               <ManagementIcon v-if="w.busy" name="loading" class="mw-spin" :size="14" />{{
-                w.busy ? '正在提交…' : submitLabel
+                w.busy ? submitBusyLabel : submitLabel
               }}
             </button>
           </footer>
-        </form></ManagementDialog
+        </form></AppDialog
       ></template
     >
   </ManagementShell>

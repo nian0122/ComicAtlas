@@ -2,50 +2,53 @@
 import { computed, reactive, ref, nextTick, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import { reactionKey, reactionTypes, type ManagedReaction, type ReactionType } from '@/entities/managed-reaction'
-import { ManagementIcon, ManagementImage, ManagementDialog, formatDate } from '@/shared/ui/management'
+import { ManagementIcon, ManagementImage, formatDate } from '@/shared/ui/management'
+import { AppDialog } from '@/shared/ui/dialog'
 import { ManagementPagedFeed } from '@/shared/ui/pagination'
 import ManagementReactionConfirm from './ManagementReactionConfirm.vue'
 import { useManagedReactions } from '../model/use-managed-reactions'
-import { canRecycleDislike, type RecyclePreview, type RecycleRequest } from '../model/recycle'
+import { canRecycleDislike, type RecycleGroup, type RecyclePreview, type RecycleRequest } from '../model/recycle'
 const props = defineProps<{ revision: number; writable: boolean; recycled: number }>()
 const emit = defineEmits<{ recycle: [payload: RecycleRequest] }>()
 const w = reactive(useManagedReactions(props))
 const isDislikeView = computed(() => w.value === 'dislike')
 const hasFilters = computed(() => Boolean(w.targetType || w.value || w.mediaType || w.includeTrashed))
-const selectedRecycleType = computed<ReactionType | ''>(() => {
-  const types = new Set(w.selectedDislikes.map((item) => item.targetType))
-  return types.size === 1 ? ([...types][0] ?? '') : ''
-})
 function titleId(item: ManagedReaction) {
   return `reaction-${item.targetType}-${item.targetId}`
 }
 interface RecycleItem {
   targetId: string
+  targetType: ReactionType
   previewUrl?: string | null
 }
 function previews(items: RecycleItem[]): RecyclePreview[] {
   return items.map((item) => ({ id: item.targetId, url: item.previewUrl ?? null }))
 }
-function recycle(items: RecycleItem[], scope: RecycleRequest['scope'], targetType: RecycleRequest['targetType']) {
-  if (!props.writable || w.loading || w.listFailed) return
-  emit('recycle', {
-    scope,
-    targetType,
-    mediaType: w.mediaType,
-    ids: scope === 'ids' ? items.map((item) => item.targetId) : [],
-    previews: previews(items),
-  })
+function recycle(groups: RecycleGroup[]) {
+  if (!props.writable || w.loading || w.listFailed || !groups.length) return
+  emit('recycle', { groups })
 }
 function recycleOne(item: ManagedReaction) {
-  if (canRecycleDislike(item)) recycle([item], 'ids', item.targetType)
+  if (canRecycleDislike(item))
+    recycle([
+      { targetType: item.targetType, scope: 'ids', ids: [item.targetId], mediaType: '', previews: previews([item]) },
+    ])
 }
 function recycleSelected() {
-  const targetType = selectedRecycleType.value
-  if (!targetType || !w.selectedDislikes.length) return
+  const grouped = new Map<ReactionType, RecycleItem[]>()
+  for (const item of w.selectedDislikes) {
+    const items = grouped.get(item.targetType) ?? []
+    items.push(item)
+    grouped.set(item.targetType, items)
+  }
   recycle(
-    w.selectedDislikes.filter((item) => item.targetType === targetType),
-    'ids',
-    targetType,
+    [...grouped].map(([targetType, items]) => ({
+      targetType,
+      scope: 'ids',
+      ids: items.map((item) => item.targetId),
+      mediaType: '',
+      previews: previews(items),
+    })),
   )
 }
 const canBulkRecycle = computed(
@@ -68,11 +71,17 @@ function recycleCurrent() {
   const targetType = w.targetType
   if (targetType !== 'chapter' && targetType !== 'media') return
   if (!canBulkRecycle.value) return
-  recycle(
-    w.rows.filter((item) => item.targetType === targetType && item.value === 'dislike' && !item.hidden),
-    'filter',
-    targetType,
-  )
+  recycle([
+    {
+      targetType,
+      scope: 'filter',
+      ids: [],
+      mediaType: w.mediaType,
+      previews: previews(
+        w.rows.filter((item) => item.targetType === targetType && item.value === 'dislike' && !item.hidden),
+      ),
+    },
+  ])
 }
 watch(
   () => props.recycled,
@@ -180,16 +189,13 @@ function location(item: ManagedReaction) {
     <template v-if="w.selected.length">
       <button class="mw-button" @click="w.selected = []">清除选择</button>
       <button
-        v-if="selectedRecycleType"
+        v-if="w.selectedDislikes.length"
         class="mw-button rating-selection-recycle"
         :disabled="w.loading || w.listFailed"
         @click="recycleSelected"
       >
         <ManagementIcon name="trash" :size="14" />回收所选 {{ w.selectedDislikes.length }} 项
       </button>
-      <span v-else-if="w.selectedDislikes.length" class="rating-selection-note">
-        回收所选需同一对象类型；请按类型筛选后分别回收。
-      </span>
       <button class="mw-button mw-button-primary" :disabled="!writable || !w.canEdit || w.loading" @click="w.edit">
         修改所选标记
       </button>
@@ -319,11 +325,7 @@ function location(item: ManagedReaction) {
     @close="w.confirmOpen = false"
     @saved="w.saved($event.length)"
   />
-  <ManagementDialog
-    :open="!!preview"
-    :title="preview?.title || '媒体预览'"
-    class="rating-media-dialog"
-    @close="closePreview"
+  <AppDialog :open="!!preview" :title="preview?.title || '媒体预览'" class="rating-media-dialog" @close="closePreview"
     ><template v-if="preview && !preview.hidden"
       ><div v-if="failed" class="mw-empty">
         <p>当前媒体无法预览，可从所属章节检查格式和文件。</p>
@@ -342,7 +344,7 @@ function location(item: ManagedReaction) {
         :src="previewSource(preview)"
         :alt="preview.title"
         @error="failed = true" /></template
-  ></ManagementDialog>
+  ></AppDialog>
 </template>
 <style scoped>
 .rating-filters {

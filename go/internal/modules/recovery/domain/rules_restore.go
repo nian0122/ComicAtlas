@@ -40,11 +40,11 @@ func PrepareRestore(comic string, sidecar Sidecar, task, recordedAt string) (Res
 		return RestorePlan{}, err
 	}
 	// 规范大小上限在分配独立快照前检查；冻结发生在 SQL 写事务之外。
-	data, snapshotSHA, err := librarydomain.SnapshotData(sidecar.Snapshot)
+	data, err := librarydomain.SnapshotData(sidecar.Snapshot)
 	if err != nil {
 		return RestorePlan{}, ErrLimit
 	}
-	result := RestorePlan{TaskID: task, RecordedAt: recordedAt, SnapshotSHA256: snapshotSHA}
+	result := RestorePlan{TaskID: task, RecordedAt: recordedAt}
 	if err = json.Unmarshal(data, &result.Snapshot); err != nil {
 		return RestorePlan{}, ErrMetadata
 	}
@@ -57,7 +57,7 @@ func PrepareRestore(comic string, sidecar Sidecar, task, recordedAt string) (Res
 		keys[key] = true
 	}
 	for _, media := range result.Snapshot.Media {
-		if (media.HQState == "released" || media.Hash == "") && !CurrentLQ(media) {
+		if media.HQState == "released" && !CurrentLQ(media) {
 			return RestorePlan{}, ErrMetadata
 		}
 	}

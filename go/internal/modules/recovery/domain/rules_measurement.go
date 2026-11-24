@@ -20,16 +20,19 @@ func ValidateLQPath(name string) error {
 	return nil
 }
 
-func MatchMeasurement(value Measurement, name, hash string, size int64) error {
-	if value.Path != name || value.Size != size || value.SHA256 != hash {
+func MatchMeasurement(value Measurement, name string, size int64) error {
+	if value.Path != name || value.Size != size {
 		return ErrContentMismatch
 	}
 	return nil
 }
 
 func MatchHQMeasurement(media librarydomain.StoredMedia, value Measurement) error {
-	if err := MatchMeasurement(value, media.StoragePath, media.Hash, media.Size); err != nil {
+	if err := MatchMeasurement(value, media.StoragePath, media.Size); err != nil {
 		return err
+	}
+	if media.Modified != 0 && value.Modified != media.Modified {
+		return ErrContentMismatch
 	}
 	if media.MediaType == "video" {
 		if value.Image != nil || value.Video == nil {
@@ -63,7 +66,7 @@ func matchVideo(media librarydomain.StoredMedia, value mediadomain.Video) error 
 }
 
 func MatchLQMeasurement(file librarydomain.StoredLQ, value Measurement) error {
-	if err := MatchMeasurement(value, file.StoragePath, file.Hash, file.Size); err != nil {
+	if err := MatchMeasurement(value, file.StoragePath, file.Size); err != nil {
 		return err
 	}
 	info := value.Image

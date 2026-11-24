@@ -36,7 +36,7 @@ func snapshotInTx(ctx context.Context, tx *sql.Tx, comic string, count int) (val
 	rows, err := tx.QueryContext(ctx, `WITH ordered AS (
  SELECT m.id,ROW_NUMBER() OVER(ORDER BY ch.global_order,m.page_number,m.id) AS ordinal
  FROM active_media m JOIN active_chapters ch ON ch.id=m.chapter_id WHERE ch.comic_id=? AND m.media_type='image'
- ) SELECT o.id,o.ordinal,m.relative_path,m.sha256,m.hq_state,COALESCE(l.relative_path,''),COALESCE(l.sha256,''),COALESCE(l.valid,0)
+ ) SELECT o.id,o.ordinal,m.relative_path,CASE WHEN m.hq_state='available' AND m.size=0 AND l.original_state IN ('missing','unbound') THEN 'released' ELSE m.hq_state END,COALESCE(l.relative_path,''),COALESCE(l.valid,0)
  FROM ordered o JOIN active_media m ON m.id=o.id LEFT JOIN image_lq l ON l.media_id=o.id WHERE o.ordinal IN (`+strings.TrimRight(strings.Repeat("?,", len(ordinals)), ",")+`) ORDER BY o.ordinal`, arguments...)
 	if err != nil {
 		return value, err
@@ -44,7 +44,7 @@ func snapshotInTx(ctx context.Context, tx *sql.Tx, comic string, count int) (val
 	for rows.Next() {
 		var choice aidomain.SourceChoice
 
-		if err = rows.Scan(&choice.MediaID, &choice.Ordinal, &choice.HQPath, &choice.HQSHA256, &choice.HQState, &choice.LQPath, &choice.LQSHA256, &choice.LQValid); err != nil {
+		if err = rows.Scan(&choice.MediaID, &choice.Ordinal, &choice.HQPath, &choice.HQState, &choice.LQPath, &choice.LQValid); err != nil {
 			rows.Close()
 			return value, err
 		}

@@ -19,7 +19,6 @@ type Term struct {
 type Sample struct {
 	MediaID     string `json:"mediaId"`
 	Ordinal     int    `json:"ordinal"`
-	SHA256      string `json:"sha256"`
 	Size        int64  `json:"size"`
 	Width       int    `json:"width"`
 	Height      int    `json:"height"`

@@ -3,16 +3,14 @@ package domain
 import (
 	jobsdomain "comicatlas.local/backend/internal/modules/jobs/domain"
 	"comicatlas.local/backend/internal/platform/natural"
-	"crypto/sha256"
-	"encoding/hex"
+	"comicatlas.local/backend/internal/platform/stableid"
 	"sort"
 	"strings"
 )
 
 func ScanReady(complete bool, status string) bool { return complete && status == "succeeded" }
 func CandidateID(source string) string {
-	sum := sha256.Sum256([]byte(source))
-	return "candidate_" + hex.EncodeToString(sum[:16])
+	return "candidate_" + stableid.Hex(source)
 }
 func SortTargets(targets []ScanTarget) {
 	sort.Slice(targets, func(i, j int) bool {

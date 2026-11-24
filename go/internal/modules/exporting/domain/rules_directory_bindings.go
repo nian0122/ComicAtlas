@@ -1,9 +1,8 @@
 package domain
 
 import (
+	librarydomain "comicatlas.local/backend/internal/modules/library/domain"
 	lifecycledomain "comicatlas.local/backend/internal/modules/lifecycle/domain"
-	"crypto/sha256"
-	"encoding/hex"
 	"path"
 	"sort"
 )
@@ -58,7 +57,8 @@ func directoryBindings(value DirectoryInventory, chapters map[string]string) ([]
 		visible := item.State == "active" && states[item.ChapterID] == "active"
 		prefix := "_retained/media/" + directoryKey(item.ID) + "/"
 		primary := "hq"
-		if item.HQState == "released" || item.Hash == "" {
+		availability := librarydomain.OriginalAvailability(item.StoredMedia)
+		if item.HQState == "released" || availability == "missing" || availability == "unbound" {
 			absent[item.StoragePath] = true
 			primary = "lq"
 			if visible && (item.MediaType != "image" || item.LQFile == nil || !item.LQFile.Valid) {
@@ -75,7 +75,7 @@ func directoryBindings(value DirectoryInventory, chapters map[string]string) ([]
 			}
 			return prefix + role + ext, nil
 		}
-		if item.Hash == "" {
+		if availability == "missing" || availability == "unbound" {
 			target, err := targetPath("hq", item.StoragePath)
 			if err != nil {
 				return nil, nil, err
@@ -87,14 +87,14 @@ func directoryBindings(value DirectoryInventory, chapters map[string]string) ([]
 			if err != nil {
 				return nil, nil, err
 			}
-			add(item.ID, item.ChapterID, "hq", target, DirectoryStoredFile{Path: item.StoragePath, Size: item.Size, SHA256: item.Hash}, false, !visible)
+			add(item.ID, item.ChapterID, "hq", target, DirectoryStoredFile{Path: item.StoragePath, Size: item.Size}, false, !visible)
 		}
 		if lq := item.LQFile; lq != nil {
 			target, err := targetPath("lq", lq.StoragePath)
 			if err != nil {
 				return nil, nil, err
 			}
-			add(item.ID, item.ChapterID, "lq", target, DirectoryStoredFile{Path: lq.StoragePath, Size: lq.Size, SHA256: lq.Hash}, !(visible && primary == "lq"), !visible)
+			add(item.ID, item.ChapterID, "lq", target, DirectoryStoredFile{Path: lq.StoragePath, Size: lq.Size}, !(visible && primary == "lq"), !visible)
 		}
 	}
 	if cover := value.Cover; cover != nil {
@@ -135,7 +135,7 @@ func directoryApplyTrash(value DirectoryInventory, bindings []*directoryBinding,
 	covered := map[string]bool{}
 	for _, entry := range value.Trash {
 		resolution, ok := resolved[entry.ID]
-		if !ok || resolution.ComicID != value.Comic.ID || resolution.EntryID != entry.ID || resolution.Manifest.Path != "trash/"+entry.ID+"/manifest.json" || !digest(resolution.Manifest.SHA256) || resolution.Manifest.Size < 1 || resolution.Manifest.Size > lifecycledomain.MaxJournalBytes || resolution.Journal.ID != entry.ID || resolution.Journal.Phase != "trashed" || lifecycledomain.MatchJournalCandidates(resolution.Journal, entry.Candidates) != nil {
+		if !ok || resolution.ComicID != value.Comic.ID || resolution.EntryID != entry.ID || resolution.Manifest.Path != "trash/"+entry.ID+"/manifest.json" || resolution.Manifest.Size < 1 || resolution.Manifest.Size > lifecycledomain.MaxJournalBytes || resolution.Journal.ID != entry.ID || resolution.Journal.Phase != "trashed" || lifecycledomain.MatchJournalCandidates(resolution.Journal, entry.Candidates) != nil {
 			return nil, ErrManifest
 		}
 		state := chapterStates[entry.TargetID]
@@ -150,13 +150,13 @@ func directoryApplyTrash(value DirectoryInventory, bindings []*directoryBinding,
 		delete(resolved, entry.ID)
 		for _, file := range resolution.Journal.Files {
 			binding := sources[file.Source.Path]
-			if binding == nil || !binding.hidden || binding.EntryID != "" || binding.MediaID == "" || entry.TargetType == "chapter" && binding.chapter != entry.TargetID || entry.TargetType == "media" && binding.MediaID != entry.TargetID || file.Source.Size != binding.file.Size || file.Source.SHA256 != binding.file.SHA256 {
+			if binding == nil || !binding.hidden || binding.EntryID != "" || binding.MediaID == "" || entry.TargetType == "chapter" && binding.chapter != entry.TargetID || entry.TargetType == "media" && binding.MediaID != entry.TargetID || file.Source.Size != binding.file.Size {
 				return nil, ErrManifest
 			}
 			binding.EntryID = entry.ID
 			absent[binding.OriginalSource] = true
 			binding.PhysicalSource = lifecycledomain.RetainedPath(entry.ID, file.Source.Path)
-			binding.file = DirectoryStoredFile{Path: binding.PhysicalSource, Size: file.Size, SHA256: file.SHA256}
+			binding.file = DirectoryStoredFile{Path: binding.PhysicalSource, Size: file.Size}
 			binding.Availability = "required"
 			if file.Missing {
 				binding.Availability = "missing"
@@ -169,8 +169,7 @@ func directoryApplyTrash(value DirectoryInventory, bindings []*directoryBinding,
 				continue
 			}
 			source := lifecycledomain.MoveMarkerPath(lifecycledomain.RetainedPath(entry.ID, unit.Path), entry.ID)
-			proof := sha256.Sum256([]byte(unit.Proof))
-			file := DirectoryStoredFile{Path: source, Size: int64(len(unit.Proof)), SHA256: hex.EncodeToString(proof[:])}
+			file := DirectoryStoredFile{Path: source, Size: int64(len(unit.Proof))}
 			bindings = append(bindings, &directoryBinding{DirectoryPlacement: DirectoryPlacement{Role: "trash_move_proof", EntryID: entry.ID, OriginalSource: source, PhysicalSource: source, Target: "_retained/trash/" + entry.ID + "/proofs/" + unit.Path + ".token", Availability: "required"}, file: file})
 		}
 	}
@@ -227,7 +226,7 @@ func directoryBoundPlan(value DirectoryInventory, name string, resolved map[stri
 			roots[root] = true
 		}
 		if binding.Availability != "missing" {
-			plan.Files = append(plan.Files, DirectoryFile{Source: binding.file.Path, Target: binding.Target, Size: binding.file.Size, SHA256: binding.file.SHA256, Optional: binding.Availability == "optional"})
+			plan.Files = append(plan.Files, DirectoryFile{Source: binding.file.Path, Target: binding.Target, Size: binding.file.Size, Optional: binding.Availability == "optional"})
 		}
 		placement := binding.DirectoryPlacement
 		placement.Target = DirectoryOutputPath(plan.Name, placement.Target)

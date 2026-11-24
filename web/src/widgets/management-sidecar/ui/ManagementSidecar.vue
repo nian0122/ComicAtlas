@@ -2,7 +2,8 @@
 import { nextTick, reactive, ref, watch } from 'vue'
 import type { Task } from '@/entities/task'
 import { sidecarStateLabels } from '@/entities/sidecar'
-import { ManagementDialog, ManagementImage, formatDate, taskStatusLabels, taskStageLabel } from '@/shared/ui/management'
+import { ManagementImage, formatDate, taskStatusLabels, taskStageLabel } from '@/shared/ui/management'
+import { AppDialog } from '@/shared/ui/dialog'
 import { useSidecar } from '../model/use-sidecar'
 const props = defineProps<{ comicId: string; taskId: string; writable: boolean }>()
 const emit = defineEmits<{ close: []; accepted: [task: Task]; task: [id: string] }>()
@@ -30,7 +31,7 @@ async function closeResync() {
 }
 </script>
 <template>
-  <ManagementDialog
+  <AppDialog
     :open="true"
     title="侧车同步"
     :busy="w.busy"
@@ -172,7 +173,7 @@ async function closeResync() {
         </button>
       </template>
     </section>
-  </ManagementDialog>
+  </AppDialog>
 </template>
 <style scoped>
 .sidecar-source {

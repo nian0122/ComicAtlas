@@ -111,12 +111,11 @@ func (files *Files) verifyMove(ctx context.Context, name, id string, unit lifecy
 		}
 		return err
 	}
-	if info.Size() != unit.Size {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if info.Size() != unit.Size || info.ModTime().UnixNano() != unit.Modified {
 		return lifecycledomain.ErrChanged
 	}
-	size, proof, err := files.digest(ctx, name)
-	if err == nil && (size != unit.Size || proof != unit.Proof) {
-		return lifecycledomain.ErrChanged
-	}
-	return err
+	return nil
 }

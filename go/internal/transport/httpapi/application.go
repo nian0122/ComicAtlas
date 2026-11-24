@@ -34,35 +34,33 @@ import (
 )
 
 type Application struct {
-	Analysis           *aiapp.Tasks
-	AnalysisJobs       *jobsapp.Engine
-	AnalysisStore      *jobsapp.Store
-	Recovery           *recoveryapp.Service
-	RecoveryRepair     *recoveryapp.Repair
-	Maintenance        *maintenanceapp.Service
-	Sidecars           *storageapp.Sidecars
-	TrashCovers        *lifecycleapp.Covers
-	Lifecycle          *lifecycleapp.Service
-	Metadata           *storageapp.MetadataService
-	Covers             *mediaapp.Covers
-	UploadPublishing   *mediaapp.UploadPublisher
-	Uploads            *mediaapp.UploadService
-	Transcode          *mediaapp.TranscodeService
-	Exports            *exportapp.Service
-	DirectoryPreviews  *exportapp.DirectoryConfirmation
-	DirectoryPreflight *exportapp.DirectoryPreflight
-	DirectoryMoves     *exportapp.DirectoryExecution
-	Scans              *ingestionapp.ScanService
-	HQ                 *mediaapp.HQService
-	Storage            *storageapp.Service
-	Scheduler          *schedulerapp.Manager
-	LQ                 *mediaapp.LQService
-	ToolCapabilities   *mediaapp.Capabilities
-	Library            *libraryapp.Service
-	Jobs               *jobsapp.Engine
-	Directory          *ingestionapp.Directory
-	Reading            *readingapp.Service
-	Settings           *settingsapp.Service
+	Analysis         *aiapp.Tasks
+	AnalysisJobs     *jobsapp.Engine
+	AnalysisStore    *jobsapp.Store
+	Recovery         *recoveryapp.Service
+	RecoveryRepair   *recoveryapp.Repair
+	Maintenance      *maintenanceapp.Service
+	Sidecars         *storageapp.Sidecars
+	TrashCovers      *lifecycleapp.Covers
+	Lifecycle        *lifecycleapp.Service
+	Metadata         *storageapp.MetadataService
+	Covers           *mediaapp.Covers
+	UploadPublishing *mediaapp.UploadPublisher
+	Uploads          *mediaapp.UploadService
+	Transcode        *mediaapp.TranscodeService
+	Exports          *exportapp.Service
+	DirectoryMoves   *exportapp.DirectoryMoves
+	Scans            *ingestionapp.ScanService
+	HQ               *mediaapp.HQService
+	Storage          *storageapp.Service
+	Scheduler        *schedulerapp.Manager
+	LQ               *mediaapp.LQService
+	ToolCapabilities *mediaapp.Capabilities
+	Library          *libraryapp.Service
+	Jobs             *jobsapp.Engine
+	Directory        *ingestionapp.Directory
+	Reading          *readingapp.Service
+	Settings         *settingsapp.Service
 }
 
 func (application *Application) Serve(response http.ResponseWriter, request *http.Request) int {
@@ -288,11 +286,6 @@ func (application *Application) Serve(response http.ResponseWriter, request *htt
 					return fail(response, 503, "UNAVAILABLE", "文件夹移出暂不可用")
 				}
 				err = application.DirectoryMoves.Retry(ctx, resource[1])
-			} else if task.Type == "directory_preflight" {
-				if application.DirectoryPreflight == nil {
-					return fail(response, 503, "UNAVAILABLE", "文件夹移出预检暂不可用")
-				}
-				err = application.DirectoryPreflight.Retry(ctx, resource[1])
 			} else if task.Type == "command_batch" {
 				if application.Maintenance == nil {
 					return fail(response, 503, "UNAVAILABLE", "批量维护暂不可用")
@@ -423,8 +416,8 @@ func applicationError(response http.ResponseWriter, err error) int {
 		return fail(response, 400, "VALIDATION_ERROR", "上传参数或分片范围无效")
 	case errors.Is(err, mediadomain.ErrUploadConflict):
 		return fail(response, 409, "CONFLICT", "上传会话、目标或分片冲突")
-	case errors.Is(err, mediadomain.ErrUploadChecksum):
-		return fail(response, 409, "UPLOAD_CHECKSUM_MISMATCH", "分片摘要与声明或已接收内容不一致")
+	case errors.Is(err, mediadomain.ErrUploadContentChanged):
+		return fail(response, 409, "UPLOAD_CONTENT_MISMATCH", "分片内容与声明长度或已接收字节不一致")
 	case errors.Is(err, mediadomain.ErrUploadExpired):
 		return fail(response, 410, "UPLOAD_EXPIRED", "上传会话已过期")
 	case errors.Is(err, mediadomain.ErrUploadSpace):
@@ -435,6 +428,8 @@ func applicationError(response http.ResponseWriter, err error) int {
 		return fail(response, 404, "NOT_FOUND", "资源不存在")
 	case errors.Is(err, mediadomain.ErrTranscodeLimit), errors.Is(err, exportdomain.ErrValidation), errors.Is(err, storagedomain.ErrValidation), errors.Is(err, librarydomain.ErrInvalidProgress), errors.Is(err, jobsdomain.ErrValidation), errors.Is(err, librarydomain.ErrValidation), errors.Is(err, settingsdomain.ErrValidation), errors.Is(err, mediadomain.ErrLQValidation), errors.Is(err, mediadomain.ErrLQEmpty):
 		return fail(response, 400, "VALIDATION_ERROR", "参数或阅读位置无效")
+	case errors.Is(err, librarydomain.ErrReferenced):
+		return fail(response, 409, "CONFLICT", "词条仍被作品引用，请先解除关联后再删除")
 	case errors.Is(err, storagedomain.ErrConflict), errors.Is(err, exportdomain.ErrConflict), errors.Is(err, exportdomain.ErrSource), errors.Is(err, jobsdomain.ErrConflict), errors.Is(err, librarydomain.ErrConflict), errors.Is(err, settingsdomain.ErrConflict), errors.Is(err, mediadomain.ErrLQConflict):
 		return fail(response, 409, "CONFLICT", "状态、版本、引用或幂等键冲突")
 	case errors.Is(err, jobsdomain.ErrFull), errors.Is(err, jobsdomain.ErrStopped):

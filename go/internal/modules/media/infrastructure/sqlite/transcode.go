@@ -86,8 +86,8 @@ func (repo *repository) TranscodeAdmission(scope mediadomain.TranscodeScope) job
 			if exists != 1 {
 				return mediadomain.ErrLQNotFound
 			}
-			_, err := tx.ExecContext(ctx, `INSERT INTO video_transcode_items(task_id,media_id,position,source_name,source_path,source_sha256,source_size)
-		 SELECT ?,m.id,row_number() OVER(ORDER BY ch.global_order,m.page_number,m.id),m.file_name,m.relative_path,m.sha256,m.size FROM active_media m JOIN active_chapters ch ON ch.id=m.chapter_id WHERE m.media_type='video' AND `+where, append([]any{id}, args...)...)
+			_, err := tx.ExecContext(ctx, `INSERT INTO video_transcode_items(task_id,media_id,position,source_name,source_path,source_modified_ns,source_size)
+		 SELECT ?,m.id,row_number() OVER(ORDER BY ch.global_order,m.page_number,m.id),m.file_name,m.relative_path,m.modified_ns,m.size FROM active_media m JOIN active_chapters ch ON ch.id=m.chapter_id WHERE m.media_type='video' AND `+where, append([]any{id}, args...)...)
 			return err
 		}
 	}
@@ -97,12 +97,12 @@ func (repo *repository) TranscodeBegin(ctx context.Context, id string) error {
 	return err
 }
 
-const transcodeColumns = "media_id,position,status,error_code,source_name,source_path,source_sha256,source_size,output_json"
+const transcodeColumns = "media_id,position,status,error_code,source_name,source_path,source_modified_ns,source_size,output_json"
 
 func scanTranscode(scanner interface{ Scan(...any) error }) (mediadomain.TranscodeItem, error) {
 	var item mediadomain.TranscodeItem
 	var output *string
-	err := scanner.Scan(&item.MediaID, &item.Position, &item.Status, &item.ErrorCode, &item.SourceName, &item.SourcePath, &item.SourceSHA256, &item.SourceSize, &output)
+	err := scanner.Scan(&item.MediaID, &item.Position, &item.Status, &item.ErrorCode, &item.SourceName, &item.SourcePath, &item.SourceModified, &item.SourceSize, &output)
 	if err == nil && output != nil {
 		var record mediadomain.TranscodeRecord
 		err = json.Unmarshal([]byte(*output), &record)
@@ -166,7 +166,7 @@ func (repo *repository) TranscodeCommit(ctx context.Context, id string, item med
 	if err != nil {
 		return err
 	}
-	result, err := tx.ExecContext(ctx, `UPDATE media SET relative_path=?,file_name=?,content_type='video/mp4',size=?,sha256=?,width=?,height=?,video_metadata=? WHERE id=? AND media_type='video' AND hq_state='available' AND relative_path=? AND sha256=? AND size=? AND EXISTS(SELECT 1 FROM tasks WHERE id=? AND status='running') AND EXISTS(SELECT 1 FROM video_transcode_items WHERE task_id=? AND media_id=media.id AND status='prepared' AND output_json=?)`, item.Output.Path, mediadomain.TranscodedName(item.SourceName), item.Output.Size, item.Output.SHA256, item.Output.Video.Width, item.Output.Video.Height, string(video), item.MediaID, item.SourcePath, item.SourceSHA256, item.SourceSize, id, id, mustTranscodeJSON(*item.Output))
+	result, err := tx.ExecContext(ctx, `UPDATE media SET relative_path=?,file_name=?,content_type='video/mp4',size=?,width=?,height=?,video_metadata=?,modified_ns=? WHERE id=? AND media_type='video' AND hq_state='available' AND relative_path=? AND modified_ns=? AND size=? AND EXISTS(SELECT 1 FROM tasks WHERE id=? AND status='running') AND EXISTS(SELECT 1 FROM video_transcode_items WHERE task_id=? AND media_id=media.id AND status='prepared' AND output_json=?)`, item.Output.Path, mediadomain.TranscodedName(item.SourceName), item.Output.Size, item.Output.Video.Width, item.Output.Video.Height, string(video), item.Output.Modified, item.MediaID, item.SourcePath, item.SourceModified, item.SourceSize, id, id, mustTranscodeJSON(*item.Output))
 	if err = transcodeUpdated(result, err); err != nil {
 		return err
 	}
@@ -181,7 +181,7 @@ func mustTranscodeJSON(record mediadomain.TranscodeRecord) string {
 	return string(data)
 }
 func (repo *repository) TranscodeSkip(ctx context.Context, id string, item mediadomain.TranscodeItem) error {
-	result, err := repo.database.Writer.ExecContext(ctx, `UPDATE video_transcode_items SET status='skipped',error_code=NULL WHERE task_id=? AND media_id=? AND status='pending' AND EXISTS(SELECT 1 FROM active_media AS media WHERE id=? AND relative_path=? AND sha256=? AND size=? AND hq_state='available') AND EXISTS(SELECT 1 FROM tasks WHERE id=? AND status='running')`, id, item.MediaID, item.MediaID, item.SourcePath, item.SourceSHA256, item.SourceSize, id)
+	result, err := repo.database.Writer.ExecContext(ctx, `UPDATE video_transcode_items SET status='skipped',error_code=NULL WHERE task_id=? AND media_id=? AND status='pending' AND EXISTS(SELECT 1 FROM active_media AS media WHERE id=? AND relative_path=? AND modified_ns=? AND size=? AND hq_state='available') AND EXISTS(SELECT 1 FROM tasks WHERE id=? AND status='running')`, id, item.MediaID, item.MediaID, item.SourcePath, item.SourceModified, item.SourceSize, id)
 	return transcodeUpdated(result, err)
 }
 func (repo *repository) TranscodeFail(ctx context.Context, id string, item mediadomain.TranscodeItem, code string) error {

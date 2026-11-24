@@ -3,8 +3,6 @@ package filesystem
 import (
 	"context"
 	"crypto/rand"
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"image"
@@ -135,7 +133,7 @@ func (preparer *Preparer) prepareImage(ctx context.Context, set *sampleSet, sour
 		if err := set.root.Mkdir("render", 0700); err != nil {
 			return empty, "", aidomain.ErrPreparation
 		}
-		artifact, err := preparer.images.Render(ctx, mediadomain.ImageRequest{SourcePath: filepath.Join(set.base.Name(), filepath.FromSlash(source.Path)), SourceSHA256: source.SHA256, WorkRoot: filepath.Join(set.root.Name(), "render"), Spec: spec})
+		artifact, err := preparer.images.Render(ctx, mediadomain.ImageRequest{SourcePath: filepath.Join(set.base.Name(), filepath.FromSlash(source.Path)), WorkRoot: filepath.Join(set.root.Name(), "render"), Spec: spec})
 		if err != nil {
 			if ctx.Err() != nil {
 				return empty, "", ctx.Err()
@@ -189,15 +187,14 @@ func inspect(ctx context.Context, root *os.Root, name string, source aidomain.So
 	if _, err = file.Seek(0, io.SeekStart); err != nil {
 		return value, false, aidomain.ErrPreparation
 	}
-	digest := sha256.New()
-	count, err := io.CopyBuffer(digest, io.LimitReader(contextReader{ctx: ctx, reader: file}, aidomain.MaxPageBytes+1), make([]byte, 64<<10))
+	count, err := io.CopyBuffer(io.Discard, io.LimitReader(contextReader{ctx: ctx, reader: file}, aidomain.MaxPageBytes+1), make([]byte, 64<<10))
 	if err != nil {
 		return value, false, err
 	}
 	if count != info.Size() || count > aidomain.MaxPageBytes {
 		return value, false, aidomain.ErrPreparation
 	}
-	return aidomain.Sample{MediaID: source.MediaID, Ordinal: source.Ordinal, SHA256: hex.EncodeToString(digest.Sum(nil)), Size: count, Width: header.Width, Height: header.Height, ContentType: "image/webp"}, false, nil
+	return aidomain.Sample{MediaID: source.MediaID, Ordinal: source.Ordinal, Size: count, Width: header.Width, Height: header.Height, ContentType: "image/webp"}, false, nil
 }
 
 func directory(root *os.Root, name string) error {

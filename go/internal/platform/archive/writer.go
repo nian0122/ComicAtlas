@@ -2,8 +2,6 @@ package archive
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"hash/crc32"
 	"io"
@@ -72,7 +70,7 @@ func writeArchive(ctx context.Context, parent *os.Root, directory string, option
 	records := make([]writeRecord, 0, len(entries))
 	buffer := make([]byte, 256<<10)
 	for _, entry := range entries {
-		record := writeRecord{name: entry.Name, size: uint64(entry.Size), sourceSHA: entry.SHA256, force64: force64, directory: entry.Directory}
+		record := writeRecord{name: entry.Name, size: uint64(entry.Size), force64: force64, directory: entry.Directory}
 		header := record.local()
 		if err = segments.reserve(len(header)); err != nil {
 			return nil, err
@@ -135,12 +133,12 @@ func copyEntry(ctx context.Context, destination io.Writer, entry WriteEntry, buf
 		return 0, io.ErrUnexpectedEOF
 	}
 	defer func() { err = errors.Join(err, reader.Close()) }()
-	hash, crc := sha256.New(), crc32.NewIEEE()
-	written, err := io.CopyBuffer(io.MultiWriter(destination, hash, crc), io.LimitReader(checkedReader{ctx, reader}, entry.Size+1), buffer)
+	crc := crc32.NewIEEE()
+	written, err := io.CopyBuffer(io.MultiWriter(destination, crc), io.LimitReader(checkedReader{ctx, reader}, entry.Size+1), buffer)
 	if err != nil {
 		return 0, err
 	}
-	if written != entry.Size || hex.EncodeToString(hash.Sum(nil)) != entry.SHA256 {
+	if written != entry.Size {
 		return 0, ErrSourceChanged
 	}
 	return crc.Sum32(), ctx.Err()

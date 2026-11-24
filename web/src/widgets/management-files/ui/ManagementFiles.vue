@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import { ManagementIcon, ManagementImage } from '@/shared/ui/management'
+import ManagementVideoSample from './ManagementVideoSample.vue'
 import type { FileRow } from '../model/types'
 const props = defineProps<{
   rows: FileRow[]
@@ -128,16 +129,31 @@ function activate(row: FileRow) {
           @failed="imageFailed(row.id, 'cover')"
           @ready="imageReady(row.id, 'cover')"
         />
+        <ManagementVideoSample
+          v-else-if="row.kind === 'video' && mode === 'grid'"
+          :key="row.videoSource"
+          :source="row.videoSource"
+        />
+        <ManagementIcon v-else-if="row.kind === 'video'" name="video" :size="24" />
         <span v-else class="mw-no-preview"
-          ><ManagementIcon :name="icons[row.kind]" :size="32" /><small>{{
-            row.kind === 'video' ? '视频' : '暂无预览'
-          }}</small></span
+          ><ManagementIcon :name="icons[row.kind]" :size="32" /><small>暂无预览</small></span
         >
-        <span v-if="row.kind === 'video'" class="mw-media-badge"><ManagementIcon name="video" :size="14" />播放</span>
       </button>
       <div class="mw-file-caption">
         <div class="mw-file-copy">
-          <button class="mw-file-title" @click="activate(row)">{{ row.title }}</button><small>{{ row.subtitle }}</small>
+          <button
+            class="mw-file-title"
+            :class="{ 'mw-video-title': row.kind === 'video' }"
+            :title="row.title"
+            :aria-label="row.title"
+            @click="activate(row)"
+          >
+            <template v-if="row.kind === 'video'"
+              ><span>{{ row.title.slice(0, -8) }}</span
+              ><span>{{ row.title.slice(-8) }}</span></template
+            >
+            <template v-else>{{ row.title }}</template></button
+          ><small>{{ row.subtitle }}</small>
           <button
             v-if="failedImages.has(row.id)"
             class="mw-button mw-image-retry"

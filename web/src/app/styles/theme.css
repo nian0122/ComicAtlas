@@ -15,7 +15,9 @@
   --atlas-selected: #222222;
   --atlas-error: #f1a8aa;
   --atlas-warning: #e8bc80;
+  --atlas-success: #9ed7b0;
   --atlas-error-surface: #281416;
+  --atlas-success-surface: #102019;
   --atlas-shadow: #00000066;
   --atlas-backdrop: #000b;
   --atlas-font: 'Microsoft YaHei UI', 'PingFang SC', sans-serif;

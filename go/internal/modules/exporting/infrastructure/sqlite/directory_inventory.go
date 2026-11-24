@@ -28,7 +28,7 @@ func (repo *repository) DirectoryInventories(ctx context.Context, ids []string) 
 		if err != nil {
 			return nil, err
 		}
-		stamp, size, err := exportdomain.DirectoryInventoryStamp(value)
+		size, err := exportdomain.DirectoryInventorySize(value)
 		if err != nil {
 			return nil, err
 		}
@@ -40,7 +40,7 @@ func (repo *repository) DirectoryInventories(ctx context.Context, ids []string) 
 		if err = tx.QueryRowContext(ctx, "SELECT revision FROM comic_change_versions WHERE comic_id=?", id).Scan(&revision); err != nil {
 			return nil, err
 		}
-		items = append(items, exportdomain.DirectoryInventorySnapshot{Inventory: value, SHA256: stamp, CanonicalBytes: size, MutationVersion: revision})
+		items = append(items, exportdomain.DirectoryInventorySnapshot{Inventory: value, CanonicalBytes: size, MutationVersion: revision})
 	}
 	if err = tx.Commit(); err != nil {
 		return nil, err

@@ -23,5 +23,15 @@ func LoadDirectories(getenv func(string) string) (Directories, error) {
 		}
 		*item.target = absolute
 	}
+	// 导出根默认与媒体根相同，正式部署可把它设为媒体根外的持久卷目录；
+	// 导出产物仍使用根内 exports/ 路径，发布要求与媒体根同一文件系统。
+	result.Export = result.Media
+	if value := strings.TrimSpace(getenv("COMICATLAS_EXPORT_DIR")); value != "" {
+		absolute, err := filepath.Abs(value)
+		if err != nil {
+			return Directories{}, fmt.Errorf("解析 EXPORT_DIR 失败")
+		}
+		result.Export = absolute
+	}
 	return result, nil
 }

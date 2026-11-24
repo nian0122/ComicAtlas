@@ -2,8 +2,8 @@ package domain
 
 import "math"
 
-func ValidateRepairProof(run RepairRun, attempt int, hash string) error {
-	if !Key(run.TaskID) || attempt < 1 || !validHash(hash) || run.Completed {
+func ValidateRepairProof(run RepairRun, attempt int) error {
+	if !Key(run.TaskID) || attempt < 1 || run.Completed {
 		return ErrValidation
 	}
 	return ValidateRepairRequest(run.ComicID, RepairRequest{Version: run.ExpectedVersion, StructureVersion: run.ExpectedStructureVersion})

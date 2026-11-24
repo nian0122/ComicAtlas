@@ -17,10 +17,6 @@ func UploadID(value, prefix string) bool {
 	_, err := hex.DecodeString(strings.TrimPrefix(value, prefix))
 	return err == nil && strings.ToLower(value) == value
 }
-func UploadDigest(value string) bool {
-	decoded, err := hex.DecodeString(value)
-	return err == nil && len(decoded) == 32 && strings.ToLower(value) == value
-}
 func UploadName(name string) bool {
 	if name == "" || len(name) > 255 || !utf8.ValidString(name) || strings.TrimSpace(name) != name || strings.HasSuffix(name, ".") || strings.ContainsAny(name, "/\\:<>\"|?*") {
 		return false
@@ -44,8 +40,7 @@ func NormalizeUpload(request UploadRequest) (UploadRequest, int64, error) {
 	names := map[string]bool{}
 	var total int64
 	for index, file := range request.Files {
-		file.SHA256 = strings.ToLower(file.SHA256)
-		if !UploadName(file.Name) || !UploadDigest(file.SHA256) || file.Size < 1 || file.Size > MaxUploadFileBytes || total > MaxUploadSessionBytes-file.Size {
+		if !UploadName(file.Name) || file.Size < 1 || file.Size > MaxUploadFileBytes || total > MaxUploadSessionBytes-file.Size {
 			return request, 0, ErrUploadValidation
 		}
 		key := strings.ToLower(file.Name)
@@ -148,7 +143,7 @@ func UploadCapacity(existing, reserved, requested int, replace bool) error {
 	return nil
 }
 func ValidateUploadPart(part UploadPart, size int64) error {
-	if size < 1 || size > MaxUploadFileBytes || part.Part < 0 || int64(part.Part) >= (size+UploadChunkBytes-1)/UploadChunkBytes || part.Size != min(UploadChunkBytes, size-int64(part.Part)*UploadChunkBytes) || !UploadDigest(part.SHA256) {
+	if size < 1 || size > MaxUploadFileBytes || part.Part < 0 || int64(part.Part) >= (size+UploadChunkBytes-1)/UploadChunkBytes || part.Size != min(UploadChunkBytes, size-int64(part.Part)*UploadChunkBytes) {
 		return ErrUploadValidation
 	}
 	return nil

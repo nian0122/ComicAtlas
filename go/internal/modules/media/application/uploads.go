@@ -3,11 +3,11 @@ package application
 import (
 	"context"
 	"crypto/rand"
-	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"hash/fnv"
 	"io"
 	"sync"
 	"time"
@@ -38,8 +38,9 @@ func uploadID(prefix string) (string, error) {
 }
 func uploadNow() string { return time.Now().UTC().Format("2006-01-02T15:04:05.000000000Z") }
 func (service *UploadService) lockSlot(id string) *sync.RWMutex {
-	hash := sha256.Sum256([]byte(id))
-	return service.locks[int(hash[0])%len(service.locks)]
+	hash := fnv.New32a()
+	_, _ = hash.Write([]byte(id))
+	return service.locks[int(hash.Sum32())%len(service.locks)]
 }
 func waitLock(ctx context.Context, try func() bool) error {
 	for {
@@ -89,18 +90,17 @@ func (service *UploadService) Create(ctx context.Context, request mediadomain.Up
 		if err != nil {
 			return value, err
 		}
-		value.Files = append(value.Files, mediadomain.UploadFile{ID: fileID, Name: file.Name, Size: file.Size, SHA256: file.SHA256})
+		value.Files = append(value.Files, mediadomain.UploadFile{ID: fileID, Name: file.Name, Size: file.Size})
 	}
 	data, err := json.Marshal(request)
 	if err != nil {
 		return value, err
 	}
-	digest := sha256.Sum256(data)
 	space, err := service.files.UploadSpace(ctx)
 	if err != nil {
 		return value, err
 	}
-	id, err = service.repository.CreateUpload(ctx, value, key, hex.EncodeToString(digest[:]), space, service.limits)
+	id, err = service.repository.CreateUpload(ctx, value, key, string(data), space, service.limits)
 	if err != nil {
 		return value, err
 	}

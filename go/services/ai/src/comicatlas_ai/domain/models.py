@@ -21,7 +21,6 @@ class Term:
 class Sample:
     media_id: str
     ordinal: int
-    sha256: str
     size: int
     width: int
     height: int

@@ -3,8 +3,16 @@ package httpapi
 import (
 	jobsdomain "comicatlas.local/backend/internal/modules/jobs/domain"
 	maintenancedomain "comicatlas.local/backend/internal/modules/maintenance/domain"
+	"errors"
 	"net/http"
 )
+
+func batchPreviewFailure(response http.ResponseWriter, err error) int {
+	if errors.Is(err, jobsdomain.ErrNotFound) {
+		return fail(response, 404, "NOT_FOUND", "批量预览不存在或已过期，请重新创建预览")
+	}
+	return applicationError(response, err)
+}
 
 func (application *Application) serveBatches(response http.ResponseWriter, request *http.Request, resource []string) (int, bool) {
 	create := len(resource) == 1 && resource[0] == "batch-previews"
@@ -66,7 +74,7 @@ func (application *Application) serveBatches(response http.ResponseWriter, reque
 		}
 		task, err := application.Maintenance.Confirm(ctx, id, request.Header.Get("Idempotency-Key"), body)
 		if err != nil {
-			return applicationError(response, err), true
+			return batchPreviewFailure(response, err), true
 		}
 		application.Jobs.Wake()
 		response.Header().Set("Location", "/api/v1/tasks/"+task.ID)
@@ -80,14 +88,14 @@ func (application *Application) serveBatches(response http.ResponseWriter, reque
 		}
 		value, err := application.Maintenance.Items(ctx, id, page, size)
 		if err != nil {
-			return applicationError(response, err), true
+			return batchPreviewFailure(response, err), true
 		}
 		writeData(response, value)
 		return 200, true
 	}
 	value, err := application.Maintenance.Get(ctx, id)
 	if err != nil {
-		return applicationError(response, err), true
+		return batchPreviewFailure(response, err), true
 	}
 	writeData(response, value)
 	return 200, true

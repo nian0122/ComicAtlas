@@ -14,7 +14,7 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
-const entriesDDL = "CREATE TABLE backup_entries(path TEXT PRIMARY KEY NOT NULL COLLATE BINARY,kind TEXT NOT NULL,size INTEGER NOT NULL,sha256 TEXT NOT NULL,modified_at TEXT NOT NULL) WITHOUT ROWID"
+const entriesDDL = "CREATE TABLE backup_entries(path TEXT PRIMARY KEY NOT NULL COLLATE BINARY,kind TEXT NOT NULL,size INTEGER NOT NULL,modified_at TEXT NOT NULL) WITHOUT ROWID"
 const infoDDL = "CREATE TABLE backup_info(format TEXT NOT NULL,version INTEGER NOT NULL)"
 
 type Catalogs struct{}

@@ -15,7 +15,6 @@ export interface AnalysisResult {
     samples: {
       mediaId: string
       ordinal: number
-      sha256: string
       size: number
       width: number
       height: number

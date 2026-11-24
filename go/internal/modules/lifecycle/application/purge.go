@@ -31,7 +31,7 @@ func (service *Service) PurgeGuarded(ctx context.Context, id, stamp string, days
 	if err != nil {
 		return jobsdomain.Task{}, err
 	}
-	request := lifecycledomain.Request{Operation: "purge", EntryID: id, Confirmation: stamp}
+	request := lifecycledomain.Request{Operation: "purge", EntryID: id, Confirmation: stamp, Stamp: stamp}
 	data, err := json.Marshal(request)
 	if err != nil {
 		return jobsdomain.Task{}, err
@@ -58,7 +58,7 @@ func (service *Service) PreviewPurge(ctx context.Context, id string) (lifecycled
 	}
 	preview.Token = hex.EncodeToString(token[:])
 	preview.ExpiresAt = now.Add(lifecycledomain.ConfirmationLifetime).Format(jobsdomain.TimestampFormat)
-	digest, _ := lifecycledomain.ConfirmationHash(preview.Token)
+	digest, _ := lifecycledomain.ConfirmationToken(preview.Token)
 	if err = service.repository.ConfirmPurge(ctx, scope, service.retentionDays, digest, preview.ExpiresAt); err != nil {
 		return lifecycledomain.PurgePreview{}, err
 	}
@@ -69,7 +69,7 @@ func (service *Service) Purge(ctx context.Context, id, token, key string) (jobsd
 	if !lifecycledomain.ValidJournalID(id) {
 		return jobsdomain.Task{}, lifecycledomain.ErrValidation
 	}
-	digest, err := lifecycledomain.ConfirmationHash(token)
+	digest, err := lifecycledomain.ConfirmationToken(token)
 	if err != nil {
 		return jobsdomain.Task{}, err
 	}

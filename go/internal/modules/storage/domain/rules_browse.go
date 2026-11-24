@@ -46,7 +46,7 @@ func ValidateBrowse(kind, id string, query BrowseQuery) error {
 	}
 	switch query.Attention {
 	case "":
-	case "missing_lq", "can_release", "missing_source_sha256":
+	case "missing_lq", "can_release":
 		if kind != "comic" {
 			return ErrValidation
 		}

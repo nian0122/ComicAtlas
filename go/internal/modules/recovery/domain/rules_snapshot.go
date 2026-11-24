@@ -87,7 +87,7 @@ func validateSnapshot(comic string, value librarydomain.Snapshot) error {
 	paths := map[string]bool{}
 	pages := map[string]map[int]bool{}
 	for _, media := range value.Media {
-		if !Key(media.ID) || ids[media.ID] || !chapters[media.ChapterID] || media.PageNumber < 1 || !librarydomain.ValidName(media.FileName, 255) || strings.ContainsAny(media.FileName, "/\\:") || (!validHash(media.Hash) && (media.Hash != "" || librarydomain.OriginalAvailability(media) == "unknown")) || media.Size < 0 || media.Size > 20<<30 || !sourcePath(media.StoragePath, "hq/"+comic) {
+		if !Key(media.ID) || ids[media.ID] || !chapters[media.ChapterID] || media.PageNumber < 1 || !librarydomain.ValidName(media.FileName, 255) || strings.ContainsAny(media.FileName, "/\\:") || media.Size < 0 || media.Size > 20<<30 || !sourcePath(media.StoragePath, "hq/"+comic) {
 			return ErrMetadata
 		}
 		if media.MediaType != "image" && media.MediaType != "video" || media.HQState != "available" && media.HQState != "released" || media.HQState == "released" && media.MediaType != "image" {
@@ -116,7 +116,7 @@ func validateSnapshot(comic string, value librarydomain.Snapshot) error {
 		pages[media.ChapterID][media.PageNumber] = true
 		paths[strings.ToLower(media.StoragePath)] = true
 		if lq := media.LQFile; lq != nil {
-			if media.MediaType != "image" || lq.MediaID != media.ID || (lq.TaskID == "" && (lq.Provenance == nil || lq.Provenance.Origin != "imported")) || lq.TaskID != "" && !Key(lq.TaskID) || mediadomain.ValidateLQProvenance(lq.Provenance, lq.TaskID) != nil || !sourcePath(lq.StoragePath, "lq") || !validHash(lq.Hash) || lq.Size < 0 || lq.Size > 20<<30 || lq.Width < 1 || lq.Height < 1 {
+			if media.MediaType != "image" || lq.MediaID != media.ID || (lq.TaskID == "" && (lq.Provenance == nil || lq.Provenance.Origin != "imported")) || lq.TaskID != "" && !Key(lq.TaskID) || mediadomain.ValidateLQProvenance(lq.Provenance, lq.TaskID) != nil || !sourcePath(lq.StoragePath, "lq") || lq.Size < 0 || lq.Size > 20<<30 || lq.Width < 1 || lq.Height < 1 {
 				return ErrMetadata
 			}
 		}

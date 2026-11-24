@@ -3,7 +3,7 @@ package domain
 type AuditEntry struct {
 	Entry       Entry
 	Candidates  []FileCandidate
-	PlanHash    string
+	PlanStamp   string
 	ObjectState string
 }
 
@@ -25,6 +25,7 @@ type JournalObservation struct {
 }
 
 type FileObservation struct {
+	DirectoryMember  bool   `json:"-"`
 	Position         int    `json:"position"`
 	EntryID          string `json:"entryId"`
 	Role             string `json:"role"`

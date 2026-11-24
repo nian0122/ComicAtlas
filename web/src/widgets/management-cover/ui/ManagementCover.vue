@@ -3,7 +3,8 @@ import { ref, watch, onBeforeUnmount } from 'vue'
 import { comicApi, type CoverSelection } from '@/entities/comic'
 import { selectComicCover } from '@/features/manage-cover'
 import { getApiErrorMessage, ApiError } from '@/shared/api/http'
-import { ManagementDialog, ManagementImage } from '@/shared/ui/management'
+import { ManagementImage } from '@/shared/ui/management'
+import { AppDialog } from '@/shared/ui/dialog'
 const props = defineProps<{
   open: boolean
   comicId: string
@@ -73,7 +74,7 @@ async function save() {
 }
 </script>
 <template>
-  <ManagementDialog :open="open" title="设置漫画封面" :busy="saving" @close="emit('close')">
+  <AppDialog :open="open" title="设置漫画封面" :busy="saving" @close="emit('close')">
     <div class="cover-choice">
       <div class="cover-choice-preview"><ManagementImage :src="previewUrl" :alt="title" /></div>
       <div>
@@ -95,7 +96,7 @@ async function save() {
         {{ saving ? '正在保存…' : '设为封面' }}
       </button>
     </footer>
-  </ManagementDialog>
+  </AppDialog>
 </template>
 <style scoped>
 .cover-choice {

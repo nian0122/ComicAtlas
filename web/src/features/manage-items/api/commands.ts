@@ -51,6 +51,17 @@ export interface BatchItem {
   dependencies?: number[]
   hq?: HqReleasePreview
 }
+export interface StructureNodeResult {
+  version: number
+  node: {
+    type: 'catalog' | 'chapter'
+    id: string
+    parentId: string | null
+    title: string
+    sortOrder: number
+    globalOrder: number | null
+  }
+}
 export type BatchOperation = 'image_lq' | 'metadata_refresh' | 'video_transcode' | 'comic_trash' | 'hq_release'
 export type TrashOperation = 'trash_restore' | 'trash_purge'
 export interface TargetFilter {
@@ -125,10 +136,13 @@ export const managementCommands = {
     id: string | null,
     body: { version: number; title: string; parentId: string | null },
   ) =>
-    request(`/comics/${encodeURIComponent(comic)}/${kind}${id ? '/' + encodeURIComponent(id) : ''}`, {
-      method: id ? 'PUT' : 'POST',
-      body,
-    }),
+    request<StructureNodeResult>(
+      `/comics/${encodeURIComponent(comic)}/${kind}${id ? '/' + encodeURIComponent(id) : ''}`,
+      {
+        method: id ? 'PUT' : 'POST',
+        body,
+      },
+    ),
   mediaOrder: (chapter: string, version: number, ids: string[]) =>
     request(`/chapters/${encodeURIComponent(chapter)}/media/order`, { method: 'PUT', body: { version, ids } }),
   structureOrder: (
