@@ -17,10 +17,19 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           persist-credentials: false
-      - name: 校验部署配置
-        env:
-          COMICATLAS_STORAGE_ROOT: /tmp/comicatlas-release
-        run: docker compose --profile ai config --quiet
+      - name: 校验启动脚本
+        shell: bash
+        run: |
+          sh -n start.sh
+          test -x start.sh
+          sh start.sh --prepare-only
+      - name: 校验 PowerShell 启动脚本
+        shell: pwsh
+        run: |
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile((Join-Path (Get-Location) 'start.ps1'), [ref]$tokens, [ref]$errors) | Out-Null
+          if ($errors.Count) { throw $errors[0].Message }
       - name: 构建发布源码镜像
         shell: bash
         run: |
