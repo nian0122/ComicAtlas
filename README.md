@@ -177,6 +177,8 @@ rm -rf storage
 - [OpenAPI 定义](go/docs/openapi.json)
 - 问题反馈请提交 [Issues](https://github.com/nian0122/ComicAtlas/issues)。这是个人项目，不承诺响应时间。
 
-## 版权与许可
+## 许可证
 
-本仓库为个人项目，未采用开源许可证，默认保留所有权利。允许下载并部署用于个人自用；未经作者书面许可，不得再分发、商用或对外提供托管服务。源码构建过程中下载的第三方组件遵循各自许可证。
+本项目采用 [MIT 许可证](LICENSE)。Copyright (c) 2026 nian0122。
+
+构建过程中下载的第三方组件（如 FFmpeg、x264、libjpeg-turbo、libwebp）遵循各自许可证；分发构建产物时需要同时遵守对应组件的许可条件。
